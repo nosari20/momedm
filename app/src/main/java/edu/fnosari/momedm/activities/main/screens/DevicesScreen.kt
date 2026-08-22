@@ -44,7 +44,10 @@ fun DevicesScreen(navController: NavHostController, viewModel: ControllerViewMod
             LazyColumn { items(devices, key = { it.deviceId }) { d ->
                 Surface(onClick = { navController.navigate(Routes.device(d.deviceId)) }, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column { Text(d.model, style = MaterialTheme.typography.bodyLarge); Text(d.deviceId, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        Column {
+                            Text(d.nickname ?: d.model, style = MaterialTheme.typography.bodyLarge)
+                            Text(if (d.nickname != null) d.model else d.deviceId, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         Text(stringResource(if (d.deviceId in online) R.string.devices_online else R.string.devices_offline),
                             color = if (d.deviceId in online) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                     }

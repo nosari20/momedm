@@ -14,11 +14,14 @@ import edu.fnosari.momedm.persistence.DeviceRegistry
 import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.CmdType
+import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Controller UI state: registry, online set, advertising flag, command results; owns the provisioning controller. */
@@ -39,6 +42,7 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     private val _appsFor = MutableStateFlow<Pair<String, List<AppInfo>?>?>(null)
     /** (deviceId, apps) while the picker is open; apps == null while loading. */
     val appsFor: StateFlow<Pair<String, List<AppInfo>?>?> = _appsFor
+    val pinSet: StateFlow<Boolean> = prefs.pinSet.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     init {
         val app = application
@@ -64,13 +68,27 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
 
     /** Returns the sent command's id, or null if [deviceId] has no authenticated session (offline). */
     private fun send(deviceId: String, type: CmdType, pkg: String? = null): String? {
-        val app = getApplication<Application>()
         val id = ControllerLink.sendCommand(deviceId, type, pkg)
         Log.d(LOG_TAG, "send $type -> $deviceId: ${if (id == null) "offline" else "sent (id=$id)"}")
-        viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.device_offline_msg) else app.getString(R.string.device_sent)) }
+        announce(id)
         return id
     }
-    fun kioskOn(deviceId: String, pkg: String) { _appsFor.value = null; send(deviceId, CmdType.KIOSK_ON, pkg) }
+    fun kioskOn(deviceId: String, apps: List<String>, pinned: String?) {
+        _appsFor.value = null
+        val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.KIOSK_ON, apps = apps, pinned = pinned) }
+        announce(id)
+    }
+    /** Re-locks a paused child by re-sending its current config. */
+    fun relock(deviceId: String) {
+        val s = registry.get(deviceId)?.lastStatus ?: return
+        if (s.kioskApps.isEmpty()) return
+        announce(ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.KIOSK_ON, apps = s.kioskApps, pinned = s.kioskPkg) })
+    }
+    fun rename(deviceId: String, nickname: String?) { viewModelScope.launch { registry.rename(deviceId, nickname) } }
+    /** Stores the PIN (hashed) and pushes it to online children. False when [pin] is invalid. */
+    suspend fun setPin(pin: String): Boolean = prefs.setPin(pin).also { if (it) ControllerLink.prefsChanged.tryEmit(Unit) }
+    fun clearPin() { viewModelScope.launch { prefs.clearPin(); ControllerLink.prefsChanged.tryEmit(Unit) } }
+
     fun kioskOff(deviceId: String) { send(deviceId, CmdType.KIOSK_OFF) }
     fun install(deviceId: String, pkg: String) { send(deviceId, CmdType.INSTALL, pkg) }
     fun addAccount(deviceId: String) { send(deviceId, CmdType.ADD_ACCOUNT) }
@@ -81,4 +99,9 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         if (send(deviceId, CmdType.LIST_APPS) == null) _appsFor.value = null
     }
     fun clearApps() { _appsFor.value = null }
+
+    private fun announce(id: String?) {
+        val app = getApplication<Application>()
+        viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.device_offline_msg) else app.getString(R.string.device_sent)) }
+    }
 }

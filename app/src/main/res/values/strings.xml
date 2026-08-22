@@ -84,8 +84,8 @@
     <string name="device_battery">Battery</string>
     <string name="device_current">Current app</string>
     <string name="device_last_seen">Last seen</string>
-    <string name="device_kiosk_on">Kiosk ON…</string>
-    <string name="device_kiosk_off">Kiosk OFF</string>
+    <string name="device_kiosk_on">Child mode: choose apps…</string>
+    <string name="device_kiosk_off">Turn child mode off</string>
     <string name="device_install">Install from Play</string>
     <string name="device_install_hint">Package name (e.g. org.mozilla.firefox)</string>
     <string name="device_add_account">Add Google account</string>
@@ -93,9 +93,23 @@
     <string name="device_offline_msg">Device is offline</string>
     <string name="device_sent">Command sent</string>
     <string name="device_result">%1$s: %2$s</string>
-    <string name="apps_title">Choose kiosk app</string>
+    <string name="device_allowed_apps">Allowed apps</string>
+    <string name="device_allowed_count">%1$d allowed</string>
+    <string name="device_choose_apps">Choose apps…</string>
+    <string name="device_pinned">Single app</string>
+    <string name="device_paused">Paused until %1$s</string>
+    <string name="device_relock">Lock again</string>
+    <string name="device_rename">Rename</string>
+    <string name="device_rename_hint">Name (e.g. Léa\'s tablet)</string>
+    <string name="device_mode_on">Child mode ON</string>
+    <string name="device_mode_off">Child mode OFF</string>
+    <string name="apps_title">Allowed apps</string>
     <string name="apps_loading">Fetching apps…</string>
     <string name="apps_cancel">Cancel</string>
+    <string name="apps_pin_one">Pin a single app</string>
+    <string name="apps_pin_none">None</string>
+    <string name="apps_confirm">Activate</string>
+    <string name="apps_search">Search</string>
     <string name="provision_title">Provision a device</string>
     <string name="provision_mode">Wi-Fi source</string>
     <string name="provision_mode_hotspot">Hotspot (auto)</string>
@@ -118,4 +132,17 @@
     <string name="settings_controller_regenerate">Regenerate secret</string>
     <string name="settings_controller_regenerate_warning">All devices provisioned with the current secret will stop authenticating until re-provisioned. Continue?</string>
     <string name="settings_controller_regenerated">Secret regenerated</string>
+
+    <!-- Settings: Parent PIN -->
+    <string name="settings_pin_title">Parent PIN</string>
+    <string name="settings_pin_set">Set PIN</string>
+    <string name="settings_pin_change">Change PIN</string>
+    <string name="settings_pin_clear">Remove PIN</string>
+    <string name="settings_pin_status_set">A PIN is set. It unlocks a child device for 10 minutes.</string>
+    <string name="settings_pin_status_unset">No PIN yet. Without it, child mode can only be ended from this phone.</string>
+    <string name="settings_pin_hint">4–6 digits</string>
+    <string name="settings_pin_confirm_hint">Confirm PIN</string>
+    <string name="settings_pin_mismatch">PINs do not match</string>
+    <string name="settings_pin_invalid">Use 4 to 6 digits</string>
+    <string name="settings_pin_saved">PIN saved and sent to connected children</string>
 </resources>
