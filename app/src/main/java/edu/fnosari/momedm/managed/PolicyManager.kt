@@ -10,7 +10,11 @@ import android.net.Uri
 import android.provider.Settings
 import android.util.Log
 import edu.fnosari.momedm.activities.managed.ManagedHomeActivity
+import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.persistence.ManagedPrefs
+import edu.fnosari.momedm.protocol.ChildPrefs
+import edu.fnosari.momedm.protocol.PinHash
+import edu.fnosari.momedm.ui.AppLocale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
@@ -20,6 +24,8 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         private const val LOG_TAG = "PolicyManager"
         const val PLAY_PKG = "com.android.vending"
         const val GMS_PKG = "com.google.android.gms"
+        /** Intent extra: the launcher should immediately start the pinned app (if any). */
+        const val EXTRA_LAUNCH_PINNED = "launch_pinned"
     }
     private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     /** The [AdminReceiver] component this app is (or would be) registered as device owner with. */
@@ -34,20 +40,30 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Log.d(LOG_TAG, "Persistent HOME set")
     }
 
+    /** Launches our launcher in lock task (the config decides what it shows). */
+    private fun launchHomeLocked() {
+        val home = Intent(context, ManagedHomeActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            .putExtra(EXTRA_LAUNCH_PINNED, true)
+        context.startActivity(home, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
+    }
+
     // Both kiosk transitions suspend (they write to DataStore), so a plain runCatching would swallow the
     // CancellationException thrown when the caller's scope is cancelled and report it as an ordinary
     // command failure, leaving the coroutine machinery to believe the work completed. Cancellation is
     // rethrown; everything else becomes a Result.failure the controller can surface.
-    override suspend fun kioskOn(pkg: String): Result<Unit> = try {
-        val launch = context.packageManager.getLaunchIntentForPackage(pkg) ?: throw IllegalArgumentException("$pkg not installed or not launchable")
-        dpm.setLockTaskPackages(admin, arrayOf(pkg, context.packageName, PLAY_PKG, GMS_PKG))
+    override suspend fun kioskOn(apps: List<String>, pinned: String?): Result<List<String>> = try {
+        val pm = context.packageManager
+        val allowed = apps.distinct().filter { pm.getLaunchIntentForPackage(it) != null }
+        if (allowed.isEmpty()) throw IllegalArgumentException("no allowed app installed")
+        val pin = pinned?.takeIf { it in allowed }
+        dpm.setLockTaskPackages(admin, (allowed + context.packageName + PLAY_PKG + GMS_PKG).toTypedArray())
         // NOTIFICATIONS requires HOME to also be enabled or AOSP throws IllegalArgumentException; SYSTEM_INFO alone is safe.
         dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        context.startActivity(launch, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
-        prefs.setKiosk(true, pkg)
-        Log.d(LOG_TAG, "Kiosk on: $pkg")
-        Result.success(Unit)
+        prefs.setKioskConfig(KioskConfig(on = true, apps = allowed, pinned = pin, pauseUntil = 0L))
+        launchHomeLocked()
+        Log.d(LOG_TAG, "Kiosk on: ${allowed.size} apps, pinned=$pin")
+        Result.success(allowed)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
     override suspend fun kioskOff(): Result<Unit> = try {
@@ -62,9 +78,33 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Result.success(Unit)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
-    /** Re-enters kiosk after reboot when it was on. */
+    /** Launches [pkg] inside the current lock task (only meaningful while child mode is on and [pkg] is allowed). */
+    fun launchAllowed(pkg: String): Boolean {
+        val i = context.packageManager.getLaunchIntentForPackage(pkg) ?: return false
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(i, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle()) }.isSuccess
+    }
+
+    /** Starts a parent-PIN pause: persists the deadline; the launcher Activity releases lock task itself. Returns pauseUntil. */
+    suspend fun pause(nowMs: Long = System.currentTimeMillis()): Long {
+        val until = nowMs + KioskConfig.PAUSE_MS
+        prefs.setPauseUntil(until); Log.d(LOG_TAG, "Kiosk paused until $until")
+        ManagedLinkState.statusPushRequests.tryEmit(Unit)
+        return until
+    }
+
+    /** Ends a pause (or is a no-op when child mode is off): re-applies the stored config and re-locks. */
+    suspend fun resume(): Result<List<String>> {
+        val c = prefs.kioskConfig.first()
+        if (!c.on) return Result.success(emptyList())
+        prefs.setPauseUntil(0L)
+        return kioskOn(c.apps, c.pinned).also { ManagedLinkState.statusPushRequests.tryEmit(Unit) }
+    }
+
+    /** Re-enters child mode after reboot when it was on; a pause never survives a reboot. */
     suspend fun restoreKiosk() {
-        if (prefs.kioskOn.first()) { val pkg = prefs.kioskPkg.first(); if (pkg.isNotEmpty()) kioskOn(pkg).onFailure { Log.w(LOG_TAG, "Kiosk restore failed", it) } }
+        val c = prefs.kioskConfig.first()
+        if (c.on && c.apps.isNotEmpty()) kioskOn(c.apps, c.pinned).onFailure { Log.w(LOG_TAG, "Kiosk restore failed", it) }
     }
 
     /**
@@ -90,5 +130,19 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
             context.startActivity(i)
             Log.d(LOG_TAG, "Opened add-account")
         }
+    }
+
+    override suspend fun applyPrefs(prefs: ChildPrefs): Result<Unit> = try {
+        this.prefs.setChildPrefs(prefs)
+        AppLocale.apply(context, prefs.language)
+        Log.d(LOG_TAG, "Prefs applied (lang=${prefs.language}, theme=${prefs.theme}, pin=${prefs.pinHash != null})")
+        Result.success(Unit)
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
+
+    /** True when [pin] matches the pushed parent PIN; false when none is set. */
+    suspend fun verifyPin(pin: String): Boolean {
+        val p = prefs.childPrefs.first()
+        val salt = p.pinSalt ?: return false; val hash = p.pinHash ?: return false
+        return PinHash.verify(pin, salt, hash)
     }
 }

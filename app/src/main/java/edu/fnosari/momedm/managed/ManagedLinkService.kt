@@ -111,6 +111,7 @@ class ManagedLinkService : Service() {
         policy = PolicyManager(this, prefs)
         status = StatusCollector(this, prefs)
         executor = CommandExecutor(policy, status)
+        scope.launch { ManagedLinkState.statusPushRequests.collect { pushStatus() } }
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification(getString(R.string.managed_notif_scanning)), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
         // minSdk 34: RECEIVER_EXPORTED/RECEIVER_NOT_EXPORTED is mandatory when registering a context-registered receiver.

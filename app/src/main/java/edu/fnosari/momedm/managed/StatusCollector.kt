@@ -37,10 +37,12 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
      * main thread (the caller is a main-dispatcher service coroutine).
      */
     override suspend fun collect(): Message.Status = withContext(Dispatchers.IO) {
-        val kioskOn = prefs.kioskOn.first(); val kioskPkg = prefs.kioskPkg.first().ifEmpty { null }
-        val s = Message.Status(kiosk = kioskOn, kioskPkg = kioskPkg, account = hasGoogleAccount(), battery = batteryPercent(),
-            currentApp = foregroundApp() ?: if (kioskOn) kioskPkg else null)
-        Log.d(LOG_TAG, "Status: $s"); s
+        val c = prefs.kioskConfig.first(); val now = System.currentTimeMillis()
+        val paused = c.isPaused(now)
+        val s = Message.Status(kiosk = c.on, kioskPkg = c.pinned, account = hasGoogleAccount(), battery = batteryPercent(),
+            currentApp = foregroundApp() ?: if (c.isLocked(now)) c.pinned else null,
+            kioskApps = if (c.on) c.apps else emptyList(), kioskPaused = paused, pauseEndsAt = if (paused) c.pauseUntil else null)
+        Log.d(LOG_TAG, "Status: kiosk=${s.kiosk} apps=${s.kioskApps.size} paused=${s.kioskPaused} battery=${s.battery}"); s
     }
 
     /** Current battery charge as a 0-100 percentage. */
