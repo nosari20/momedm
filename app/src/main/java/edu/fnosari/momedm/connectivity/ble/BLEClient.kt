@@ -151,13 +151,13 @@ class BLEClient(
      * `onMtuChanged` can fire again later for a remote-initiated MTU change; that must still
      * reach [BLEClientCallBack.onMtuChanged] but must not re-fire `onConnected`.
      */
-    private var _connectedReported: Boolean = false
+    @Volatile private var _connectedReported: Boolean = false
 
     /**
      * Pending [MTU_TIMEOUT_MS] fallback posted after a successful `requestMtu`, cancelled by
      * [BluetoothGattCallback.onMtuChanged] and by [closeGatt]. See [MTU_TIMEOUT_MS].
      */
-    private var _mtuWatchdog: Runnable? = null
+    @Volatile private var _mtuWatchdog: Runnable? = null
 
     /**
      * Dedicated handler for [_mtuWatchdog]. Deliberately not [_scanHandler]: [stopScan] clears that
