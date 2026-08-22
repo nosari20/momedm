@@ -1,0 +1,41 @@
+package edu.fnosari.momedm.protocol
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class FramerTest {
+    @Test fun maxChunkFromMtu() {
+        assertEquals(5, Framer.maxChunk(23))      // 23-3-15
+        assertEquals(499, Framer.maxChunk(517))
+        assertEquals(1, Framer.maxChunk(10))      // never below 1
+    }
+    @Test fun splitAndParse() {
+        val frames = Framer.split(0x1a2b, "abcdefghij", 4)
+        assertEquals(listOf("1a2b:0/3:abcd", "1a2b:1/3:efgh", "1a2b:2/3:ij"), frames)
+        val f = Framer.parse("1a2b:1/3:efgh")!!
+        assertEquals(0x1a2b, f.msgId); assertEquals(1, f.index); assertEquals(3, f.count); assertEquals("efgh", f.chunk)
+    }
+    @Test fun emptyPayloadIsOneFrame() {
+        assertEquals(listOf("0001:0/1:"), Framer.split(1, "", 5))
+    }
+    @Test fun parseRejectsGarbage() {
+        assertNull(Framer.parse("nope")); assertNull(Framer.parse("zzzz:0/1:x")); assertNull(Framer.parse("0001:2/1:x"))
+    }
+    @Test fun reassembleInOrder() {
+        val r = Reassembler()
+        assertNull(r.feed("0001:0/2:hel", 0L))
+        assertEquals("hello", r.feed("0001:1/2:lo", 1L))
+    }
+    @Test fun reassembleDropsStaleMessage() {
+        val r = Reassembler(timeoutMs = 10_000)
+        assertNull(r.feed("0001:0/2:hel", 0L))
+        assertNull(r.feed("0002:0/1:x", 20_000L).let { assertEquals("x", it); null })
+        assertNull(r.feed("0001:1/2:lo", 20_001L)) // first message expired → restarted, still incomplete
+    }
+    @Test fun interleavedMessagesAreIndependent() {
+        val r = Reassembler()
+        assertNull(r.feed("000a:0/2:A1", 0L)); assertNull(r.feed("000b:0/2:B1", 0L))
+        assertEquals("B1B2", r.feed("000b:1/2:B2", 0L)); assertEquals("A1A2", r.feed("000a:1/2:A2", 0L))
+    }
+}
