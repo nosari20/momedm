@@ -23,6 +23,7 @@ import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -36,14 +37,20 @@ class ControllerService : Service() {
         private const val LOG_TAG = "ControllerService"
         const val CHANNEL_ID = "controller"
         const val NOTIFICATION_ID = 2
+        /** Intent extra telling a running service to reload its identity and restart the BLE server. */
+        const val EXTRA_RELOAD_IDENTITY = "reload_identity"
         fun start(context: Context) = context.startForegroundService(Intent(context, ControllerService::class.java))
         fun stop(context: Context) { context.stopService(Intent(context, ControllerService::class.java)) }
+        /** Tells the already-running service to re-read the (just-rotated) secret and restart the BLE server with it. */
+        fun reloadIdentity(context: Context) = context.startForegroundService(Intent(context, ControllerService::class.java).putExtra(EXTRA_RELOAD_IDENTITY, true))
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val gatt = MdmService()
     private var server: BLEServer? = null
     private var sessions: SessionManager? = null
+    /** The session-tick loop launched by the current [startServer] call; cancelled before restarting so a stale loop can't keep ticking an orphaned [SessionManager]. */
+    private var tickJob: Job? = null
     /** Mutated from binder threads (device connect/disconnect callbacks), read from the main scope's coroutines. */
     private val devicesByKey = ConcurrentHashMap<String, BluetoothDevice>()
     private lateinit var prefs: ControllerPrefs
@@ -59,6 +66,26 @@ class ControllerService : Service() {
         nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, getString(R.string.controller_notif_channel), NotificationManager.IMPORTANCE_LOW))
         startForeground(NOTIFICATION_ID, notification(0), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
         scope.launch { startServer() }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.getBooleanExtra(EXTRA_RELOAD_IDENTITY, false) == true) {
+            Log.d(LOG_TAG, "Reload identity requested — restarting BLE server")
+            scope.launch { restartServer() }
+        }
+        return START_STICKY
+    }
+
+    /** Tears down the current BLE server/session state and starts fresh, picking up whatever identity [ControllerPrefs.ensureIdentity] now returns. */
+    private suspend fun restartServer() {
+        tickJob?.cancel(); tickJob = null
+        try { server?.stopServer() } catch (e: BLEException) { Log.w(LOG_TAG, "restart stop failed: ${e.message}") }
+        server = null
+        devicesByKey.clear()
+        sessions = null
+        ControllerLink.commander = null
+        ControllerLink.online.value = emptySet()
+        startServer()
     }
 
     private suspend fun startServer() {
@@ -104,7 +131,7 @@ class ControllerService : Service() {
         } catch (e: Throwable) {
             Log.e(LOG_TAG, "Server start failed: ${e.message}"); ControllerLink.errors.tryEmit(e.message ?: "BLE error"); stopSelf(); return
         }
-        scope.launch { while (isActive) { delay(1_000); sm.tick(System.currentTimeMillis()) } }
+        tickJob = scope.launch { while (isActive) { delay(1_000); sm.tick(System.currentTimeMillis()) } }
     }
 
     private fun refreshOnline() {

@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
                     val advertising by vm.advertising.collectAsState()
                     val online by vm.online.collectAsState()
                     LaunchedEffect(Unit) { vm.events.collect { snackbar.showSnackbar(it) } }
+                    LaunchedEffect(Unit) { vm.startServiceIfWanted() }
                     Layout.BasicLayoutWithTopBarAndDrawer(
                         title = context.getString(R.string.main_activity_title),
                         rightActions = {

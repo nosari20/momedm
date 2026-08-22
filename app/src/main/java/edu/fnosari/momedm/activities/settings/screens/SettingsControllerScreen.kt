@@ -58,7 +58,10 @@ fun SettingsControllerScreen(navController: NavHostController) {
             confirm = false
             scope.launch {
                 identity = prefs.regenerateSecret()
-                if (ControllerLink.advertising.value) { ControllerService.stop(context); ControllerService.start(context) }
+                // Rotating the secret while the service is running needs an in-place restart of its BLE
+                // server/session state with the new identity — a separate stop() + start() pair is async
+                // and can collapse into a no-op (or race), leaving the running SessionManager on the old secret.
+                if (ControllerLink.advertising.value) ControllerService.reloadIdentity(context)
                 info = context.getString(R.string.settings_controller_regenerated)
             }
         }) { Text(stringResource(R.string.settings_dialog_confirm)) } },

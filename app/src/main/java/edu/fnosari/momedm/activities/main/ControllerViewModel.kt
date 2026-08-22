@@ -1,6 +1,7 @@
 package edu.fnosari.momedm.activities.main
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import edu.fnosari.momedm.R
@@ -22,6 +23,8 @@ import kotlinx.coroutines.launch
 
 /** Controller UI state: registry, online set, advertising flag, command results; owns the provisioning controller. */
 class ControllerViewModel(application: Application) : AndroidViewModel(application) {
+    companion object { private const val LOG_TAG = "ControllerViewModel" }
+
     private val prefs = ControllerPrefs(DataStorePreferencesProvider(application))
     private val registry = DeviceRegistry(prefs, viewModelScope)
     val provisioning = ProvisioningController(application, prefs, viewModelScope)
@@ -29,7 +32,9 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     val devices: StateFlow<List<DeviceRecord>> = registry.devices
     val online: StateFlow<Set<String>> = ControllerLink.online
     val advertising: StateFlow<Boolean> = ControllerLink.advertising
-    private val _events = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    // replay = 1 so an error/result emitted just before the snackbar collector attaches (e.g. during
+    // the permission gate, before the post-gate LaunchedEffect subscribes) is not lost.
+    private val _events = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 8)
     val events: SharedFlow<String> = _events
     private val _appsFor = MutableStateFlow<Pair<String, List<AppInfo>?>?>(null)
     /** (deviceId, apps) while the picker is open; apps == null while loading. */
@@ -40,23 +45,40 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch { ControllerLink.results.collect { (id, r) -> _events.emit(app.getString(R.string.device_result, if (r.ok) "OK" else "ERR", r.msg)) } }
         viewModelScope.launch { ControllerLink.apps.collect { (id, a) -> if (_appsFor.value?.first == id) _appsFor.value = id to a.apps } }
         viewModelScope.launch { ControllerLink.errors.collect { _events.emit(it) } }
-        viewModelScope.launch { if (prefs.advertiseOnLaunch.first() && !ControllerLink.advertising.value) ControllerService.start(app) }
         // Service-side registry writes land in DataStore; re-read the blob so the UI list refreshes.
         viewModelScope.launch { prefs.registryJson.collect { registry.reload() } }
     }
 
+    /**
+     * Starts [ControllerService] if the user wants advertising on launch and it isn't already running.
+     * Must be called only after the caller's permission gate has passed — calling it from [init] would
+     * race the gate (the view model is created before permissions are granted), producing a doomed
+     * service start whose failure the UI isn't yet subscribed to observe.
+     */
+    fun startServiceIfWanted() {
+        val app = getApplication<Application>()
+        viewModelScope.launch { if (prefs.advertiseOnLaunch.first() && !ControllerLink.advertising.value) ControllerService.start(app) }
+    }
+
     fun setAdvertising(on: Boolean) { val app = getApplication<Application>(); viewModelScope.launch { prefs.setAdvertiseOnLaunch(on) }; if (on) ControllerService.start(app) else ControllerService.stop(app) }
 
-    private fun send(deviceId: String, type: CmdType, pkg: String? = null) {
+    /** Returns the sent command's id, or null if [deviceId] has no authenticated session (offline). */
+    private fun send(deviceId: String, type: CmdType, pkg: String? = null): String? {
         val app = getApplication<Application>()
         val id = ControllerLink.sendCommand(deviceId, type, pkg)
+        Log.d(LOG_TAG, "send $type -> $deviceId: ${if (id == null) "offline" else "sent (id=$id)"}")
         viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.device_offline_msg) else app.getString(R.string.device_sent)) }
+        return id
     }
     fun kioskOn(deviceId: String, pkg: String) { _appsFor.value = null; send(deviceId, CmdType.KIOSK_ON, pkg) }
-    fun kioskOff(deviceId: String) = send(deviceId, CmdType.KIOSK_OFF)
-    fun install(deviceId: String, pkg: String) = send(deviceId, CmdType.INSTALL, pkg)
-    fun addAccount(deviceId: String) = send(deviceId, CmdType.ADD_ACCOUNT)
-    fun refresh(deviceId: String) = send(deviceId, CmdType.GET_STATUS)
-    fun requestApps(deviceId: String) { _appsFor.value = deviceId to null; send(deviceId, CmdType.LIST_APPS) }
+    fun kioskOff(deviceId: String) { send(deviceId, CmdType.KIOSK_OFF) }
+    fun install(deviceId: String, pkg: String) { send(deviceId, CmdType.INSTALL, pkg) }
+    fun addAccount(deviceId: String) { send(deviceId, CmdType.ADD_ACCOUNT) }
+    fun refresh(deviceId: String) { send(deviceId, CmdType.GET_STATUS) }
+    fun requestApps(deviceId: String) {
+        _appsFor.value = deviceId to null
+        // Offline device: no picker to keep open, so clear it back out instead of hanging on "loading".
+        if (send(deviceId, CmdType.LIST_APPS) == null) _appsFor.value = null
+    }
     fun clearApps() { _appsFor.value = null }
 }
