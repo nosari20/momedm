@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,7 +29,10 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -66,6 +70,15 @@ class MainActivity : ComponentActivity() {
             val snackbar = remember { SnackbarHostState() }
             MomeDMTheme {
                 val required = remember { mutableStateListOf(BLUETOOTH_CONNECT, BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE, POST_NOTIFICATIONS, NEARBY_WIFI_DEVICES) }
+                // A permission granted from system Settings (rather than through our own dialog) never
+                // fires the launcher callback, so re-check on every resume and drop what is now granted
+                // — otherwise the gate stays up until the activity is recreated. Mirrors
+                // ManagedHomeActivity.
+                val owner = LocalLifecycleOwner.current
+                DisposableEffect(owner) {
+                    val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) required.removeAll { ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED } }
+                    owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
+                }
                 val missing = required.filter { ActivityCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
                 Log.d(LOG_TAG, "Missing permissions: $missing")
                 if (missing.isNotEmpty()) {

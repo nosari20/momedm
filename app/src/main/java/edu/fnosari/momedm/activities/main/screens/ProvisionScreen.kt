@@ -59,9 +59,15 @@ fun ProvisionScreen(navController: NavHostController, viewModel: ControllerViewM
         s.ip?.takeIf { s.serverRunning }?.let { Text(stringResource(R.string.provision_serving, it), style = MaterialTheme.typography.bodySmall) }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         s.qrPayload?.let { payload ->
-            val bmp = remember(payload) { QrBitmap.render(payload, 800) }
-            Image(bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.size(320.dp))
-            Text(stringResource(R.string.provision_help), style = MaterialTheme.typography.bodySmall)
+            // zxing throws (WriterException) when the payload exceeds what a QR code can hold — e.g. a
+            // long custom URL plus credentials. Surface it instead of crashing the whole screen.
+            val bmp = remember(payload) { runCatching { QrBitmap.render(payload, 800) }.getOrNull() }
+            if (bmp == null) {
+                Text(stringResource(R.string.provision_qr_error), color = MaterialTheme.colorScheme.error)
+            } else {
+                Image(bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.size(320.dp))
+                Text(stringResource(R.string.provision_help), style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

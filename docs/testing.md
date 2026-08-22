@@ -10,6 +10,7 @@
 ## B. Provisioning device B (factory reset)
 - [ ] Tap welcome screen 6×, scan QR (hotspot) → Wi-Fi joins, APK downloads, "Set up your device" → our wizard (account step, usage step) → home = Môme DM managed screen.
 - [ ] If download fails on hotspot: retry with Manual (shared LAN) mode; if `http://` refused: Custom URL mode with an https host. Record which worked in this file.
+- [ ] Hotspot security type: QR declares WPA; if the hotspot came up WPA3-only the managed device may fail to join → use Manual mode.
 - [ ] `adb shell dumpsys device_policy | grep -i owner` shows `edu.fnosari.momedm`.
 
 ## C. Link + commands
@@ -18,6 +19,7 @@
 - [ ] Kiosk ON → app picker lists B's apps (non-ASCII labels intact) → pick one → B enters lock task in that app; A shows kiosk=pkg. Back/home blocked on B.
 - [ ] Kiosk OFF → B returns to managed home; status kiosk=no.
 - [ ] Install (e.g. `org.mozilla.firefox`) with account on B → Play listing opens (also while kiosk ON).
+- [ ] Install (kiosk OFF) → Play listing opens normally (not pinned in lock task; Back/Home still work on B).
 - [ ] Add account → Google sign-in flow opens on B (kiosk OFF).
 - [ ] Snackbar on A shows `OK: ...` / `ERR: ...` for every command.
 

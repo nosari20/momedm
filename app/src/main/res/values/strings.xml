@@ -103,6 +103,7 @@
     <string name="provision_start">Generate QR</string>
     <string name="provision_stop">Stop</string>
     <string name="provision_serving">Serving APK at %1$s</string>
+    <string name="provision_qr_error">QR payload too large to render</string>
     <string name="provision_help">Factory-reset the device, tap the welcome screen 6 times and scan this QR.</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>

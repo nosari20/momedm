@@ -65,7 +65,8 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     private fun serveAndBuild() {
         pollJob?.cancel(); pollJob = null
         try {
-            if (http == null) { http = ApkHttpServer(context.applicationInfo.sourceDir).also { it.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, false) } }
+            // daemon = true: the listener thread must not keep the process alive after the UI is gone.
+            if (http == null) { http = ApkHttpServer(context.applicationInfo.sourceDir).also { it.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, true) } }
         } catch (e: Exception) {
             Log.e(LOG_TAG, "HTTP server failed", e); _state.update { it.copy(error = "HTTP server: ${e.message}") }; return
         }
