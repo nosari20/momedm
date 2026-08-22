@@ -15,4 +15,11 @@
     <string name="settings_dialog_title_edit">Edit Value</string>
     <string name="settings_dialog_confirm">Save</string>
     <string name="settings_dialog_dismiss">Cancel</string>
+
+    <!-- Managed link service -->
+    <string name="managed_notif_channel">Controller link</string>
+    <string name="managed_notif_title">Môme DM</string>
+    <string name="managed_notif_scanning">Looking for controller…</string>
+    <string name="managed_notif_connected">Connected to controller</string>
+    <string name="managed_notif_authenticated">Managed by controller</string>
 </resources>
