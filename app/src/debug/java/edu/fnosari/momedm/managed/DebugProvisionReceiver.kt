@@ -34,6 +34,6 @@ class DebugProvisionReceiver : BroadcastReceiver() {
         }
         val ok = ManagedSetup.persistExtras(context, bundle)
         Log.w(LOG_TAG, "Debug provisioning applied=$ok; starting link service")
-        if (ok) ManagedLinkService.start(context)
+        if (ok) ManagedLinkService.restart(context)
     }
 }

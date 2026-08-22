@@ -44,6 +44,8 @@ class ManagedLinkService : Service() {
         const val CHANNEL_ID = "managed_link"
         const val NOTIFICATION_ID = 1
         const val EXTRA_FROM_BOOT = "from_boot"
+        /** Tear the current link down and rebuild it from persisted prefs (new secret / re-provisioning). */
+        const val EXTRA_RESTART = "restart"
         private const val STATUS_PERIOD_MS = 5 * 60_000L
         /** Sealed PING cadence while authenticated: bounds how long a dead session goes unnoticed. */
         private const val KEEPALIVE_PERIOD_MS = 60_000L
@@ -54,6 +56,11 @@ class ManagedLinkService : Service() {
             context.startForegroundService(Intent(context, ManagedLinkService::class.java).putExtra(EXTRA_FROM_BOOT, fromBoot))
         }
         fun stop(context: Context) { context.stopService(Intent(context, ManagedLinkService::class.java)) }
+        /** Restarts the link in place: drops client + endpoint and re-reads the secret/device id from prefs.
+         * Use this instead of stop()+start(), which is an async pair that may collapse into a no-op. */
+        fun restart(context: Context) {
+            context.startForegroundService(Intent(context, ManagedLinkService::class.java).putExtra(EXTRA_RESTART, true))
+        }
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -112,6 +119,15 @@ class ManagedLinkService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val fromBoot = intent?.getBooleanExtra(EXTRA_FROM_BOOT, false) == true
+        if (intent?.getBooleanExtra(EXTRA_RESTART, false) == true) {
+            Log.d(LOG_TAG, "Restart requested — tearing down link")
+            main.removeCallbacksAndMessages(null)
+            statusJob?.cancel()
+            client?.stopScan(); client?.disconnect(); client = null
+            endpoint?.reset(); endpoint = null
+            backoffMs = BACKOFF_MIN_MS
+            ManagedLinkState.lastError.value = null
+        }
         // No separate "started" latch: the link is (re)kicked off whenever there is no live
         // client yet. This keeps a "Not provisioned" first call a genuine no-op that a later
         // start(context) — e.g. right after provisioning completes — can retry. linkStarting

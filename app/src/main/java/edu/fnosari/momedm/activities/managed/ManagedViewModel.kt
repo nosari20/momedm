@@ -27,6 +27,6 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
         runCatching { getApplication<Application>().startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             .onFailure { Log.w(LOG_TAG, "Usage access settings unavailable", it); ManagedLinkState.lastError.value = "Usage access settings unavailable" }
     }
-    fun restartLink() { val app = getApplication<Application>(); ManagedLinkService.stop(app); ManagedLinkService.start(app) }
+    fun restartLink() = ManagedLinkService.restart(getApplication())
     fun ensureLink() { if (ManagedLinkState.state.value == ManagedLinkState.LinkState.IDLE) ManagedLinkService.start(getApplication()) }
 }
