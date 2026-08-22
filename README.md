@@ -126,8 +126,8 @@ physical devices (see `docs/testing.md`).
 - No silent Play install: `INSTALL` opens the Play listing for the user to
   tap Install — a custom (non-registered-EMM) DPC cannot install silently.
 - Usage access (for `currentApp` in `STATUS`) is optional and skippable
-  during provisioning; without it the managed device reports `unknown`
-  outside of kiosk.
+  during provisioning; without it the managed device reports the kiosk
+  package while kiosk is on, or nothing (shown as "—" in both UIs) otherwise.
 - The provisioning download URL defaults to plain `http://` (the controller's
   self-hosted APK server); SUW's acceptance of `http://` and of a no-internet
   hotspot network varies by OEM/Android version — fall back to Manual (shared
