@@ -130,8 +130,10 @@ treat the QR screen as sensitive while it's on screen.
 ./gradlew :app:testDebugUnitTest # JVM unit tests (protocol, controller, persistence, managed)
 ```
 
-BLE and device-owner behavior cannot be exercised on an emulator — use two
-physical devices (see `docs/testing.md`).
+BLE and device-owner behavior can be exercised between two API 33+ emulators
+(emulated Bluetooth) — see the "Emulator test rig" section of
+`docs/testing.md`; the QR/Setup-Wizard provisioning path and the hotspot need
+real devices.
 
 ## Known limitations
 

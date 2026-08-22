@@ -31,8 +31,10 @@ Transport is BLE only — no cloud, no Play EMM. Design spec:
 
 On Windows, `./gradlew` runs through Git Bash; `gradlew.bat` is the native
 equivalent. `local.properties` must point `sdk.dir` at the Android SDK. BLE
-and device-owner behavior cannot be exercised on an emulator — use two
-physical devices and `docs/testing.md`.
+and device-owner behavior CAN be exercised between two API 33+ emulators
+(the emulator's rootcanal Bluetooth stack links all emulators on one host) —
+see "Emulator test rig" in `docs/testing.md`; real hardware still needed for
+the QR/Setup-Wizard provisioning path and hotspot.
 
 **Windows Gradle quirk:** a stray Gradle daemon can hold a file lock on
 `app/build` between runs. If a build fails with a lock/access error: `./gradlew
@@ -152,9 +154,11 @@ screens.
 
 ## Gotchas
 
-- **BLE does not work on an emulator.** Both roles (controller GATT server,
-  managed GATT client) need two physical devices; CI/emulator can only
-  compile-check and run the JVM unit tests.
+- **BLE works between two emulators** (API 33+ images expose emulated
+  Bluetooth via rootcanal; advertising, scanning, GATT, MTU 517 all work).
+  `docs/testing.md` has the exact rig (two AVDs, `dpm set-device-owner`,
+  the debug-only `DebugProvisionReceiver` to inject the controller secret).
+  CI can still only compile-check and run the JVM unit tests.
 - **The DPC (device-owner) path is only testable two ways:** a factory-reset
   device run through Setup Wizard QR provisioning, or on a device with **no
   accounts added**, via
@@ -240,6 +244,6 @@ screens.
 - Match the existing doc-comment style (KDoc on public classes/members) and
   logging style (`LOG_TAG` + `android.util.Log`).
 - Don't reformat or churn unrelated files.
-- BLE/DPM behavior can't be verified in CI/emulator — call out when a change
-  needs on-device testing, and update `docs/testing.md` if it changes the
-  manual checklist.
+- BLE/DPM behavior can't be verified in CI; use the two-emulator rig in
+  `docs/testing.md` (or real devices) and say which you used. Update
+  `docs/testing.md` if a change alters the manual checklist.
