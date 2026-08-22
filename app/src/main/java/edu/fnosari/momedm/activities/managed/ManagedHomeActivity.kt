@@ -10,33 +10,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import edu.fnosari.momedm.R
-import edu.fnosari.momedm.activities.managed.components.LinkBanner
-import edu.fnosari.momedm.activities.managed.navigation.Routes
-import edu.fnosari.momedm.activities.managed.screens.HomeScreen
+import edu.fnosari.momedm.activities.managed.screens.ChildLauncherScreen
 import edu.fnosari.momedm.ui.components.ButtonRequestPermission
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
-import edu.fnosari.momedm.ui.layouts.Layout
 import edu.fnosari.momedm.ui.theme.MomeDMTheme
 
-/** HOME activity of a managed device: permission gate, drawer + NavHost, link banner. */
+/** HOME activity of a managed device: permission gate, then the child launcher (tiles grid, pinned relaunch, PIN dialog). */
 class ManagedHomeActivity : ComponentActivity() {
     companion object { private const val LOG_TAG = "ManagedHomeActivity" }
 
@@ -45,7 +35,6 @@ class ManagedHomeActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
-            val navController = rememberNavController()
             val vm: ManagedViewModel = viewModel()
             MomeDMTheme {
                 val required = remember { mutableStateListOf(BLUETOOTH_SCAN, BLUETOOTH_CONNECT, POST_NOTIFICATIONS) }
@@ -61,20 +50,16 @@ class ManagedHomeActivity : ComponentActivity() {
                         Column { for (p in missing) ButtonRequestPermission(context, p, p, granted = { required.remove(p) }, denied = { Log.d(LOG_TAG, "$p denied") }) }
                     }
                 } else {
-                    LaunchedEffect(Unit) { vm.ensureLink() }
-                    val link by vm.linkState.collectAsState()
-                    Layout.BasicLayoutWithTopBarAndDrawer(
-                        title = context.getString(R.string.managed_activity_title),
-                        drawerItems = listOf(Layout.DrawerItem(context.getString(Routes.HOME.label), Routes.HOME.icon) { navController.navigate(Routes.HOME.name) }),
-                        drawerName = context.getString(R.string.managed_drawer_name),
-                    ) {
-                        Column(Modifier.fillMaxSize()) {
-                            LinkBanner(link)
-                            NavHost(navController, startDestination = Routes.HOME.name) {
-                                composable(Routes.HOME.name) { HomeScreen(navController, vm) }
-                            }
-                        }
+                    LaunchedEffect(Unit) { vm.ensureLink(); vm.refreshApps() }
+                    // Pinned app: every time the launcher comes to the front while locked, bounce into it.
+                    DisposableEffect(owner) {
+                        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) vm.shouldAutoLaunchPinned()?.let { vm.open(it) } }
+                        owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
                     }
+                    ChildLauncherScreen(vm, onUnlocked = {
+                        // PolicyManager.pause() already persisted the deadline; release lock task from the Activity.
+                        runCatching { stopLockTask() }.onFailure { Log.w(LOG_TAG, "stopLockTask failed", it) }
+                    })
                 }
             }
         }
