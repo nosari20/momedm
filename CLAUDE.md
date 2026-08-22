@@ -79,7 +79,7 @@ app/src/main/java/edu/fnosari/momedm/
 │
 ├── persistence/
 │   ├── preferences/               # Preference<T>, PreferencesProvider, DataStore impl (copied from BLEController)
-│   ├── ManagedPrefs.kt            #   controllerId, secret, deviceId, kioskConfig, childPrefs
+│   ├── ManagedPrefs.kt            #   controllerId, secret, deviceId, kioskConfig, childPrefs, PIN lockout
 │   ├── KioskConfig.kt             #   on/apps/pinned/pauseUntil + isPaused/isLocked, PAUSE_MS (pure Kotlin)
 │   ├── ControllerPrefs.kt         #   controllerId, secret (identity), parent PIN (hash+salt), pinSet
 │   └── DeviceRegistry.kt          #   DeviceRecord, codec, registry (DataStore JSON), nickname
@@ -217,22 +217,47 @@ screens.
 - **Parent PIN is PBKDF2, never plaintext, and pushed as prefs, not a
   command.** `PinHash` (PBKDF2-HMAC-SHA256, 20k iterations, 32-byte output,
   16-byte random salt) hashes the PIN on the **controller**; only the salt +
-  hash travel inside `ChildPrefs` on `SET_PREFS`. A correct PIN starts a
-  10-minute pause (`KioskConfig.PAUSE_MS`) that the launcher `Activity`
-  itself releases by calling `stopLockTask()` — `PolicyManager.pause()` only
-  persists the deadline, it does not touch lock-task state. The pause is
-  **not honoured across reboot**: `restoreKiosk()` unconditionally re-locks
-  with the stored `apps`/`pinned` on `BOOT_COMPLETED`, ignoring any prior
-  `pauseUntil`.
+  hash travel inside `ChildPrefs` on `SET_PREFS`. `ChildPrefs.sanitized()`
+  keeps the pair only when both halves are lower-case hex of exactly the
+  lengths `PinHash` emits (32 / 64 chars); anything else nulls both, because
+  `PinHash.verify` would otherwise raise inside `Hex.decode` on the child's PIN
+  dialog. `PolicyManager.verifyPin` is belt-and-braces on top: it never throws
+  (a malformed pair may already sit in `ManagedPrefs` from before that check)
+  and runs the 20k iterations on `Dispatchers.Default`. The launcher's
+  wrong-PIN backoff is persisted (`ManagedPrefs.pinFailures` /
+  `pinLockUntil`), so force-stopping the launcher does not reset it. A correct
+  PIN starts a 10-minute pause (`KioskConfig.PAUSE_MS`) that the launcher
+  `Activity` itself releases by calling `stopLockTask()` —
+  `PolicyManager.pause()` only persists the deadline, it does not touch
+  lock-task state. The pause is **not honoured across reboot**:
+  `restoreKiosk()` unconditionally re-locks with the stored `apps`/`pinned` on
+  `BOOT_COMPLETED`, ignoring any prior `pauseUntil`.
+- **Ending a pause is the *service's* job, not the launcher's.**
+  `ManagedLinkService` runs a `collectLatest` watchdog over
+  `ManagedPrefs.kioskConfig` that waits out `pauseUntil`, re-reads the deadline
+  and then calls `PolicyManager.resume()`. `ManagedViewModel` keeps its own
+  countdown, but only to drive the launcher's banner — it dies with the
+  Activity, so it can never be the durable guarantee.
 - **`SET_PREFS` is pushed after every successful auth and after every prefs
   change** (PIN set/changed/cleared, language/theme/accent), so a managed
   device that reconnects always gets the parent's current PIN hash — never
-  rely on it being pushed only once.
+  rely on it being pushed only once. Those service-originated pushes produce
+  `RESULT`s on the process-wide `ControllerLink.results`, so
+  `ControllerViewModel` announces only results whose `cmdId` it sent itself —
+  otherwise the parent gets a snackbar every time a child reconnects.
+- **`ChildPrefs.theme` and `accent` are stored on the child but drive
+  nothing yet** — only `language` is applied (through `ui/AppLocale`). The
+  other two are wired end to end (controller settings → `SET_PREFS` →
+  `ManagedPrefs`) and wait for the Plan 2 launcher redesign to be honoured.
 - **`ManagedHomeActivity` is a launcher for both modes**: with child mode
   off it shows every launchable app (`ChildLauncherScreen`, header "All
   apps"); with child mode on it shows only the allowed apps (header "Child
   mode", lock icon when a PIN is set) — there is no separate "off" screen to
-  maintain.
+  maintain. `ManagedViewModel.kioskConfig` is a `StateFlow<KioskConfig?>`
+  seeded **null**, meaning "not loaded yet": a `KioskConfig()` seed would claim
+  child mode is off for the first frames of a cold start and flash every
+  installed app on a locked-down device. Screen, `refreshApps` and the
+  pinned-app bounce all render/do nothing while it is null.
 - **`ADD_ACCOUNT` is refused while kiosk is on** — Settings would be
   escapable from inside lock task, so the controller must send `KIOSK_OFF`
   first; this is on purpose, not a bug.
