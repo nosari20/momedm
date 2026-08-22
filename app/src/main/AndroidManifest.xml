@@ -38,6 +38,12 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MomeDM">
+
+        <activity
+            android:name=".activities.settings.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_activity_name"
+            android:theme="@style/Theme.MomeDM" />
     </application>
 
 </manifest>

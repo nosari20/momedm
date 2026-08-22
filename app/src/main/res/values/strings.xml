@@ -1,3 +1,18 @@
 <resources>
     <string name="app_name">Môme DM</string>
+
+    <!-- Settings -->
+    <string name="settings_activity_name">Settings</string>
+    <string name="settings_screen_title">Settings</string>
+    <string name="settings_screen_category_controller">Controller</string>
+    <string name="settings_screen_category_legal">Legal</string>
+    <string name="settings_screen_category_licenses">Licenses</string>
+    <string name="settings_screen_category_easteregg">Easter Egg</string>
+    <string name="settings_screen_category_easteregg_title">🎉</string>
+    <string name="settings_screen_category_easteregg_text">You found the hidden chalkboard. Back to class!</string>
+    <string name="settings_screen_version">Version %1$s (%2$s)</string>
+    <string name="settings_screen_copyrights">© 2026 fnosari</string>
+    <string name="settings_dialog_title_edit">Edit Value</string>
+    <string name="settings_dialog_confirm">Save</string>
+    <string name="settings_dialog_dismiss">Cancel</string>
 </resources>
