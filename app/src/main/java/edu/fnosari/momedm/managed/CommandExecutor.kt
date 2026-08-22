@@ -33,6 +33,8 @@ class CommandExecutor(private val policy: PolicyActions, private val status: Sta
             CmdType.ADD_ACCOUNT -> listOf(res(policy.openAddAccount(), "account flow opened"))
             CmdType.LIST_APPS -> listOf(Message.Result(cmd.id, true, "apps"), Message.Apps(status.launchableApps()))
             CmdType.GET_STATUS -> listOf(Message.Result(cmd.id, true, "status"), status.collect())
+            // TODO(kiosk v2): wired up once PolicyActions gains a setChildPrefs action (out of scope for this task).
+            CmdType.SET_PREFS -> listOf(Message.Result(cmd.id, false, "not implemented"))
         }
     }
 }
