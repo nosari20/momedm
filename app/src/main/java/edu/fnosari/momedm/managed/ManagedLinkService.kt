@@ -45,6 +45,8 @@ class ManagedLinkService : Service() {
         const val NOTIFICATION_ID = 1
         const val EXTRA_FROM_BOOT = "from_boot"
         private const val STATUS_PERIOD_MS = 5 * 60_000L
+        /** Sealed PING cadence while authenticated: bounds how long a dead session goes unnoticed. */
+        private const val KEEPALIVE_PERIOD_MS = 60_000L
         private const val BACKOFF_MIN_MS = 2_000L
         private const val BACKOFF_MAX_MS = 30_000L
 
@@ -161,6 +163,14 @@ class ManagedLinkService : Service() {
                 override fun onMtuChanged(mtu: Int) { this@ManagedLinkService.mtu = mtu }
                 override fun onConnected() { Log.d(LOG_TAG, "Connected, mtu=$mtu"); setState(LinkState.CONNECTED); endpoint?.onConnected(mtu) }
                 override fun onDisconnected() { Log.d(LOG_TAG, "Disconnected"); statusJob?.cancel(); endpoint?.reset(); scheduleRescan() }
+                override fun onWriteFailed(characteristic: android.bluetooth.BluetoothGattCharacteristic, status: Int) {
+                    // The controller rejected our frame: it no longer holds a session for this link (e.g. its
+                    // GATT server restarted). Notifications would not reach us on this stale link, so drop it
+                    // and reconnect from scratch.
+                    Log.w(LOG_TAG, "Write rejected (status $status); link stale, reconnecting")
+                    ManagedLinkState.lastError.value = "link reset by controller"
+                    statusJob?.cancel(); endpoint?.reset(); client?.disconnect(); scheduleRescan()
+                }
                 override fun onCharacteristicChanged(characteristic: BLECharacteristic, service: BLEService) {
                     if (characteristic.uuid == MdmGatt.CMD_UUID) endpoint?.onFrame(characteristic.value)
                 }
@@ -245,7 +255,13 @@ class ManagedLinkService : Service() {
 
     private fun startPeriodicStatus() {
         statusJob?.cancel()
-        statusJob = scope.launch { while (isActive) { delay(STATUS_PERIOD_MS); pushStatus() } }
+        statusJob = scope.launch {
+            var sinceStatus = 0L
+            while (isActive) {
+                delay(KEEPALIVE_PERIOD_MS); sinceStatus += KEEPALIVE_PERIOD_MS
+                if (sinceStatus >= STATUS_PERIOD_MS) { sinceStatus = 0L; pushStatus() } else safeSend(Message.Ping)
+            }
+        }
     }
 
     private fun setState(s: LinkState) {

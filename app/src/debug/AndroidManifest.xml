@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Debug-only test hook: provisions the managed role without the SUW QR flow. -->
+        <receiver
+            android:name=".managed.DebugProvisionReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="edu.fnosari.momedm.DEBUG_PROVISION" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

@@ -7,7 +7,7 @@ import org.junit.Test
 class MessagesTest {
     @Test fun roundTripAllTypes() {
         val msgs = listOf(
-            Message.Hello("d1", "Pixel", "aa", 517), Message.Challenge("bb", "cc"), Message.Auth("dd"), Message.AuthOk,
+            Message.Hello("d1", "Pixel", "aa", 517), Message.Challenge("bb", "cc"), Message.Auth("dd"), Message.AuthOk, Message.Rehello, Message.Ping,
             Message.Status(true, "com.x", false, 77, "com.x"), Message.Apps(listOf(AppInfo("com.a", "A"))),
             Message.Result("c1", true, "ok"), Message.Cmd("c1", CmdType.KIOSK_ON, "com.a"), Message.Cmd("c2", CmdType.GET_STATUS, null),
         )

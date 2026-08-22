@@ -10,11 +10,21 @@ class SessionManager(
     private val events: Events,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    companion object { const val AUTH_TIMEOUT_MS = 5_000L }
+    companion object {
+        /** A session that has not authenticated this long after (re)connecting is disconnected and forgotten. */
+        const val AUTH_TIMEOUT_MS = 5_000L
+        /** A (re)connected session that has not even sent HELLO after this long is probed once with REHELLO —
+         * it is most likely a managed device whose link survived a controller-side restart and that still
+         * believes an older session is alive. A fresh HELLO arrives well within this window. */
+        const val REHELLO_AFTER_MS = 3_000L
+    }
     interface Transport { fun sendFrame(key: String, frame: String); fun disconnect(key: String) }
     interface Events { fun onAuthenticated(key: String, hello: Message.Hello); fun onMessage(key: String, deviceId: String, m: Message); fun onDropped(key: String, deviceId: String?) }
 
-    private class Session(val key: String, val endpoint: ControllerEndpoint, val connectedAt: Long)
+    private class Session(val key: String, val endpoint: ControllerEndpoint, var connectedAt: Long) {
+        /** REHELLO probe already sent (at most one per session). */
+        var probed = false
+    }
     private val sessions = LinkedHashMap<String, Session>()
 
     /** Starts tracking a newly connected central. Replaces (and drops) any stale session already at [key]. */
@@ -33,8 +43,15 @@ class SessionManager(
     }
     /** Stops tracking the central at [key] (e.g. after the transport reports a disconnect). */
     @Synchronized fun onDisconnected(key: String) { sessions.remove(key)?.let { events.onDropped(key, it.endpoint.deviceId) } }
-    /** Feeds one raw frame received from the central at [key] into its session's endpoint. */
-    @Synchronized fun onFrame(key: String, frame: String) { sessions[key]?.endpoint?.onFrame(frame) }
+    /** Feeds one raw frame received from the central at [key] into its session's endpoint. Returns false —
+     * and feeds nothing — when [key] has no session (the BLE link outlived our session state, e.g. after a
+     * server restart or an auth timeout): the transport should then fail the write so the peer notices the
+     * dead session and reconnects, which is the only reliable recovery when notifications no longer reach it. */
+    @Synchronized fun onFrame(key: String, frame: String): Boolean {
+        val s = sessions[key] ?: return false
+        s.endpoint.onFrame(frame)
+        return true
+    }
     /** Sends [m] to the authenticated session for [deviceId]. Returns false if no such session exists. */
     @Synchronized fun send(deviceId: String, m: Message): Boolean {
         val s = sessions.values.firstOrNull { it.endpoint.authenticated && it.endpoint.deviceId == deviceId } ?: return false
@@ -42,9 +59,15 @@ class SessionManager(
     }
     /** Device ids of all currently authenticated sessions. */
     @Synchronized fun onlineDeviceIds(): Set<String> = sessions.values.filter { it.endpoint.authenticated }.mapNotNull { it.endpoint.deviceId }.toSet()
-    /** Disconnects and forgets centrals that have not authenticated within [AUTH_TIMEOUT_MS]. Call periodically;
-     * idempotent — a session is only ever disconnected/dropped once, on the tick that first finds it timed out. */
+    /** Probes silent sessions with REHELLO after [REHELLO_AFTER_MS], and disconnects and forgets centrals that
+     * have not authenticated within [AUTH_TIMEOUT_MS] (measured from connect or from the probe). Call
+     * periodically; idempotent — a session is only ever probed once and disconnected/dropped once. */
     @Synchronized fun tick(nowMs: Long) {
+        // Probe silent (no HELLO yet) sessions once; the probe also restarts their auth-timeout clock so a
+        // peer that answers the REHELLO has the full AUTH_TIMEOUT_MS to complete the new handshake.
+        sessions.values.filter { !it.endpoint.helloReceived && !it.probed && nowMs - it.connectedAt > REHELLO_AFTER_MS }.forEach {
+            it.probed = true; it.connectedAt = nowMs; it.endpoint.requestRehello()
+        }
         val timedOut = sessions.values.filter { !it.endpoint.authenticated && nowMs - it.connectedAt > AUTH_TIMEOUT_MS }
         for (s in timedOut) {
             sessions.remove(s.key)

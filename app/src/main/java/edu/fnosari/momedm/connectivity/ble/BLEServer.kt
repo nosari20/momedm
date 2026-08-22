@@ -73,13 +73,17 @@ class BLEServer(
          * is a single field shared by every characteristic instance, so with multiple centrals connected
          * concurrently a second write can overwrite it before this callback for the first one runs.
          * [BLECharacteristic.value] is still updated for compatibility with read-back use cases.
+         *
+         * @return true to acknowledge the write (GATT_SUCCESS); false to reject it (GATT_FAILURE) — the
+         * central sees a failed write, which an application can use as a "this link is no longer valid"
+         * signal (e.g. a peer whose session state the server no longer holds).
          */
         fun onCharacteristicWriteRequest(
             characteristic: BLECharacteristic,
             service: BLEService,
             device: BluetoothDevice,
             value: String
-        )
+        ): Boolean
         fun onDeviceConnected(device: BluetoothDevice)
         fun onDeviceDisconnected(device: BluetoothDevice)
         /** ATT MTU negotiated by [device]; payload per notification = mtu - 3. */
@@ -236,7 +240,7 @@ class BLEServer(
                     val writtenValue = value.toString(Charsets.UTF_8)
                     Log.d(LOG_TAG, "${device.address} requesting to write to characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid}) from service ${service.name} (${service.uuid}) (${value.size} bytes)")
                     serviceCharacteristic.value = writtenValue
-                    callBack.onCharacteristicWriteRequest(serviceCharacteristic, service, device, writtenValue)
+                    val accepted = callBack.onCharacteristicWriteRequest(serviceCharacteristic, service, device, writtenValue)
 
                     if(responseNeeded){
                         if (ActivityCompat.checkSelfPermission(
@@ -247,7 +251,9 @@ class BLEServer(
                             Log.e(LOG_TAG,"BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
                             return
                         }
-                        _gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+                        val status = if (accepted) BluetoothGatt.GATT_SUCCESS else BluetoothGatt.GATT_FAILURE
+                        if (!accepted) Log.w(LOG_TAG, "Rejecting write from ${device.address} on ${characteristic.uuid}")
+                        _gattServer.sendResponse(device, requestId, status, offset, value)
                     }
                 }
             }

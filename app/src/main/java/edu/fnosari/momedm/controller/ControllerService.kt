@@ -109,6 +109,7 @@ class ControllerService : Service() {
                 when (m) {
                     is Message.Status -> scope.launch { registry.updateStatus(deviceId, m, System.currentTimeMillis()) }
                     is Message.Result -> ControllerLink.results.tryEmit(deviceId to m)
+                    is Message.Ping -> scope.launch { registry.upsertSeen(deviceId, registry.get(deviceId)?.model ?: "?", System.currentTimeMillis()) }
                     is Message.Apps -> ControllerLink.apps.tryEmit(deviceId to m)
                     else -> Log.w(LOG_TAG, "Unexpected ${m::class.simpleName} from $deviceId")
                 }
@@ -121,8 +122,11 @@ class ControllerService : Service() {
             val s = BLEServer(this, clientLimit = 7, callBack = object : BLEServer.BLEServerCallBack {
                 override fun onDeviceConnected(device: BluetoothDevice) { devicesByKey[device.address] = device; sm.onConnected(device.address) }
                 override fun onDeviceDisconnected(device: BluetoothDevice) { devicesByKey.remove(device.address); sm.onDisconnected(device.address) }
-                override fun onCharacteristicWriteRequest(characteristic: BLECharacteristic, service: BLEService, device: BluetoothDevice, value: String) {
-                    if (characteristic.uuid == MdmGatt.RSP_UUID) sm.onFrame(device.address, value)
+                override fun onCharacteristicWriteRequest(characteristic: BLECharacteristic, service: BLEService, device: BluetoothDevice, value: String): Boolean {
+                    // A frame from a link we hold no session for (our server restarted / the session was
+                    // dropped while the BLE link stayed up) is rejected at GATT level: notifications to such
+                    // a stale client do not reach it, but a failed write does, and makes it reconnect.
+                    return if (characteristic.uuid == MdmGatt.RSP_UUID) sm.onFrame(device.address, value) else true
                 }
             }, includeDeviceName = false)
             s.addService(gatt); s.startServer(); server = s

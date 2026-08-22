@@ -78,6 +78,33 @@ class EndpointLoopbackTest {
         assertEquals(517, tooHigh.wire.controller.mtu)
     }
 
+    @Test fun controllerSessionLossRecoversViaRehello() {
+        // The controller's GATT server restarted (or it dropped the session) while the BLE link stayed up:
+        // the managed side still believes it is authenticated and keeps sending sealed frames. The controller
+        // must answer with a plain REHELLO and the managed side must re-run the handshake.
+        val b = build(517); val w = b.wire
+        assertTrue(w.managed.authenticated)
+        w.controller.reset()                                 // simulate controller-side session loss
+        w.managed.send(Message.Status(false, null, false, 50, null)); w.pump()
+        assertTrue(w.managed.authenticated); assertTrue(w.controller.authenticated)
+        assertEquals("dev-1", w.controller.deviceId)
+        assertTrue(b.managedErrors.isEmpty())
+        w.controller.send(Message.Cmd("c9", CmdType.GET_STATUS)); w.pump()
+        assertEquals(CmdType.GET_STATUS, b.cmds.last().type)
+    }
+
+    @Test fun rehelloBeforeAnyLinkIsIgnored() {
+        // A REHELLO must not make a never-connected endpoint emit a HELLO (there is no link/mtu yet).
+        val sent = mutableListOf<String>()
+        val managed = ManagedEndpoint(secret, "dev-1", "Pixel", { sent.add(it) }, object : ManagedEndpoint.Listener {
+            override fun onAuthenticated() {}
+            override fun onCommand(cmd: Message.Cmd) {}
+            override fun onProtocolError(reason: String) {}
+        })
+        for (f in frames(Message.Rehello)) managed.onFrame(f)
+        assertTrue(sent.isEmpty())
+    }
+
     @Test fun malformedFrameTriggersProtocolError() {
         val b = build(517)
         b.wire.controller.onFrame("garbage")

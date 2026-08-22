@@ -3,6 +3,10 @@ package edu.fnosari.momedm.protocol
 /** Sends one BLE-sized frame string over whatever transport the host provides. */
 fun interface FrameSink { fun send(frame: String) }
 
+/** True when [env] is a plain (unsealed) envelope carrying [Message.Rehello]. Never throws. */
+internal fun isPlainRehello(env: Envelope): Boolean =
+    env.seq == 0L && try { MessageCodec.decodeMessage(env.body) is Message.Rehello } catch (e: Exception) { false }
+
 /** Shared chunking/reassembly for both endpoints. */
 internal class FrameLayer(private val sink: FrameSink, private val clock: () -> Long) {
     private val reassembler = Reassembler()
@@ -47,11 +51,13 @@ class ManagedEndpoint(
     private var channel: SecureChannel? = null
     /** True only once the controller's sealed AUTH_OK has been verified — not merely after we sent our AUTH. */
     private var confirmed = false
+    /** MTU of the current link (0 = [onConnected] never called); reused when the controller asks for a REHELLO. */
+    private var linkMtu = 0
     val authenticated: Boolean get() = confirmed
 
     /** Call once the link is up and MTU known: resets state and sends HELLO. */
     @Synchronized fun onConnected(mtu: Int) {
-        reset(); frames.mtu = mtu
+        reset(); frames.mtu = mtu; linkMtu = mtu
         handshake = ManagedHandshake(secret, deviceId, model, mtu).also { frames.sendEnvelope(Envelope.plain(it.hello())) }
     }
     /** Clears all session state (handshake progress, secure channel, auth confirmation). After this, the
@@ -61,6 +67,10 @@ class ManagedEndpoint(
 
     @Synchronized fun onFrame(frame: String) {
         val env = try { frames.receive(frame) } catch (e: Exception) { reset(); listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
+        // Controller lost its session state for this link (e.g. its GATT server restarted while the BLE link
+        // stayed up) and asks us to start over. Only honoured once we have a link (onConnected was called);
+        // the worst an impostor on the same link could do is force a re-handshake.
+        if (env.seq == 0L && linkMtu > 0 && isPlainRehello(env)) { onConnected(linkMtu); return }
         val ch = channel
         if (ch == null) {
             val hs = handshake ?: run { reset(); listener.onProtocolError("message before HELLO"); return }
@@ -114,6 +124,13 @@ class ControllerEndpoint(
     val authenticated: Boolean get() = channel != null
     val deviceId: String? get() = handshake?.hello?.deviceId
     val mtu: Int get() = frames.mtu
+    /** True once a HELLO has been received on this session (handshake started). */
+    val helloReceived: Boolean get() = handshake != null
+
+    /** Asks the peer to (re)start the handshake with a plain REHELLO. Used by the host to probe a link that
+     * stays silent after (re)connecting — typically a managed device that still believes an older session
+     * is alive. Harmless if the peer has no link state yet (it ignores it). */
+    @Synchronized fun requestRehello() { frames.sendEnvelope(Envelope.plain(Message.Rehello)) }
 
     /** Clears all session state, including the negotiated MTU (reset to the pre-connection default of 23).
      * After this, the endpoint only resumes when it receives a fresh HELLO — a replayed CHALLENGE/AUTH or a
@@ -124,6 +141,10 @@ class ControllerEndpoint(
         val env = try { frames.receive(frame) } catch (e: Exception) { reset(); listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
         val ch = channel
         if (ch == null) {
+            // A sealed frame on a link we have no session for: the peer still believes it is authenticated
+            // (our server restarted / our session was dropped while the BLE link stayed up). Ask it to
+            // start over instead of erroring — a plain REHELLO makes the managed side re-send HELLO.
+            if (env.seq > 0L) { frames.sendEnvelope(Envelope.plain(Message.Rehello)); return }
             val m = try { MessageCodec.decodeMessage(env.body) } catch (e: Exception) { reset(); listener.onProtocolError("bad handshake body"); return }
             when (m) {
                 is Message.Hello -> {

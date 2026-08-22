@@ -16,6 +16,15 @@ sealed class Message {
     @Serializable @SerialName("CHALLENGE") data class Challenge(val nonceS: String, val proof: String) : Message()
     @Serializable @SerialName("AUTH")      data class Auth(val proof: String) : Message()
     @Serializable @SerialName("AUTH_OK")   data object AuthOk : Message()
+    /** Plain (unsealed) controller→managed request to restart the handshake: sent when the controller
+     * receives a sealed frame on a link it has no session for (e.g. after the controller's GATT server
+     * restarted while the BLE link stayed up). The managed side answers with a fresh HELLO. */
+    @Serializable @SerialName("REHELLO")   data object Rehello : Message()
+    /** Sealed managed→controller keepalive (every minute while authenticated). Carries nothing; the
+     * controller only refreshes `lastSeen`. Its purpose is to make the managed side notice a dead session
+     * quickly: a PING written on a link the controller no longer holds a session for is rejected at GATT
+     * level, which triggers a reconnect (see `BLEClient.BLEClientCallBack.onWriteFailed`). */
+    @Serializable @SerialName("PING")      data object Ping : Message()
     @Serializable @SerialName("STATUS")    data class Status(val kiosk: Boolean, val kioskPkg: String?, val account: Boolean, val battery: Int, val currentApp: String?) : Message()
     @Serializable @SerialName("APPS")      data class Apps(val apps: List<AppInfo>) : Message()
     @Serializable @SerialName("RESULT")    data class Result(val cmdId: String, val ok: Boolean, val msg: String) : Message()

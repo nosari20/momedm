@@ -254,7 +254,20 @@ Controller → managed: `CHALLENGE`, `CMD{id,type,args}` with types
 `GET_STATUS`.
 
 `STATUS` is pushed on auth complete, on any change (kiosk, account, battery
-±5 %, foreground app), and at least every 5 min.
+±5 %, foreground app), and at least every 5 min. A sealed `PING` (no payload)
+is sent every minute in between as a keepalive.
+
+**Session-loss recovery.** A BLE link can outlive a session (the controller's
+GATT server restarts, or it dropped the session): `cancelConnection` does not
+reliably close a central-initiated link, and notifications no longer reach a
+client that subscribed on the old server instance. Recovery is therefore
+write-driven: the controller answers any write from a link it holds no session
+for with `GATT_FAILURE`; the managed side treats a failed write as "link
+stale", disconnects and reconnects from scratch (→ fresh HELLO). In addition,
+a controller that receives a *sealed* frame on an un-authenticated session, or
+sees a session stay silent for 3 s after (re)connect, sends a plain `REHELLO`;
+a managed endpoint that has a link answers it with a new HELLO. Worst-case
+detection latency is one keepalive period (60 s).
 
 `protocol/` has no Android imports (kotlinx-serialization + `javax.crypto`).
 

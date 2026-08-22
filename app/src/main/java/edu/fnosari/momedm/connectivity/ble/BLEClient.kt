@@ -86,6 +86,11 @@ class BLEClient(
          * already-connected link — that later call does not re-trigger [onConnected].
          */
         fun onMtuChanged(mtu: Int) {}
+        /**
+         * A queued characteristic write completed with a non-success GATT [status] (e.g. the peripheral
+         * answered GATT_FAILURE). Applications can treat this as "the link is no longer usable".
+         */
+        fun onWriteFailed(characteristic: BluetoothGattCharacteristic, status: Int) {}
     }
 
     /**
@@ -353,6 +358,7 @@ class BLEClient(
             Log.d(LOG_TAG, "Characteristic ${characteristic.uuid} write status: $status")
             // Advance the queue so the next enqueued operation can run.
             _operationQueue?.signalOperationComplete()
+            if (status != BluetoothGatt.GATT_SUCCESS) callBack.onWriteFailed(characteristic, status)
         }
 
 

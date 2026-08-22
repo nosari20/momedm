@@ -84,6 +84,31 @@ class SessionManagerTest {
         r.connect("BB", "dev-A")
         assertEquals(listOf("AA"), r.disconnected)
     }
+    @Test fun frameFromForgottenKeyIsRejected() {
+        // The controller dropped the session (auth timeout / server restart) but the BLE link survived: the
+        // managed peer keeps sending sealed frames on the same key. onFrame must report false (the transport
+        // then fails the write) and must not resurrect a session for it — the peer reconnects instead.
+        val r = Rig(secret); r.connect("AA", "dev-A")
+        r.sm.onDisconnected("AA")
+        assertFalse(r.sm.onFrame("AA", "0001:0/1:x"))
+        assertTrue(r.sm.onlineDeviceIds().isEmpty())
+        assertFalse(r.sm.onFrame("BB", "0001:0/1:x"))
+    }
+    @Test fun silentStaleLinkIsProbedWithRehello() {
+        // Server restart: the BLE link re-attaches (onConnected fires again) but the managed peer believes it
+        // is authenticated and sends nothing. After REHELLO_AFTER_MS the tick must probe it with REHELLO so it
+        // re-handshakes — without waiting for its next periodic STATUS.
+        val r = Rig(secret); r.connect("AA", "dev-A")
+        r.sm.onDisconnected("AA"); r.now = 10_000; r.sm.onConnected("AA")   // stale link, peer silent
+        r.now = 10_000 + SessionManager.REHELLO_AFTER_MS + 1; r.sm.tick(r.now); r.pump()
+        assertEquals(setOf("dev-A"), r.sm.onlineDeviceIds())
+        assertTrue(r.disconnected.isEmpty())
+        // a probed-but-still-silent session is still dropped after the auth timeout
+        val r2 = Rig(secret); r2.connect("BB", "dev-B", managedSecret = ByteArray(32) { 9 })
+        r2.now = SessionManager.REHELLO_AFTER_MS + 1; r2.sm.tick(r2.now)
+        r2.now = SessionManager.REHELLO_AFTER_MS + SessionManager.AUTH_TIMEOUT_MS + 2; r2.sm.tick(r2.now)
+        assertEquals(listOf("BB"), r2.disconnected)
+    }
     @Test fun protocolErrorDisconnectsKey() {
         val r = Rig(secret); r.connect("AA", "dev-A")
         r.sm.onFrame("AA", "not a valid frame")

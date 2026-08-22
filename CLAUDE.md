@@ -204,7 +204,17 @@ screens.
 - **`STATUS` push cadence** is: on auth, after every command, on a battery
   change of ≥5 percentage points, and at least every 5 minutes — *not* on
   foreground-app or account change (no cheap signal exists for those; the
-  5-minute timer covers them). Acceptable for v1.
+  5-minute timer covers them). A sealed `PING` goes out every minute in
+  between. Acceptable for v1.
+- **Session-loss recovery is write-driven.** `BluetoothGattServer.cancelConnection`
+  does not reliably drop a central-initiated link and notifications do not
+  reach a client after the server re-registers (verified on the emulator's
+  rootcanal stack). So `SessionManager.onFrame` returns `false` for a key it
+  has no session for, `ControllerService` answers that write with
+  `GATT_FAILURE`, `BLEClient` surfaces it as `onWriteFailed`, and
+  `ManagedLinkService` disconnects + rescans. `REHELLO` (plain) is the
+  notify-side complement (sealed frame before auth / silent session probe)
+  and `PING` bounds detection latency to ~60 s.
 - **`BLEServerCallBack.onCharacteristicWriteRequest` takes a 4th `value:
   String` parameter** — use it, not `characteristic.value`, since the latter
   is a single field shared across all connected centrals and can be

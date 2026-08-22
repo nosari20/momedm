@@ -129,6 +129,9 @@ val client = BLEClient(
         override fun onConnected() { /* link up; safe to read/write */ }
         override fun onDisconnected() { /* link down (auto-closed) */ }
         override fun onMtuChanged(mtu: Int) { /* negotiated MTU; payload = mtu - 3 */ }
+        override fun onWriteFailed(characteristic: BluetoothGattCharacteristic, status: Int) {
+            // A queued write was answered with a non-success status (e.g. the server rejected it).
+        }
         override fun onCharacteristicChanged(
             characteristic: BLECharacteristic,
             service: BLEService
@@ -173,11 +176,14 @@ val server = BLEServer(
             service: BLEService,
             device: BluetoothDevice,
             value: String
-        ) {
+        ): Boolean {
             // A central wrote `value`; react here. Use `value`, not `characteristic.value` —
             // the latter is a single field shared by every characteristic instance, so with
             // multiple centrals connected concurrently a second write can overwrite it before
             // this callback for the first one runs.
+            // Return false to answer GATT_FAILURE: the central's BLEClient then gets
+            // `onWriteFailed(characteristic, status)` — a cheap "this link is stale" signal.
+            return true
         }
     }
 )
