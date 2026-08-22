@@ -39,6 +39,9 @@ class DeviceRegistry(private val prefs: ControllerPrefs, scope: CoroutineScope) 
      */
     fun get(deviceId: String): DeviceRecord? = _devices.value.firstOrNull { it.deviceId == deviceId }
 
+    /** Re-reads the persisted blob (another process/service wrote it). */
+    suspend fun reload() { _devices.value = DeviceRegistryCodec.decode(prefs.registryJson.first()) }
+
     /** Records that [deviceId] (model [model]) was seen at [nowMs], preserving its last known status. */
     suspend fun upsertSeen(deviceId: String, model: String, nowMs: Long) = mutate { list ->
         val old = list.firstOrNull { it.deviceId == deviceId }
