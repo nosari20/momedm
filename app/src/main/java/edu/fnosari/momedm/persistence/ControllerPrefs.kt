@@ -67,13 +67,25 @@ class ControllerPrefs(private val p: PreferencesProvider) {
     suspend fun setAdvertiseOnLaunch(v: Boolean) = p.write(KEY_ADVERTISE_ON_LAUNCH, v)
     /** Reads the current [childPrefs] snapshot without collecting the flow. */
     suspend fun childPrefsNow(): ChildPrefs = childPrefs.first()
-    /** Persists the parent-chosen UI language/theme/accent pushed to children. */
+    /**
+     * Persists the parent-chosen UI language/theme/accent pushed to children.
+     * Callers must emit `ControllerLink.prefsChanged` afterwards so online children receive SET_PREFS
+     * (persistence must not depend on the controller package).
+     */
     suspend fun setUiPrefs(language: String, theme: String, accent: Int) { p.write(KEY_LANGUAGE, language); p.write(KEY_THEME, theme); p.write(KEY_ACCENT, accent) }
-    /** Hashes and stores [pin] (4-6 digits) with a fresh salt. The clear PIN is never persisted. Returns false when [pin] is invalid. */
+    /**
+     * Hashes and stores [pin] (4-6 digits) with a fresh salt. The clear PIN is never persisted. Returns false when [pin] is invalid.
+     * Callers must emit `ControllerLink.prefsChanged` afterwards so online children receive SET_PREFS
+     * (persistence must not depend on the controller package).
+     */
     suspend fun setPin(pin: String): Boolean {
         if (!PinHash.isValidPin(pin)) return false
         val salt = PinHash.newSalt(); p.write(KEY_PIN_SALT, salt); p.write(KEY_PIN_HASH, PinHash.hash(pin, salt)); return true
     }
-    /** Clears the stored PIN salt/hash: no PIN required after this. */
+    /**
+     * Clears the stored PIN salt/hash: no PIN required after this.
+     * Callers must emit `ControllerLink.prefsChanged` afterwards so online children receive SET_PREFS
+     * (persistence must not depend on the controller package).
+     */
     suspend fun clearPin() { p.write(KEY_PIN_SALT, ""); p.write(KEY_PIN_HASH, "") }
 }

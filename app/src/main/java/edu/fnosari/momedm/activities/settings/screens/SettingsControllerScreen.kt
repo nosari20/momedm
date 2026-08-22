@@ -83,10 +83,11 @@ fun SettingsControllerScreen(navController: NavHostController) {
         }) { Text(stringResource(R.string.settings_dialog_confirm)) } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.settings_dialog_dismiss)) } })
     if (confirmClearPin) AlertDialog(onDismissRequest = { confirmClearPin = false },
-        text = { Text(stringResource(R.string.settings_pin_clear)) },
+        title = { Text(stringResource(R.string.settings_pin_clear)) },
+        text = { Text(stringResource(R.string.settings_pin_clear_warning)) },
         confirmButton = { TextButton(onClick = {
             confirmClearPin = false
-            scope.launch { prefs.clearPin(); ControllerLink.prefsChanged.tryEmit(Unit) }
+            scope.launch { prefs.clearPin(); ControllerLink.prefsChanged.tryEmit(Unit); info = context.getString(R.string.settings_pin_cleared) }
         }) { Text(stringResource(R.string.settings_dialog_confirm)) } },
         dismissButton = { TextButton(onClick = { confirmClearPin = false }) { Text(stringResource(R.string.settings_dialog_dismiss)) } })
     if (pinDialog) {

@@ -18,10 +18,8 @@ import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Controller UI state: registry, online set, advertising flag, command results; owns the provisioning controller. */
@@ -42,7 +40,6 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     private val _appsFor = MutableStateFlow<Pair<String, List<AppInfo>?>?>(null)
     /** (deviceId, apps) while the picker is open; apps == null while loading. */
     val appsFor: StateFlow<Pair<String, List<AppInfo>?>?> = _appsFor
-    val pinSet: StateFlow<Boolean> = prefs.pinSet.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     init {
         val app = application
@@ -76,18 +73,18 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     fun kioskOn(deviceId: String, apps: List<String>, pinned: String?) {
         _appsFor.value = null
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.KIOSK_ON, apps = apps, pinned = pinned) }
+        Log.d(LOG_TAG, "kioskOn -> $deviceId: ${apps.size} apps, pinned=$pinned: ${if (id == null) "offline" else "sent (id=$id)"}")
         announce(id)
     }
     /** Re-locks a paused child by re-sending its current config. */
     fun relock(deviceId: String) {
         val s = registry.get(deviceId)?.lastStatus ?: return
         if (s.kioskApps.isEmpty()) return
-        announce(ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.KIOSK_ON, apps = s.kioskApps, pinned = s.kioskPkg) })
+        val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.KIOSK_ON, apps = s.kioskApps, pinned = s.kioskPkg) }
+        Log.d(LOG_TAG, "relock -> $deviceId: ${if (id == null) "offline" else "sent (id=$id)"}")
+        announce(id)
     }
     fun rename(deviceId: String, nickname: String?) { viewModelScope.launch { registry.rename(deviceId, nickname) } }
-    /** Stores the PIN (hashed) and pushes it to online children. False when [pin] is invalid. */
-    suspend fun setPin(pin: String): Boolean = prefs.setPin(pin).also { if (it) ControllerLink.prefsChanged.tryEmit(Unit) }
-    fun clearPin() { viewModelScope.launch { prefs.clearPin(); ControllerLink.prefsChanged.tryEmit(Unit) } }
 
     fun kioskOff(deviceId: String) { send(deviceId, CmdType.KIOSK_OFF) }
     fun install(deviceId: String, pkg: String) { send(deviceId, CmdType.INSTALL, pkg) }

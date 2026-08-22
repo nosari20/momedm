@@ -138,6 +138,7 @@
     <string name="settings_pin_set">Set PIN</string>
     <string name="settings_pin_change">Change PIN</string>
     <string name="settings_pin_clear">Remove PIN</string>
+    <string name="settings_pin_clear_warning">Children will stop accepting the PIN the next time they connect. Continue?</string>
     <string name="settings_pin_status_set">A PIN is set. It unlocks a child device for 10 minutes.</string>
     <string name="settings_pin_status_unset">No PIN yet. Without it, child mode can only be ended from this phone.</string>
     <string name="settings_pin_hint">4–6 digits</string>
@@ -145,4 +146,5 @@
     <string name="settings_pin_mismatch">PINs do not match</string>
     <string name="settings_pin_invalid">Use 4 to 6 digits</string>
     <string name="settings_pin_saved">PIN saved and sent to connected children</string>
+    <string name="settings_pin_cleared">PIN removed</string>
 </resources>
