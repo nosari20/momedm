@@ -147,8 +147,11 @@ class BLEClient(
 
     /**
      * The Bluetooth Low Energy scanner used to search for available BLE devices.
+     * Resolved lazily in [startScan] rather than [initBluetooth]: Bluetooth can be toggled
+     * off/on after this client is constructed, and fetching the scanner while the adapter is
+     * null or disabled would NPE. Kept around so [stopScan] can use the same instance.
      */
-    private lateinit var _bluetoothLeScanner: BluetoothLeScanner
+    private var _bluetoothLeScanner: BluetoothLeScanner? = null
 
     /**
      * Indicates whether a BLE scan is currently in progress.
@@ -381,7 +384,6 @@ class BLEClient(
         // Get bluetooth manager
         _bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         _bluetoothAdapter = _bluetoothManager.adapter
-        _bluetoothLeScanner = _bluetoothAdapter!!.bluetoothLeScanner!!
 
         // Check if bluetooth is available
         Log.d(LOG_TAG,"Check if bluetooth is available")
@@ -431,6 +433,12 @@ class BLEClient(
     fun startScan(onTimeout: (() -> Unit)? = null) {
         if(isScanning()) return
 
+        // Resolved here (not in initBluetooth) because Bluetooth can be toggled off/on after
+        // this client is constructed; grabbing the scanner while the adapter is null/disabled
+        // would NPE. Checked before any state mutation so a disabled adapter cleanly throws
+        // instead of leaving _isScanning stuck true.
+        val scanner = _bluetoothAdapter?.takeIf { it.isEnabled }?.bluetoothLeScanner
+            ?: throw BLEException("Bluetooth not enabled: ${BLEClientExitCode.ERROR_BLUETOOTH_NOT_ENABLED}")
 
         _isScanning = true
         _listeningServices = mutableListOf()
@@ -448,6 +456,7 @@ class BLEClient(
             throw BLEException("BLUETOOTH_SCAN permission not granted: ${BLEClientExitCode.ERROR_BLUETOOTH_SCAN_PERMISSION_NOT_GRANTED}")
         }
 
+        _bluetoothLeScanner = scanner
 
         _scanHandler.postDelayed({
             if(isScanning()){
@@ -465,16 +474,19 @@ class BLEClient(
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
         val filters: List<ScanFilter>? = serviceUuid?.let { listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(it)).build()) }
-        _bluetoothLeScanner.startScan(filters, scanSettings, _scanCallback)
+        scanner.startScan(filters, scanSettings, _scanCallback)
 
 
     }
 
     /**
-     * Stop scanning for BLE devices.
-     * @throws BLEException if any error occurs.
+     * Stops an in-flight scan and cancels the pending scan-timeout callback. Idempotent — safe
+     * to call when no scan is in progress or no scan was ever started. Never throws: a missing
+     * permission or a failure to reach the platform scanner (e.g. Bluetooth turned off mid-scan)
+     * is logged and swallowed rather than crashing the caller.
      */
-    private fun stopScan() {
+    fun stopScan() {
+        _scanHandler.removeCallbacksAndMessages(null)
         if(!isScanning()) return
         _isScanning = false
         if (ActivityCompat.checkSelfPermission(
@@ -483,10 +495,14 @@ class BLEClient(
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             Log.d(LOG_TAG,"BLUETOOTH_SCAN permission not granted: ${BLEClientExitCode.ERROR_BLUETOOTH_SCAN_PERMISSION_NOT_GRANTED}")
-            throw BLEException("BLUETOOTH_SCAN permission not granted: ${BLEClientExitCode.ERROR_BLUETOOTH_SCAN_PERMISSION_NOT_GRANTED}")
+            return
         }
-        Log.d(LOG_TAG, "Starting device scan")
-        _bluetoothLeScanner.stopScan(_scanCallback)
+        Log.d(LOG_TAG, "Stopping device scan")
+        try {
+            _bluetoothLeScanner?.stopScan(_scanCallback)
+        } catch (e: Exception) {
+            Log.w(LOG_TAG, "stopScan failed: ${e.message}")
+        }
     }
 
     /**

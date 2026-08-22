@@ -62,13 +62,14 @@ class ManagedLinkService : Service() {
     private lateinit var status: StatusCollector
     private lateinit var executor: CommandExecutor
     private val gatt = MdmService()
-    private var client: BLEClient? = null
-    private var endpoint: ManagedEndpoint? = null
-    private var mtu = 23
-    private var backoffMs = BACKOFF_MIN_MS
-    private var statusJob: Job? = null
+    @Volatile private var client: BLEClient? = null
+    @Volatile private var endpoint: ManagedEndpoint? = null
+    @Volatile private var mtu = 23
+    @Volatile private var backoffMs = BACKOFF_MIN_MS
+    @Volatile private var statusJob: Job? = null
     private var lastBattery = -1
-    private var started = false
+    /** Set once in [onDestroy]; guards [scan]/[scheduleRescan] against firing after teardown. */
+    @Volatile private var destroyed = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -93,13 +94,21 @@ class ManagedLinkService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val fromBoot = intent?.getBooleanExtra(EXTRA_FROM_BOOT, false) == true
-        if (!started) { started = true; scope.launch { if (fromBoot) policy.restoreKiosk(); startLink() } }
+        // No separate "started" latch: the link is (re)kicked off whenever there is no live
+        // client yet. This keeps a "Not provisioned" first call a genuine no-op that a later
+        // start(context) — e.g. right after provisioning completes — can retry.
+        if (client == null) { scope.launch { if (fromBoot) policy.restoreKiosk(); startLink() } }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        unregisterReceiver(batteryReceiver)
-        statusJob?.cancel(); client?.disconnect(); scope.cancel()
+        destroyed = true
+        main.removeCallbacksAndMessages(null)
+        runCatching { unregisterReceiver(batteryReceiver) }
+        statusJob?.cancel()
+        client?.stopScan()
+        client?.disconnect()
+        scope.cancel()
         ManagedLinkState.state.value = LinkState.IDLE
         super.onDestroy()
     }
@@ -107,43 +116,71 @@ class ManagedLinkService : Service() {
     private suspend fun startLink() {
         val secret = prefs.secretBytes()
         if (secret == null) { Log.w(LOG_TAG, "Not provisioned; no secret"); ManagedLinkState.lastError.value = "Not provisioned"; return }
-        val deviceId = prefs.ensureDeviceId()
-        val model = "${Build.MANUFACTURER} ${Build.MODEL}"
-        endpoint = ManagedEndpoint(secret, deviceId, model, { frame -> sendFrame(frame) }, object : ManagedEndpoint.Listener {
-            override fun onAuthenticated() {
-                Log.d(LOG_TAG, "Authenticated")
-                backoffMs = BACKOFF_MIN_MS
-                setState(LinkState.AUTHENTICATED)
-                pushStatus(); startPeriodicStatus()
-            }
-            override fun onCommand(cmd: Message.Cmd) { scope.launch { handleCommand(cmd) } }
-            override fun onProtocolError(reason: String) {
-                Log.w(LOG_TAG, "Protocol error: $reason"); ManagedLinkState.lastError.value = reason
-                client?.disconnect(); scheduleRescan()
-            }
-        })
-        client = BLEClient(this, serverName = null, servicesToListen = listOf(gatt), callBack = object : BLEClient.BLEClientCallBack {
-            override fun onMtuChanged(mtu: Int) { this@ManagedLinkService.mtu = mtu }
-            override fun onConnected() { Log.d(LOG_TAG, "Connected, mtu=$mtu"); setState(LinkState.CONNECTED); endpoint?.onConnected(mtu) }
-            override fun onDisconnected() { Log.d(LOG_TAG, "Disconnected"); statusJob?.cancel(); endpoint?.reset(); scheduleRescan() }
-            override fun onCharacteristicChanged(characteristic: BLECharacteristic, service: BLEService) {
-                if (characteristic.uuid == MdmGatt.CMD_UUID) endpoint?.onFrame(characteristic.value)
-            }
-        }, serviceUuid = MdmGatt.SERVICE_UUID)
-        scan()
+        try {
+            val deviceId = prefs.ensureDeviceId()
+            val model = "${Build.MANUFACTURER} ${Build.MODEL}"
+            endpoint = ManagedEndpoint(secret, deviceId, model, { frame -> sendFrame(frame) }, object : ManagedEndpoint.Listener {
+                override fun onAuthenticated() {
+                    Log.d(LOG_TAG, "Authenticated")
+                    backoffMs = BACKOFF_MIN_MS
+                    setState(LinkState.AUTHENTICATED)
+                    pushStatus(); startPeriodicStatus()
+                }
+                override fun onCommand(cmd: Message.Cmd) { scope.launch { handleCommand(cmd) } }
+                override fun onProtocolError(reason: String) {
+                    Log.w(LOG_TAG, "Protocol error: $reason"); ManagedLinkState.lastError.value = reason
+                    // client.disconnect() is a synchronous local close — it does not fire
+                    // onDisconnected(), so the periodic status job must be cancelled here too.
+                    statusJob?.cancel()
+                    client?.disconnect(); scheduleRescan()
+                }
+            })
+            client = BLEClient(this, serverName = null, servicesToListen = listOf(gatt), callBack = object : BLEClient.BLEClientCallBack {
+                override fun onMtuChanged(mtu: Int) { this@ManagedLinkService.mtu = mtu }
+                override fun onConnected() { Log.d(LOG_TAG, "Connected, mtu=$mtu"); setState(LinkState.CONNECTED); endpoint?.onConnected(mtu) }
+                override fun onDisconnected() { Log.d(LOG_TAG, "Disconnected"); statusJob?.cancel(); endpoint?.reset(); scheduleRescan() }
+                override fun onCharacteristicChanged(characteristic: BLECharacteristic, service: BLEService) {
+                    if (characteristic.uuid == MdmGatt.CMD_UUID) endpoint?.onFrame(characteristic.value)
+                }
+            }, serviceUuid = MdmGatt.SERVICE_UUID)
+            scan()
+        } catch (t: Throwable) {
+            // BLEClient's constructor (and startScan below) can throw BLEException — most
+            // commonly "Bluetooth not enabled". Never let that escape and crash the service;
+            // just log, surface it, and let the backoff loop retry.
+            Log.e(LOG_TAG, "startLink failed: ${t.message}", t)
+            ManagedLinkState.lastError.value = t.message ?: t::class.simpleName
+            // Counts as a failed attempt too (client construction itself is what failed) — bump
+            // here or a sustained outage (e.g. Bluetooth left off) would retry forever at the
+            // base interval and never back off toward BACKOFF_MAX_MS.
+            bumpBackoff(); scheduleRescan()
+        }
     }
 
     private fun scan() {
+        if (destroyed) return
+        val c = client
+        if (c == null) {
+            // Construction of the BLEClient itself failed last time (e.g. Bluetooth was off) —
+            // retry the whole link setup rather than looping on a scan call that can never run.
+            scope.launch { startLink() }
+            return
+        }
         setState(LinkState.SCANNING)
-        try { client?.startScan(onTimeout = { Log.d(LOG_TAG, "Scan timeout"); scheduleRescan() }) }
-        catch (e: BLEException) { Log.w(LOG_TAG, "Scan failed: ${e.message}"); ManagedLinkState.lastError.value = e.message; scheduleRescan() }
+        // Advanced here (only when a scan is actually attempted) rather than in
+        // scheduleRescan(), so concurrent/duplicate reschedule requests for the same failure
+        // (e.g. onProtocolError and a later onDisconnected) collapse into a single doubling.
+        bumpBackoff()
+        try { c.startScan(onTimeout = { Log.d(LOG_TAG, "Scan timeout"); scheduleRescan() }) }
+        catch (t: Throwable) { Log.w(LOG_TAG, "Scan failed: ${t.message}"); ManagedLinkState.lastError.value = t.message ?: t::class.simpleName; scheduleRescan() }
     }
 
+    private fun bumpBackoff() { backoffMs = (backoffMs * 2).coerceAtMost(BACKOFF_MAX_MS) }
+
     private fun scheduleRescan() {
-        setState(LinkState.SCANNING)
-        val delayMs = backoffMs; backoffMs = (backoffMs * 2).coerceAtMost(BACKOFF_MAX_MS)
+        if (destroyed) return
         main.removeCallbacksAndMessages(null)
-        main.postDelayed({ scan() }, delayMs)
+        main.postDelayed({ scan() }, backoffMs)
     }
 
     private fun sendFrame(frame: String) {

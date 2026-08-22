@@ -50,6 +50,7 @@ It is plain Android — no DI, no third-party BLE library.
   scan by advertised service UUID (name optional); `BLEServer(includeDeviceName = ...)`
   controls whether the advertised device name is included.
 - **`disconnectDevice`.** The server can drop a specific central's link.
+- **Bluetooth-off safe.** `BLEClient` resolves the platform scanner lazily inside `startScan()` (not at construction), so a disabled/toggled adapter throws `BLEException` instead of crashing; `stopScan()` is public, idempotent, cancels the pending scan-timeout, and never throws.
 
 ## Requirements
 
