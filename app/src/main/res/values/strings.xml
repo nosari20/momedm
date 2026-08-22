@@ -36,4 +36,23 @@
     <string name="setup_done">Finish</string>
     <string name="setup_status_done">Done</string>
     <string name="setup_status_missing">Not yet</string>
+
+    <!-- Managed home UI -->
+    <string name="managed_activity_title">Môme DM</string>
+    <string name="managed_drawer_name">Managed device</string>
+    <string name="managed_route_home">Home</string>
+    <string name="managed_allow">Allow</string>
+    <string name="managed_link_scanning">Looking for controller…</string>
+    <string name="managed_link_connected">Connected, authenticating…</string>
+    <string name="managed_link_idle">Link service stopped</string>
+    <string name="managed_status_title">Status</string>
+    <string name="managed_status_kiosk">Kiosk</string>
+    <string name="managed_status_account">Google account</string>
+    <string name="managed_status_battery">Battery</string>
+    <string name="managed_status_current">Current app</string>
+    <string name="managed_action_account">Add Google account</string>
+    <string name="managed_action_usage">Grant usage access</string>
+    <string name="managed_action_restart">Restart link</string>
+    <string name="managed_yes">Yes</string>
+    <string name="managed_no">No</string>
 </resources>
