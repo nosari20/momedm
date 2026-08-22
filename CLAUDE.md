@@ -122,9 +122,9 @@ app/src/main/java/edu/fnosari/momedm/
 
 app/src/test/java/edu/fnosari/momedm/
 ├── protocol/                      # Framer/Reassembler, Crypto, Encoding, Handshake, Messages, SecureChannel,
-│                                  #   EndpointLoopbackTest (full controller<->managed session over an in-memory sink)
+│                                  #   PinHashTest, EndpointLoopbackTest (full controller<->managed session over an in-memory sink)
 ├── controller/                    # SessionManagerTest, provisioning/{ControllerIdentityTest,NetUtilsTest,QrPayloadBuilderTest}
-├── persistence/                   # ManagedPrefsTest, ControllerPrefsTest, DeviceRegistryCodecTest, InMemoryPreferencesProvider
+├── persistence/                   # ManagedPrefsTest, ControllerPrefsTest, DeviceRegistryCodecTest, KioskConfigTest, InMemoryPreferencesProvider
 └── managed/                       # CommandExecutorTest
 ```
 

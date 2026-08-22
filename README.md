@@ -89,7 +89,7 @@ a custom DPC).
 child mode off it lists every installed app; with child mode on ("Child
 mode" header) it shows only the parent-chosen `apps`, running under Android
 lock task so Back/Home can't escape it. If the parent picked a **pinned**
-app, the launcher immediately relaunches into it and keeps bouncing back
+app, the launcher relaunches into it after a short (1.5 s) grace period — so the parent-PIN lock icon stays reachable — and keeps bouncing back
 whenever the child returns to the launcher (e.g. via Home).
 
 If the parent has set a PIN (Settings → Controller → *Set PIN*), a lock icon
