@@ -25,3 +25,15 @@ Deferred minors and parked findings from the per-task and final code reviews of 
 - Task 13: minor (deferred): buildQr() launch job not captured (one-shot, low risk).
 - Task 14-15: minor (deferred): unused strings device_title/provision_title; _appsFor not scoped to DeviceScreen lifetime.
 - Task 14-15: minor (deferred): BLEServer.stopServer defers close 1 s → two GATT handles during restart; replayed snackbar on gate re-entry.
+
+## Plan 1 — kiosk v2 (2026-08-22, branch feature/kiosk-v2)
+
+### Parked / deferred
+- Task 1-2: minor (deferred): unused catch binding in decodeApps; no test for childPrefs default / sanitized pin pairing.
+- Task 3-4: minor (deferred): RESULT pinned note computed pre-filter (STATUS carries truth); spec §7 'note' on SET_PREFS sanitization not emitted (brief said plain 'prefs applied'); AppLocale LF vs CRLF.
+- Task 3-4: minor (deferred): no PolicyManager-level tests for locked/paused gating.
+- Task 5: minor (deferred): icon bitmaps converted per lazy item; pinError resolved as String in VM (Plan 2 i18n); dead VM surface (addAccount/openUsageAccess/restartLink) kept for Plan 2.
+- Task 5: minor (deferred): resumeTick/pinDialogOpen exposed as public MutableStateFlow; RESUMED not re-checked after bounce delay; managed_no orphan string.
+- Task 6-7: minor (deferred): setPin two DataStore writes (tiny half-pair window, parent-recoverable); picker seeds remembered without keys; prefsJob starts before BLE try; pushPrefs duplicates id generation; tests don't assert clear-PIN absence / updateStatus nickname.
+- Task 8: minor (deferred): debug provisioning path does not call setAsDefaultHome (Home goes to stock launcher when child mode off on the rig).
+- Final: parked — resume() inside collectLatest cancellable by unrelated DataStore writes (self-heals); DeviceRegistry.reload() outside mutex; lockout restore startup race; malformed PIN pair at rest until next SET_PREFS; tryPin during restored lockout silently swallowed — Ruling: deferred, all self-healing or tiny windows.
