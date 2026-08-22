@@ -31,12 +31,20 @@ class DeviceRegistry(private val prefs: ControllerPrefs, scope: CoroutineScope) 
     val devices: StateFlow<List<DeviceRecord>> = _devices.asStateFlow()
     private val loaded = scope.launch { _devices.value = DeviceRegistryCodec.decode(prefs.registryJson.first()) }
 
+    /**
+     * Reads the current in-memory snapshot for [deviceId]; does not suspend or wait for the
+     * initial load. May be null either because the device isn't known yet, or because the
+     * initial load from [ControllerPrefs] hasn't completed yet — observe [devices] instead for
+     * a reactive read that reflects the load once it finishes.
+     */
     fun get(deviceId: String): DeviceRecord? = _devices.value.firstOrNull { it.deviceId == deviceId }
 
+    /** Records that [deviceId] (model [model]) was seen at [nowMs], preserving its last known status. */
     suspend fun upsertSeen(deviceId: String, model: String, nowMs: Long) = mutate { list ->
         val old = list.firstOrNull { it.deviceId == deviceId }
         list.filter { it.deviceId != deviceId } + DeviceRecord(deviceId, model, nowMs, old?.lastStatus)
     }
+    /** Records a fresh [status] for [deviceId] at [nowMs], synthesizing a placeholder record if it wasn't known yet. */
     suspend fun updateStatus(deviceId: String, status: Message.Status, nowMs: Long) = mutate { list ->
         val old = list.firstOrNull { it.deviceId == deviceId } ?: DeviceRecord(deviceId, "?", nowMs)
         list.filter { it.deviceId != deviceId } + old.copy(lastSeen = nowMs, lastStatus = status)

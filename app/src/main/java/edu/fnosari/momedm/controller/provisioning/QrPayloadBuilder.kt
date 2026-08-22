@@ -23,8 +23,10 @@ object QrPayloadBuilder {
     const val HTTP_PORT = 8080
     private const val P = "android.app.extra."
 
+    /** Builds the URL for the controller's locally-hosted APK, given the controller's own [ip]. */
     fun apkUrl(ip: String): String = "http://$ip:$HTTP_PORT/$APK_FILE_NAME"
 
+    /** Serializes [p] into the QR-encodable Android Enterprise provisioning JSON. */
     fun build(p: ProvisioningParams): String {
         val obj: JsonObject = buildJsonObject {
             put(P + "PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME", ADMIN_COMPONENT)

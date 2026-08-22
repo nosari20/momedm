@@ -21,13 +21,18 @@ class ManagedPrefs(private val p: PreferencesProvider) {
     val kioskPkg: Flow<String> = p.readString(KEY_KIOSK_PKG, "")
     val kioskOn: Flow<Boolean> = p.readBoolean(KEY_KIOSK_ON, false)
 
+    /** Persists the controller identity (id + secret) received from the QR admin extras. */
     suspend fun saveProvisioning(controllerId: String, secretBase64: String) { p.write(KEY_CONTROLLER_ID, controllerId); p.write(KEY_SECRET, secretBase64) }
+    /** True once a controller secret has been saved via [saveProvisioning]. */
     suspend fun isProvisioned(): Boolean = secretBase64.first().isNotEmpty()
+    /** Decodes the stored secret, or null if none has been saved yet. */
     suspend fun secretBytes(): ByteArray? = secretBase64.first().takeIf { it.isNotEmpty() }?.let { Base64Std.decode(it) }
+    /** Returns this device's id, generating and persisting one on first call. */
     suspend fun ensureDeviceId(): String {
         val existing = deviceId.first()
         if (existing.isNotEmpty()) return existing
         return UUID.randomUUID().toString().also { p.write(KEY_DEVICE_ID, it) }
     }
+    /** Persists the kiosk on/off state and the kiosk package (empty string when [pkg] is null). */
     suspend fun setKiosk(on: Boolean, pkg: String?) { p.write(KEY_KIOSK_ON, on); p.write(KEY_KIOSK_PKG, pkg ?: "") }
 }
