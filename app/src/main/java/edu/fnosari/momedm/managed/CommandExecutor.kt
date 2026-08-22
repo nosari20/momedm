@@ -4,13 +4,15 @@ import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.Message
 
+/** Managed-role actions the [CommandExecutor] drives; implemented by [PolicyManager]. */
 interface PolicyActions {
     suspend fun kioskOn(pkg: String): Result<Unit>
     suspend fun kioskOff(): Result<Unit>
     fun openPlay(pkg: String): Result<Unit>
-    fun openAddAccount(): Result<Unit>
+    suspend fun openAddAccount(): Result<Unit>
 }
 
+/** Read-only device state the [CommandExecutor] reports back; implemented by [StatusCollector]. */
 interface StatusSource {
     suspend fun collect(): Message.Status
     fun launchableApps(): List<AppInfo>

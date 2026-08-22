@@ -15,7 +15,7 @@ class CommandExecutorTest {
         override suspend fun kioskOn(pkg: String) = if (pkg == "bad") Result.failure(IllegalArgumentException("not installed")) else { kiosk = pkg; Result.success(Unit) }
         override suspend fun kioskOff() = run { kiosk = null; Result.success(Unit) }
         override fun openPlay(pkg: String) = run { played = pkg; Result.success(Unit) }
-        override fun openAddAccount() = run { accountOpened = true; Result.success(Unit) }
+        override suspend fun openAddAccount() = if (kiosk != null) Result.failure(IllegalStateException("kiosk is on; turn it off first")) else run { accountOpened = true; Result.success(Unit) }
     }
     private class FakeStatus : StatusSource {
         override suspend fun collect() = Message.Status(false, null, true, 42, "x")
@@ -28,11 +28,17 @@ class CommandExecutorTest {
     }
     @Test fun kioskOnFailure() = runTest {
         val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("2", CmdType.KIOSK_ON, "bad"))
-        assertFalse((out[0] as Message.Result).ok); assertEquals(1, out.size)
+        val result = out[0] as Message.Result
+        assertFalse(result.ok); assertEquals(1, out.size); assertEquals("not installed", result.msg)
     }
     @Test fun kioskOnWithoutPkgFails() = runTest {
         val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("3", CmdType.KIOSK_ON, null))
         assertFalse((out[0] as Message.Result).ok)
+    }
+    @Test fun kioskOffReturnsResultThenStatus() = runTest {
+        val p = FakePolicy(); p.kiosk = "com.k"
+        val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("8", CmdType.KIOSK_OFF))
+        assertEquals(Message.Result("8", true, "kiosk off"), out[0]); assertTrue(out[1] is Message.Status); assertEquals(null, p.kiosk)
     }
     @Test fun listAppsAndStatus() = runTest {
         val ex = CommandExecutor(FakePolicy(), FakeStatus())
@@ -43,5 +49,12 @@ class CommandExecutorTest {
         val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
         assertTrue((ex.execute(Message.Cmd("6", CmdType.INSTALL, "com.p"))[0] as Message.Result).ok); assertEquals("com.p", p.played)
         assertTrue((ex.execute(Message.Cmd("7", CmdType.ADD_ACCOUNT))[0] as Message.Result).ok); assertTrue(p.accountOpened)
+    }
+    @Test fun addAccountRefusedWhileKioskOn() = runTest {
+        val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
+        ex.execute(Message.Cmd("9", CmdType.KIOSK_ON, "com.k"))
+        val out = ex.execute(Message.Cmd("10", CmdType.ADD_ACCOUNT))
+        val result = out[0] as Message.Result
+        assertFalse(result.ok); assertEquals("kiosk is on; turn it off first", result.msg); assertFalse(p.accountOpened)
     }
 }

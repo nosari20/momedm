@@ -21,7 +21,9 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         const val GMS_PKG = "com.google.android.gms"
     }
     private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    /** The [AdminReceiver] component this app is (or would be) registered as device owner with. */
     val admin = ComponentName(context, AdminReceiver::class.java)
+    /** True once this app has been set as device owner (via `dpm set-device-owner` during provisioning). */
     val isDeviceOwner: Boolean get() = dpm.isDeviceOwnerApp(context.packageName)
 
     /** Makes [ManagedHomeActivity] the persistent HOME so the device boots into us. */
@@ -34,7 +36,8 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
     override suspend fun kioskOn(pkg: String): Result<Unit> = runCatching {
         val launch = context.packageManager.getLaunchIntentForPackage(pkg) ?: throw IllegalArgumentException("$pkg not installed or not launchable")
         dpm.setLockTaskPackages(admin, arrayOf(pkg, context.packageName, PLAY_PKG, GMS_PKG))
-        dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
+        // NOTIFICATIONS requires HOME to also be enabled or AOSP throws IllegalArgumentException; SYSTEM_INFO alone is safe.
+        dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(launch, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
         prefs.setKiosk(true, pkg)
@@ -43,9 +46,12 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
 
     override suspend fun kioskOff(): Result<Unit> = runCatching {
         dpm.setLockTaskPackages(admin, emptyArray())   // removing the allowlist forces lock task to end
-        val home = Intent(context, ManagedHomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        context.startActivity(home)
         prefs.setKiosk(false, null)
+        // State is already cleared above; a launch failure here must not resurrect kiosk on the next restoreKiosk().
+        runCatching {
+            val home = Intent(context, ManagedHomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            context.startActivity(home)
+        }.onFailure { Log.w(LOG_TAG, "Failed to launch ManagedHomeActivity after kiosk off", it) }
         Log.d(LOG_TAG, "Kiosk off")
     }
 
@@ -62,9 +68,12 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Log.d(LOG_TAG, "Opened Play for $pkg")
     }
 
-    override fun openAddAccount(): Result<Unit> = runCatching {
-        val i = Intent(Settings.ACTION_ADD_ACCOUNT).putExtra(Settings.EXTRA_ACCOUNT_TYPES, arrayOf("com.google")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(i)
-        Log.d(LOG_TAG, "Opened add-account")
+    override suspend fun openAddAccount(): Result<Unit> {
+        if (prefs.kioskOn.first()) return Result.failure(IllegalStateException("kiosk is on; turn it off first"))
+        return runCatching {
+            val i = Intent(Settings.ACTION_ADD_ACCOUNT).putExtra(Settings.EXTRA_ACCOUNT_TYPES, arrayOf("com.google")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(i)
+            Log.d(LOG_TAG, "Opened add-account")
+        }
     }
 }

@@ -26,10 +26,13 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
         Log.d(LOG_TAG, "Status: $s"); return s
     }
 
+    /** Current battery charge as a 0-100 percentage. */
     fun batteryPercent(): Int = (context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
 
+    /** True when a Google account is present, or false (without throwing) if account visibility is denied. */
     fun hasGoogleAccount(): Boolean = try { AccountManager.get(context).getAccountsByType("com.google").isNotEmpty() } catch (e: SecurityException) { Log.w(LOG_TAG, "No account visibility", e); false }
 
+    /** True when this app currently holds the PACKAGE_USAGE_STATS app-op, needed by [foregroundApp]. */
     fun hasUsageAccess(): Boolean {
         val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         return ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
@@ -45,6 +48,7 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
         return last
     }
 
+    /** All launcher-visible apps on the device, deduped by package and sorted by label. */
     override fun launchableApps(): List<AppInfo> {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
