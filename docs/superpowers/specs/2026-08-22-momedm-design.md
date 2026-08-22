@@ -32,6 +32,11 @@ re-namespaced, with four small extensions (§4.1).
 | `LIST_APPS` | Reply with installed launchable apps |
 | `GET_STATUS` | Reply with status |
 
+> **Superseded for `KIOSK_ON` / child mode:** `docs/superpowers/specs/2026-08-22-kiosk-v2-parent-ux-design.md`
+> replaces single-app kiosk with multi-app child mode (`KIOSK_ON {apps, pinned?}`),
+> adds `SET_PREFS` (parent PIN, language/theme/accent) and a parent-PIN pause —
+> see that spec and `README.md`/`CLAUDE.md` for the current semantics.
+
 Out of scope v1: lock/reboot/wipe, user restrictions, APK streaming over BLE,
 sideload URL, silent Play install (requires registered EMM — not available to a
 custom DPC).
@@ -252,6 +257,11 @@ currentApp}`, `APPS[{pkg,label}]`, `RESULT{cmdId,ok,msg}`.
 Controller → managed: `CHALLENGE`, `CMD{id,type,args}` with types
 `KIOSK_ON{pkg}`, `KIOSK_OFF`, `INSTALL{pkg}`, `ADD_ACCOUNT`, `LIST_APPS`,
 `GET_STATUS`.
+
+> **Superseded:** `docs/superpowers/specs/2026-08-22-kiosk-v2-parent-ux-design.md`
+> adds `SET_PREFS{prefs}`, changes `KIOSK_ON` to `{apps,pinned?}`, and adds
+> `kioskApps`/`kioskPaused`/`pauseEndsAt` to `STATUS` — see that spec for the
+> current wire shapes.
 
 `STATUS` is pushed on auth complete, on any change (kiosk, account, battery
 ±5 %, foreground app), and at least every 5 min. A sealed `PING` (no payload)

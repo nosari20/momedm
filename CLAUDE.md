@@ -72,21 +72,24 @@ app/src/main/java/edu/fnosari/momedm/
 │   ├── Handshake.kt                #   ManagedHandshake, ControllerHandshake
 │   ├── SecureChannel.kt           #   SecureChannel (seal/open), ProtocolException
 │   ├── Endpoints.kt               #   FrameSink, ManagedEndpoint, ControllerEndpoint (session state machines)
+│   ├── PinHash.kt                 #   Parent-PIN hashing: PBKDF2-HMAC-SHA256, 20k iters, 32-byte out, 16-byte salt
 │   └── ProvisioningExtras.kt      #   Admin-extras bundle keys (controller_id, secret)
 │
 ├── link/MdmGatt.kt                # Service/characteristic UUIDs (permanent) + MdmService/Cmd/RspCharacteristic
 │
 ├── persistence/
 │   ├── preferences/               # Preference<T>, PreferencesProvider, DataStore impl (copied from BLEController)
-│   ├── ManagedPrefs.kt            #   controllerId, secret, deviceId, kioskPkg, kioskOn
-│   ├── ControllerPrefs.kt         #   controllerId, secret (identity)
-│   └── DeviceRegistry.kt          #   DeviceRecord, codec, registry (DataStore JSON)
+│   ├── ManagedPrefs.kt            #   controllerId, secret, deviceId, kioskConfig, childPrefs
+│   ├── KioskConfig.kt             #   on/apps/pinned/pauseUntil + isPaused/isLocked, PAUSE_MS (pure Kotlin)
+│   ├── ControllerPrefs.kt         #   controllerId, secret (identity), parent PIN (hash+salt), pinSet
+│   └── DeviceRegistry.kt          #   DeviceRecord, codec, registry (DataStore JSON), nickname
 │
 ├── managed/                       # Non-UI, device-owner side
 │   ├── AdminReceiver.kt           #   DeviceAdminReceiver
 │   ├── BootReceiver.kt            #   Restarts ManagedLinkService on BOOT_COMPLETED
 │   ├── ManagedSetup.kt            #   Post-provisioning setup (preferred HOME, start link)
-│   ├── PolicyManager.kt           #   DevicePolicyManager wrapper: kiosk on/off, install, add account
+│   ├── PolicyManager.kt           #   DevicePolicyManager wrapper: multi-app kiosk on/off/pause/resume,
+│   │                              #     restoreKiosk (reboot), verifyPin, install, add account
 │   ├── StatusCollector.kt         #   Battery, account, foreground app, launchable apps
 │   ├── CommandExecutor.kt         #   Dispatches Cmd -> PolicyManager/StatusCollector, builds Result
 │   ├── ManagedLinkState.kt        #   Link state enum/data exposed to UI
@@ -104,14 +107,17 @@ app/src/main/java/edu/fnosari/momedm/
 │   │   │                          #   isDeviceOwnerApp), ControllerViewModel, navigation/Routes {DEVICES, PROVISION},
 │   │   │                          #   screens/{DevicesScreen,DeviceScreen,ProvisionScreen},
 │   │   └── components/{ServiceBanner,OnlineIndicator,AppPickerDialog}
-│   ├── managed/                   # Managed UI: ManagedHomeActivity (HOME/DEFAULT, no LAUNCHER), ManagedViewModel,
-│   │   │                          #   navigation/Routes {HOME}, screens/HomeScreen, components/LinkBanner
+│   ├── managed/                   # Managed UI: ManagedHomeActivity (HOME/DEFAULT; itself a launcher screen — all
+│   │   │                          #   apps when child mode is off), ManagedViewModel, screens/ChildLauncherScreen
+│   │   │                          #   (app grid, pinned-app bounce, PIN pause banner), components/PinDialog
+│   │   │                          #   (masked numeric PIN, lockout countdown)
 │   │   └── provisioning/          #   GetProvisioningModeActivity, PolicyComplianceActivity (setup wizard steps)
 │   └── settings/                  # SettingsActivity (copied), navigation/Routes, screens/{SettingsCategories,
 │                                  #   SettingsScreen, SettingsEasterEgg, SettingsControllerScreen}, components/
 │
 ├── ui/{layouts,theme}/            # Layout.BasicLayoutWithTopBarAndDrawer, BasicLayoutWithTopBar, MomeDMTheme (copied)
 ├── ui/components/ButtonRequestPermission.kt  # Permission-gate button used by activity onCreate flows
+├── ui/AppLocale.kt                # Applies a ChildPrefs language override (per-app locale) at runtime
 └── utils/AppVersion.kt            # Copied
 
 app/src/test/java/edu/fnosari/momedm/
@@ -197,11 +203,36 @@ screens.
 - **Reassembler** discards a partial message after 10 s of inactivity and
   tracks at most 16 concurrent partials (oldest evicted first) to bound
   pre-auth memory use against junk frames.
-- **Kiosk allowlist** is `[pkg, self, "com.android.vending",
+- **Kiosk allowlist** is `[...apps, self, "com.android.vending",
   "com.google.android.gms"]` (GMS is needed for Play's UI inside lock task,
   beyond what the spec listed) and `setLockTaskFeatures` only enables
   `SYSTEM_INFO` — `NOTIFICATIONS` requires `HOME` to also be enabled or AOSP
   throws `IllegalArgumentException`, so it's left off.
+- **`KIOSK_ON` carries `apps` (non-empty allowlist) + optional `pinned`**
+  (single app kept in front, must be `in apps`) — v1's single-`pkg` kiosk is
+  gone. `PolicyManager.kioskOn` persists both into `KioskConfig` and always
+  re-derives the lock-task allowlist as `apps + self + Play + GMS`; a
+  `pinned` app that isn't installed/allowed is silently dropped (logged),
+  never rejected outright.
+- **Parent PIN is PBKDF2, never plaintext, and pushed as prefs, not a
+  command.** `PinHash` (PBKDF2-HMAC-SHA256, 20k iterations, 32-byte output,
+  16-byte random salt) hashes the PIN on the **controller**; only the salt +
+  hash travel inside `ChildPrefs` on `SET_PREFS`. A correct PIN starts a
+  10-minute pause (`KioskConfig.PAUSE_MS`) that the launcher `Activity`
+  itself releases by calling `stopLockTask()` — `PolicyManager.pause()` only
+  persists the deadline, it does not touch lock-task state. The pause is
+  **not honoured across reboot**: `restoreKiosk()` unconditionally re-locks
+  with the stored `apps`/`pinned` on `BOOT_COMPLETED`, ignoring any prior
+  `pauseUntil`.
+- **`SET_PREFS` is pushed after every successful auth and after every prefs
+  change** (PIN set/changed/cleared, language/theme/accent), so a managed
+  device that reconnects always gets the parent's current PIN hash — never
+  rely on it being pushed only once.
+- **`ManagedHomeActivity` is a launcher for both modes**: with child mode
+  off it shows every launchable app (`ChildLauncherScreen`, header "All
+  apps"); with child mode on it shows only the allowed apps (header "Child
+  mode", lock icon when a PIN is set) — there is no separate "off" screen to
+  maintain.
 - **`ADD_ACCOUNT` is refused while kiosk is on** — Settings would be
   escapable from inside lock task, so the controller must send `KIOSK_OFF`
   first; this is on purpose, not a bug.

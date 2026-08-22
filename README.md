@@ -71,8 +71,9 @@ devices.
 
 | Command | Effect on managed device |
 |---|---|
-| `KIOSK_ON {pkg}` | Lock-task mode running `pkg` |
-| `KIOSK_OFF` | Exit lock task, return to managed home |
+| `KIOSK_ON {apps, pinned?}` | Child mode on: lock task with `apps` allowed; if `pinned` (must be in `apps`) is set, the launcher keeps bouncing back into that one app |
+| `KIOSK_OFF` | Child mode off: exit lock task, launcher shows every installed app |
+| `SET_PREFS {prefs}` | Push language/theme/accent and the parent-PIN hash+salt (or clear it); applied immediately and re-sent after every reconnect |
 | `INSTALL {pkg}` | Open Google Play listing (`market://details?id=pkg`); user taps Install |
 | `ADD_ACCOUNT` | Open system "Add Google account" flow |
 | `LIST_APPS` | Reply with installed launchable apps |
@@ -81,6 +82,25 @@ devices.
 Out of scope v1: lock/reboot/wipe, user restrictions, APK streaming over BLE,
 sideload URL, silent Play install (requires registered EMM — not available to
 a custom DPC).
+
+### Child mode
+
+`ManagedHomeActivity` is the managed device's launcher in both states: with
+child mode off it lists every installed app; with child mode on ("Child
+mode" header) it shows only the parent-chosen `apps`, running under Android
+lock task so Back/Home can't escape it. If the parent picked a **pinned**
+app, the launcher immediately relaunches into it and keeps bouncing back
+whenever the child returns to the launcher (e.g. via Home).
+
+If the parent has set a PIN (Settings → Controller → *Set PIN*), a lock icon
+in the header opens a PIN prompt; a correct PIN pauses child mode for 10
+minutes (lock task is released, all apps become reachable, a countdown
+banner shows) without turning it off — the parent can end the pause early
+with *Lock again*, or a wrong PIN triggers a growing lockout. The pause does
+**not** survive a reboot: the device re-locks with the same `apps`/`pinned`
+on boot. The PIN itself is hashed (PBKDF2) on the controller before it's
+sent — the managed device only ever stores/compares the hash, never the
+plaintext PIN.
 
 ## Security
 

@@ -43,8 +43,9 @@ $ADB -s emulator-5556 shell dumpsys activity activities | grep -E 'mLockTaskMode
 Emulator results so far: A (all except hotspot/QR-scan), C (all commands incl.
 kiosk lock-task, Play listing, add-account refusal), D reconnect after
 advertising toggle (recovered via write-rejection/PING in ~30 s), D reboot with
-kiosk ON. Not testable on emulator: hotspot, SUW QR provisioning, real-radio
-MTU/throughput.
+kiosk ON, E (child mode v2: multi-app, single-app pin, PIN pause/lockout/reboot,
+PIN change — see below, all 9 checks pass). Not testable on emulator: hotspot,
+SUW QR provisioning, real-radio MTU/throughput.
 
 ## A. Controller standalone
 - [ ] Fresh install on phone A (not device owner) → permission gate shows 5 permissions; after granting, Devices screen.
@@ -76,3 +77,31 @@ MTU/throughput.
 - [ ] Second managed device C → both online simultaneously; commands go to the right device.
 - [ ] Controller with a different secret (regenerate on A) → B never authenticates, A shows B offline, B keeps scanning; re-provision fixes it.
 - [ ] Logcat on A shows unauthenticated centrals dropped after 5 s.
+
+## E. Child mode v2 (multi-app, PIN, prefs)
+
+Verified on the emulator rig 2026-08-22 (controller = emulator-5554, managed =
+emulator-5556, both API 35, Task 7 build). The Medium_Phone_API_35 image has
+no Calculator app, so app-picker checks below use **Calendar + Clock** in
+place of the brief's "Clock + Calculator" example — behavior is identical,
+only the sample packages differ.
+
+- [x] Managed launcher with child mode OFF shows all apps ("All apps" header); tapping a tile (Clock) opens it. — **PASS**. `topResumedActivity` = `com.google.android.deskclock/.DeskClock`.
+- [x] Parent: Settings → Controller → *Set PIN* (any 4-digit test PIN) → info text "PIN saved and sent to connected children"; managed logcat `PolicyManager: Prefs applied (lang=system, theme=system, pin=true)`. — **PASS**.
+- [x] Parent: Device → *Child mode: choose apps…* → select 2 apps, confirm → managed: `mLockTaskModeState=LOCKED`, launcher shows exactly those 2 tiles, header "Child mode", lock icon visible; parent status shows *Allowed apps: 2 allowed*. — **PASS**. Managed logcat `PolicyManager: Kiosk on: 2 apps, pinned=null`.
+- [x] Tap an allowed tile (Clock) → opens inside lock task; Back returns to the launcher (still LOCKED). — **PASS**.
+- [x] Parent: choose apps again with *Pin a single app* = Clock → managed bounces into Clock; pressing Home (`adb shell input keyevent KEYCODE_HOME`) lands back in Clock within ~1 s, still LOCKED. — **PASS**. Parent status shows *Single app: com.google.android.deskclock*.
+- [x] Managed: lock icon → wrong PIN twice (error "Wrong PIN" + growing countdown: 3 s, then 5–6 s) → correct PIN → banner "Child mode paused · 09:5x", `mLockTaskModeState=NONE`, all apps visible; parent status *Paused until …*; parent *Lock again* → LOCKED again with the same 2 apps. — **PASS**.
+- [x] PIN pause again, then `adb reboot` the managed emulator → after boot `mLockTaskModeState=LOCKED` again (pause not honoured across reboot). — **PASS**. Logcat: `BootReceiver: Boot completed; starting link service` → `PolicyManager: Kiosk on: 2 apps, pinned=null` (unconditional re-lock, no residual pause).
+- [x] Parent *Turn child mode off* → `mLockTaskModeState=NONE`, launcher shows all apps ("All apps" header). — **PASS**.
+- [x] Parent changes PIN (Settings → Controller → *Change PIN*) → managed verifies only the new one: old PIN rejected (still LOCKED, lockout countdown), new PIN accepted (pauses, `mLockTaskModeState=NONE`). — **PASS**.
+
+Screenshots (launcher off/on/paused, parent device page, PIN dialogs) are
+under `.superpowers/sdd/2026-08-22-kiosk-v2-plan1/shots/`. No defects found;
+one rig-only observation: on this debug-provisioned emulator (bypassing the
+Setup-Wizard `PolicyComplianceActivity` step), `setAsDefaultHome()` never
+runs, so pressing Home while child mode is *off* goes to the AVD's Nexus
+launcher instead of `ManagedHomeActivity` — expected, since only the real
+provisioning flow (or QR/SUW) sets the persistent-preferred-HOME activity;
+while child mode is *on*, lock task itself keeps Home inside our launcher/pinned
+app regardless.
