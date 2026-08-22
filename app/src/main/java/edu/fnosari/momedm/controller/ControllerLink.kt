@@ -12,7 +12,8 @@ object ControllerLink {
     val online = MutableStateFlow<Set<String>>(emptySet())
     val results = MutableSharedFlow<Pair<String, Message.Result>>(extraBufferCapacity = 16)
     val apps = MutableSharedFlow<Pair<String, Message.Apps>>(extraBufferCapacity = 4)
-    val errors = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    /** replay = 1 so a start failure emitted before the UI subscribes is not lost. */
+    val errors = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 8)
     /** Installed by the running service. */
     @Volatile var commander: ((deviceId: String, cmd: Message.Cmd) -> Boolean)? = null
 

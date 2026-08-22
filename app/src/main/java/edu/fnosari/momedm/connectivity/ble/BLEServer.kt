@@ -69,10 +69,18 @@ class BLEServer(
      * Callback interface for BLE events.
      */
     interface BLEServerCallBack {
+        /**
+         * A central wrote to [characteristic]. [value] is the UTF-8 decode of *this* write request's
+         * bytes — use it (not [BLECharacteristic.value]) to read what was written: [BLECharacteristic.value]
+         * is a single field shared by every characteristic instance, so with multiple centrals connected
+         * concurrently a second write can overwrite it before this callback for the first one runs.
+         * [BLECharacteristic.value] is still updated for compatibility with read-back use cases.
+         */
         fun onCharacteristicWriteRequest(
             characteristic: BLECharacteristic,
             service: BLEService,
-            device: BluetoothDevice
+            device: BluetoothDevice,
+            value: String
         )
         fun onDeviceConnected(device: BluetoothDevice)
         fun onDeviceDisconnected(device: BluetoothDevice)
@@ -225,9 +233,10 @@ class BLEServer(
                 val serviceCharacteristicSearch = service.characteristics.filter { it.uuid == characteristic.uuid }
                 if(serviceCharacteristicSearch.isNotEmpty()){
                     val serviceCharacteristic = serviceCharacteristicSearch.first()
-                    Log.d(LOG_TAG, "${device.address} requesting to  write to characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid})  from service ${service.name} (${service.uuid}) with value: ${value.toString(Charsets.UTF_8)}")
-                    serviceCharacteristic.value = value.toString(Charsets.UTF_8)
-                    callBack.onCharacteristicWriteRequest(serviceCharacteristic, service, device)
+                    val writtenValue = value.toString(Charsets.UTF_8)
+                    Log.d(LOG_TAG, "${device.address} requesting to  write to characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid})  from service ${service.name} (${service.uuid}) with value: $writtenValue")
+                    serviceCharacteristic.value = writtenValue
+                    callBack.onCharacteristicWriteRequest(serviceCharacteristic, service, device, writtenValue)
 
                     if(responseNeeded){
                         if (ActivityCompat.checkSelfPermission(

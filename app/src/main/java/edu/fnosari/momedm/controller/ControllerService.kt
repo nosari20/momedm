@@ -28,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /** Foreground service hosting the BLE GATT server and all managed-device sessions. */
 class ControllerService : Service() {
@@ -43,7 +44,8 @@ class ControllerService : Service() {
     private val gatt = MdmService()
     private var server: BLEServer? = null
     private var sessions: SessionManager? = null
-    private val devicesByKey = HashMap<String, BluetoothDevice>()
+    /** Mutated from binder threads (device connect/disconnect callbacks), read from the main scope's coroutines. */
+    private val devicesByKey = ConcurrentHashMap<String, BluetoothDevice>()
     private lateinit var prefs: ControllerPrefs
     private lateinit var registry: DeviceRegistry
 
@@ -64,6 +66,9 @@ class ControllerService : Service() {
         val sm = SessionManager(identity.secretBytes, object : SessionManager.Transport {
             override fun sendFrame(key: String, frame: String) {
                 val device = devicesByKey[key] ?: return
+                // Staging the outgoing frame on the shared `gatt.cmd.value` field is safe only because
+                // every call into SessionManager (and therefore every sendFrame) runs inside its monitor
+                // (@Synchronized), so no other frame can be staged here concurrently.
                 gatt.cmd.value = frame
                 try { server?.notifyDevice(device, gatt, gatt.cmd) } catch (e: BLEException) { Log.w(LOG_TAG, "notify failed: ${e.message}") }
             }
@@ -89,8 +94,8 @@ class ControllerService : Service() {
             val s = BLEServer(this, clientLimit = 7, callBack = object : BLEServer.BLEServerCallBack {
                 override fun onDeviceConnected(device: BluetoothDevice) { devicesByKey[device.address] = device; sm.onConnected(device.address) }
                 override fun onDeviceDisconnected(device: BluetoothDevice) { devicesByKey.remove(device.address); sm.onDisconnected(device.address) }
-                override fun onCharacteristicWriteRequest(characteristic: BLECharacteristic, service: BLEService, device: BluetoothDevice) {
-                    if (characteristic.uuid == MdmGatt.RSP_UUID) sm.onFrame(device.address, characteristic.value)
+                override fun onCharacteristicWriteRequest(characteristic: BLECharacteristic, service: BLEService, device: BluetoothDevice, value: String) {
+                    if (characteristic.uuid == MdmGatt.RSP_UUID) sm.onFrame(device.address, value)
                 }
             }, includeDeviceName = false)
             s.addService(gatt); s.startServer(); server = s

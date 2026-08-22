@@ -168,9 +168,13 @@ val server = BLEServer(
         override fun onCharacteristicWriteRequest(
             characteristic: BLECharacteristic,
             service: BLEService,
-            device: BluetoothDevice
+            device: BluetoothDevice,
+            value: String
         ) {
-            // A central wrote `characteristic.value`; react here.
+            // A central wrote `value`; react here. Use `value`, not `characteristic.value` —
+            // the latter is a single field shared by every characteristic instance, so with
+            // multiple centrals connected concurrently a second write can overwrite it before
+            // this callback for the first one runs.
         }
     }
 )

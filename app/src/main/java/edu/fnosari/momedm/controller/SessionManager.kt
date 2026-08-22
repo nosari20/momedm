@@ -17,7 +17,9 @@ class SessionManager(
     private class Session(val key: String, val endpoint: ControllerEndpoint, val connectedAt: Long)
     private val sessions = LinkedHashMap<String, Session>()
 
+    /** Starts tracking a newly connected central. Replaces (and drops) any stale session already at [key]. */
     @Synchronized fun onConnected(key: String) {
+        sessions.remove(key)?.let { events.onDropped(key, it.endpoint.deviceId) }
         val ep = ControllerEndpoint(secret, { f -> transport.sendFrame(key, f) }, object : ControllerEndpoint.Listener {
             override fun onAuthenticated(hello: Message.Hello) {
                 // one session per deviceId: drop an older link of the same device
@@ -29,15 +31,25 @@ class SessionManager(
         }, clock)
         sessions[key] = Session(key, ep, clock())
     }
+    /** Stops tracking the central at [key] (e.g. after the transport reports a disconnect). */
     @Synchronized fun onDisconnected(key: String) { sessions.remove(key)?.let { events.onDropped(key, it.endpoint.deviceId) } }
+    /** Feeds one raw frame received from the central at [key] into its session's endpoint. */
     @Synchronized fun onFrame(key: String, frame: String) { sessions[key]?.endpoint?.onFrame(frame) }
+    /** Sends [m] to the authenticated session for [deviceId]. Returns false if no such session exists. */
     @Synchronized fun send(deviceId: String, m: Message): Boolean {
         val s = sessions.values.firstOrNull { it.endpoint.authenticated && it.endpoint.deviceId == deviceId } ?: return false
         return try { s.endpoint.send(m); true } catch (e: IllegalStateException) { false }
     }
+    /** Device ids of all currently authenticated sessions. */
     @Synchronized fun onlineDeviceIds(): Set<String> = sessions.values.filter { it.endpoint.authenticated }.mapNotNull { it.endpoint.deviceId }.toSet()
-    /** Disconnects centrals that have not authenticated within [AUTH_TIMEOUT_MS]. Call periodically. */
+    /** Disconnects and forgets centrals that have not authenticated within [AUTH_TIMEOUT_MS]. Call periodically;
+     * idempotent — a session is only ever disconnected/dropped once, on the tick that first finds it timed out. */
     @Synchronized fun tick(nowMs: Long) {
-        sessions.values.filter { !it.endpoint.authenticated && nowMs - it.connectedAt > AUTH_TIMEOUT_MS }.forEach { transport.disconnect(it.key) }
+        val timedOut = sessions.values.filter { !it.endpoint.authenticated && nowMs - it.connectedAt > AUTH_TIMEOUT_MS }
+        for (s in timedOut) {
+            sessions.remove(s.key)
+            transport.disconnect(s.key)
+            events.onDropped(s.key, null)
+        }
     }
 }
