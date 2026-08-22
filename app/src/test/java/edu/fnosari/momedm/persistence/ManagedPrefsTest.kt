@@ -18,4 +18,15 @@ class ManagedPrefsTest {
         p.setKiosk(true, "com.k"); assertTrue(p.kioskOn.first()); assertEquals("com.k", p.kioskPkg.first())
         p.setKiosk(false, null); assertFalse(p.kioskOn.first()); assertEquals("", p.kioskPkg.first())
     }
+    @Test fun kioskConfigAndChildPrefsRoundTrip() = runTest {
+        val p = ManagedPrefs(InMemoryPreferencesProvider())
+        assertEquals(KioskConfig(), p.kioskConfig.first())
+        p.setKioskConfig(KioskConfig(on = true, apps = listOf("a", "b"), pinned = "a", pauseUntil = 0L))
+        assertEquals(KioskConfig(true, listOf("a", "b"), "a", 0L), p.kioskConfig.first())
+        assertTrue(p.kioskOn.first()); assertEquals("a", p.kioskPkg.first())
+        p.setPauseUntil(42L); assertEquals(42L, p.kioskConfig.first().pauseUntil)
+        p.setKiosk(false, null); assertFalse(p.kioskConfig.first().on); assertEquals(listOf("a", "b"), p.kioskConfig.first().apps)
+        val cp = edu.fnosari.momedm.protocol.ChildPrefs("fr", "dark", 7, "00".repeat(16), "11".repeat(32))
+        p.setChildPrefs(cp); assertEquals(cp, p.childPrefs.first())
+    }
 }

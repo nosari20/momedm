@@ -2,7 +2,9 @@ package edu.fnosari.momedm.persistence
 
 import edu.fnosari.momedm.persistence.preferences.PreferencesProvider
 import edu.fnosari.momedm.protocol.Base64Std
+import edu.fnosari.momedm.protocol.ChildPrefs
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import java.util.UUID
 
@@ -14,12 +16,29 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         const val KEY_DEVICE_ID = "managed_device_id"
         const val KEY_KIOSK_PKG = "managed_kiosk_pkg"
         const val KEY_KIOSK_ON = "managed_kiosk_on"
+        const val KEY_KIOSK_APPS = "managed_kiosk_apps"
+        const val KEY_KIOSK_PAUSE_UNTIL = "managed_kiosk_pause_until"
+        const val KEY_PREF_LANGUAGE = "managed_pref_language"
+        const val KEY_PREF_THEME = "managed_pref_theme"
+        const val KEY_PREF_ACCENT = "managed_pref_accent"
+        const val KEY_PIN_SALT = "managed_pin_salt"
+        const val KEY_PIN_HASH = "managed_pin_hash"
     }
     val controllerId: Flow<String> = p.readString(KEY_CONTROLLER_ID, "")
     val secretBase64: Flow<String> = p.readString(KEY_SECRET, "")
     val deviceId: Flow<String> = p.readString(KEY_DEVICE_ID, "")
     val kioskPkg: Flow<String> = p.readString(KEY_KIOSK_PKG, "")
     val kioskOn: Flow<Boolean> = p.readBoolean(KEY_KIOSK_ON, false)
+    private val kioskApps: Flow<String> = p.readString(KEY_KIOSK_APPS, "")
+    private val pauseUntil: Flow<String> = p.readString(KEY_KIOSK_PAUSE_UNTIL, "0")  // Long stored as string (provider has no Long)
+    /** Whole child-mode configuration ([kioskPkg] is its `pinned`). */
+    val kioskConfig: Flow<KioskConfig> = combine(kioskOn, kioskPkg, kioskApps, pauseUntil) { on, pkg, apps, pause ->
+        KioskConfig(on, KioskConfig.decodeApps(apps), pkg.ifEmpty { null }, pause.toLongOrNull() ?: 0L)
+    }
+    val childPrefs: Flow<ChildPrefs> = combine(p.readString(KEY_PREF_LANGUAGE, "system"), p.readString(KEY_PREF_THEME, "system"),
+        p.readInt(KEY_PREF_ACCENT, ChildPrefs.DEFAULT_ACCENT), p.readString(KEY_PIN_SALT, ""), p.readString(KEY_PIN_HASH, "")) { l, t, a, s, h ->
+        ChildPrefs(l, t, a, s.ifEmpty { null }, h.ifEmpty { null })
+    }
 
     /** Persists the controller identity (id + secret) received from the QR admin extras. */
     suspend fun saveProvisioning(controllerId: String, secretBase64: String) { p.write(KEY_CONTROLLER_ID, controllerId); p.write(KEY_SECRET, secretBase64) }
@@ -35,4 +54,13 @@ class ManagedPrefs(private val p: PreferencesProvider) {
     }
     /** Persists the kiosk on/off state and the kiosk package (empty string when [pkg] is null). */
     suspend fun setKiosk(on: Boolean, pkg: String?) { p.write(KEY_KIOSK_ON, on); p.write(KEY_KIOSK_PKG, pkg ?: "") }
+    /** Persists the full child-mode configuration. */
+    suspend fun setKioskConfig(c: KioskConfig) {
+        p.write(KEY_KIOSK_ON, c.on); p.write(KEY_KIOSK_PKG, c.pinned ?: ""); p.write(KEY_KIOSK_APPS, KioskConfig.encodeApps(c.apps)); p.write(KEY_KIOSK_PAUSE_UNTIL, c.pauseUntil.toString())
+    }
+    suspend fun setPauseUntil(t: Long) = p.write(KEY_KIOSK_PAUSE_UNTIL, t.toString())
+    suspend fun setChildPrefs(c: ChildPrefs) {
+        p.write(KEY_PREF_LANGUAGE, c.language); p.write(KEY_PREF_THEME, c.theme); p.write(KEY_PREF_ACCENT, c.accent)
+        p.write(KEY_PIN_SALT, c.pinSalt ?: ""); p.write(KEY_PIN_HASH, c.pinHash ?: "")
+    }
 }
