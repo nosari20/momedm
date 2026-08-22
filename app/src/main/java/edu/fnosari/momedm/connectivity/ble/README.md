@@ -25,6 +25,9 @@ It is plain Android — no DI, no third-party BLE library.
   eventually breaks all connections.
 - **Permission-safe callbacks.** System callbacks run on binder threads, so they
   log-and-return on a missing permission instead of throwing (which would crash).
+- **Payload-free logging.** Characteristic reads, writes and notifications are
+  logged as UUID + byte length only — payloads are application data (possibly
+  secrets) and logcat is readable through `adb` and bug reports.
 - **Version-safe writes.** Uses the API-33 `writeCharacteristic` overload with a
   fallback for API 31–32.
 - **NOTIFY characteristics.** `Permission.NOTIFY` sets `PROPERTY_NOTIFY` +

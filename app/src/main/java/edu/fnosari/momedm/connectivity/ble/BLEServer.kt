@@ -22,8 +22,6 @@ import android.os.ParcelUuid
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.core.app.ActivityCompat
-import edu.fnosari.momedm.connectivity.ble.BLEClient.BLEClientExitCode
-import edu.fnosari.momedm.connectivity.ble.BLEClient.Companion
 import edu.fnosari.momedm.connectivity.ble.characteristics.BLECharacteristic
 import edu.fnosari.momedm.connectivity.ble.services.BLEService
 import java.util.UUID
@@ -206,7 +204,7 @@ class BLEServer(
             val c = _services.find { it.uuid == characteristic.service.uuid }?.characteristics?.find { it.uuid == characteristic.uuid }
 
             if (c != null) {
-                Log.d(LOG_TAG,"Responding with value ${c.value}")
+                Log.d(LOG_TAG,"Responding to read of ${characteristic.uuid} (${c.value.length} chars)")
                 _gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, c.value.toByteArray())
             }
         }
@@ -226,7 +224,9 @@ class BLEServer(
         ) {
             //super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value)
 
-            Log.d(LOG_TAG,"Writing ${characteristic.uuid} ${value.toString(Charsets.UTF_8)}")
+            // UUID + length only: characteristic payloads carry application data (here, protocol
+            // frames) and must never reach logcat.
+            Log.d(LOG_TAG,"Write request on ${characteristic.uuid} (${value.size} bytes)")
             val serviceSearch = _services.filter { it.characteristics.filter { it.uuid == characteristic.uuid }.isNotEmpty() }
             if(serviceSearch.isNotEmpty()){
                 val service = serviceSearch.first()
@@ -234,7 +234,7 @@ class BLEServer(
                 if(serviceCharacteristicSearch.isNotEmpty()){
                     val serviceCharacteristic = serviceCharacteristicSearch.first()
                     val writtenValue = value.toString(Charsets.UTF_8)
-                    Log.d(LOG_TAG, "${device.address} requesting to  write to characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid})  from service ${service.name} (${service.uuid}) with value: $writtenValue")
+                    Log.d(LOG_TAG, "${device.address} requesting to write to characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid}) from service ${service.name} (${service.uuid}) (${value.size} bytes)")
                     serviceCharacteristic.value = writtenValue
                     callBack.onCharacteristicWriteRequest(serviceCharacteristic, service, device, writtenValue)
 

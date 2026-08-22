@@ -58,6 +58,9 @@ class ManagedEndpoint(
             val hs = handshake ?: run { reset(); listener.onProtocolError("message before HELLO"); return }
             val m = try { MessageCodec.decodeMessage(env.body) } catch (e: Exception) { reset(); listener.onProtocolError("bad handshake body"); return }
             val c = m as? Message.Challenge ?: run { reset(); listener.onProtocolError("expected CHALLENGE, got ${m::class.simpleName}"); return }
+            // Checked before any HMAC is computed: nonceS is peer-controlled and feeds the auth proof and
+            // the session key, so only the exact shape Crypto.randomHex(16) produces is ever accepted.
+            if (!isValidNonce(c.nonceS)) { reset(); listener.onProtocolError("malformed nonceS"); return }
             val auth = hs.onChallenge(c) ?: run { reset(); listener.onProtocolError("controller proof invalid"); return }
             channel = SecureChannel(hs.sessionKey, outDir = 'M', inDir = 'C')
             frames.sendEnvelope(Envelope.plain(auth))
@@ -110,6 +113,10 @@ class ControllerEndpoint(
             val m = try { MessageCodec.decodeMessage(env.body) } catch (e: Exception) { reset(); listener.onProtocolError("bad handshake body"); return }
             when (m) {
                 is Message.Hello -> {
+                    // Checked before any HMAC is computed: nonceC is peer-controlled and is the sole input
+                    // to the CHALLENGE proof we hand back, so only the exact shape Crypto.randomHex(16)
+                    // produces is ever accepted — a chosen-length nonce can never reach the HMAC.
+                    if (!isValidNonce(m.nonceC)) { reset(); listener.onProtocolError("malformed nonceC"); return }
                     // Clamp to the valid BLE ATT MTU range so a bogus/out-of-range value from the managed
                     // side can't push our outgoing chunk size below 1 or into an unnegotiated MTU.
                     frames.mtu = m.mtu.coerceIn(23, 517)

@@ -217,10 +217,22 @@ Shared `secret` (32 B) from QR. HMAC-SHA256 throughout.
 
 ```
 C→S  HELLO     {deviceId, model, nonceC, mtu}
-S→C  CHALLENGE {nonceS, proof = HMAC(secret, nonceC)}     client verifies proof
-C→S  AUTH      {proof = HMAC(secret, nonceS)}             server verifies
-sessionKey = HMAC(secret, nonceC || nonceS)
+S→C  CHALLENGE {nonceS, proof = HMAC(secret, "momedm/challenge|" + nonceC)}
+C→S  AUTH      {proof = HMAC(secret, "momedm/auth|" + nonceS)}
+sessionKey = HMAC(secret, "momedm/session|" + nonceC + "|" + nonceS)
 ```
+
+Every HMAC is **domain-separated** by a distinct constant prefix. Without it the
+three computations share one key and one input space, and the CHALLENGE proof is
+an oracle: whoever sends the HELLO picks `nonceC` freely, so a forged HELLO with
+`nonceC = realNonceC + nonceS` would come back with exactly the value the old
+`HMAC(secret, nonceC || nonceS)` session key had — disclosing the session key
+without ever knowing the secret. The tags make the three input spaces disjoint.
+
+Both endpoints also **validate the peer's nonce before any HMAC is computed**: a
+`nonceC` (controller side, on HELLO) or `nonceS` (managed side, on CHALLENGE)
+that is not exactly 32 lower-case hex chars — the shape `Crypto.randomHex(16)`
+produces — is a protocol error and resets the session.
 
 After auth, every message is `{seq, body, mac}` with
 `mac = HMAC(sessionKey, dir|seq|body)` with `dir = 'C'` for controller→managed

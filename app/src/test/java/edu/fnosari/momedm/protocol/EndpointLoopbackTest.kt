@@ -84,6 +84,38 @@ class EndpointLoopbackTest {
         assertTrue(b.ctrlErrors.isNotEmpty())
     }
 
+    /** Encodes [m] as a plain (unsealed) envelope and splits it into transport frames. */
+    private fun frames(m: Message): List<String> =
+        Framer.split(1, MessageCodec.encodeEnvelope(Envelope.plain(m)), 1000)
+
+    @Test fun malformedNonceRejected() {
+        // Nonces are the only attacker-controlled input to the handshake HMACs. Anything that is not
+        // exactly 32 lower-case hex chars (what Crypto.randomHex(16) produces) is a protocol error on
+        // both sides, checked before any proof is computed — so a chosen-length/chosen-content nonce
+        // can never reach the HMAC at all.
+        val ctrlErrors = mutableListOf<String>()
+        val controller = ControllerEndpoint(secret, { }, object : ControllerEndpoint.Listener {
+            override fun onAuthenticated(hello: Message.Hello) {}
+            override fun onMessage(m: Message) {}
+            override fun onProtocolError(reason: String) { ctrlErrors.add(reason) }
+        })
+        for (f in frames(Message.Hello("dev-1", "Pixel", "abc", 517))) controller.onFrame(f)
+        assertFalse(controller.authenticated)
+        assertTrue(ctrlErrors.isNotEmpty())
+
+        val managedErrors = mutableListOf<String>()
+        val managed = ManagedEndpoint(secret, "dev-1", "Pixel", { }, object : ManagedEndpoint.Listener {
+            override fun onAuthenticated() {}
+            override fun onCommand(cmd: Message.Cmd) {}
+            override fun onProtocolError(reason: String) { managedErrors.add(reason) }
+        })
+        managed.onConnected(517)
+        // 31 hex chars: one short of a valid nonce. The proof is irrelevant — the nonce is rejected first.
+        for (f in frames(Message.Challenge("0".repeat(31), "00".repeat(32)))) managed.onFrame(f)
+        assertFalse(managed.authenticated)
+        assertTrue(managedErrors.isNotEmpty())
+    }
+
     private fun corruptMac(frame: String): String {
         val key = "\"mac\":\""
         val idx = frame.indexOf(key)

@@ -170,6 +170,19 @@ screens.
 - **GATT UUIDs in `link/MdmGatt.kt` are permanent** — `SERVICE_UUID`,
   `CMD_UUID`, `RSP_UUID` are fixed forever once generated; do not regenerate
   them, or already-provisioned devices lose discovery.
+- **Every handshake HMAC is domain-separated** — challenge proof =
+  `HMAC(secret, "momedm/challenge|$nonceC")`, auth proof =
+  `HMAC(secret, "momedm/auth|$nonceS")`, session key =
+  `HMAC(secret, "momedm/session|$nonceC|$nonceS")`. Never collapse these onto a
+  shared input space: the CHALLENGE proof is an oracle over an attacker-chosen
+  `nonceC`, so without the tags a forged HELLO with `nonceC = realNonceC+nonceS`
+  gets the session key handed straight back. Both endpoints also reject any
+  peer nonce that isn't exactly 32 lower-case hex chars, *before* hashing it.
+- **Never log string preference values or BLE payloads** —
+  `DataStorePreferencesProvider` logs string writes as key + length only (the
+  shared secret and the Wi-Fi passphrase go through it), and `BLEClient`/
+  `BLEServer` log characteristic traffic as UUID + byte length only (payloads
+  are protocol frames).
 - **Protocol errors reset the whole session** (handshake + channel), on
   either side — a bad MAC, non-increasing seq, or unexpected message before
   auth never leaves a half-valid state that a replayed frame could exploit.

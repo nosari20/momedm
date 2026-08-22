@@ -61,7 +61,9 @@ class DataStorePreferencesProvider(context: Context) : PreferencesProvider {
         read(doublePreferencesKey(key), default)
 
     override suspend fun write(key: String, value: String) {
-        Log.d(LOG_TAG, "Writing string $key = $value")
+        // Never log a string value: the shared HMAC secret, the controller id and the Wi-Fi
+        // passphrase all round-trip through here, and logcat is readable by adb/bug reports.
+        Log.d(LOG_TAG, "Writing string $key (${value.length} chars)")
         appContext.dataStore.edit { it[stringPreferencesKey(key)] = value }
     }
 

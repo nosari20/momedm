@@ -295,14 +295,16 @@ class BLEClient(
         }
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
-            Log.d(LOG_TAG, "Characteristic ${characteristic.uuid} changed: ${String(value)}")
+            // UUID + length only: characteristic payloads carry application data (here, protocol
+            // frames) and must never reach logcat.
+            Log.d(LOG_TAG, "Characteristic ${characteristic.uuid} changed (${value.size} bytes)")
             val serviceSearch = servicesToListen.filter { it.characteristics.filter { it.uuid == characteristic.uuid }.isNotEmpty() }
             if(serviceSearch.isNotEmpty()){
                 val service = serviceSearch.first()
                 val serviceCharacteristicSearch = service.characteristics.filter { it.uuid == characteristic.uuid }
                 if(serviceCharacteristicSearch.isNotEmpty()){
                     val serviceCharacteristic = serviceCharacteristicSearch.first()
-                    Log.d(LOG_TAG, "Characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid})  from service ${service.name} (${service.uuid}) changed: ${value.toString(Charsets.UTF_8)}")
+                    Log.d(LOG_TAG, "Characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid}) from service ${service.name} (${service.uuid}) changed (${value.size} bytes)")
                     serviceCharacteristic.value = value.toString(Charsets.UTF_8)
                     callBack.onCharacteristicChanged(serviceCharacteristic, service)
                 }
@@ -337,7 +339,7 @@ class BLEClient(
                 val serviceCharacteristicSearch = service.characteristics.filter { it.uuid == characteristic.uuid }
                 if(serviceCharacteristicSearch.isNotEmpty()){
                     val serviceCharacteristic = serviceCharacteristicSearch.first()
-                    Log.d(LOG_TAG, "Characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid})  from service ${service.name} (${service.uuid}) changed: ${value.toString(Charsets.UTF_8)}")
+                    Log.d(LOG_TAG, "Characteristic ${serviceCharacteristic.name} (${serviceCharacteristic.uuid}) from service ${service.name} (${service.uuid}) read (${value.size} bytes)")
                     serviceCharacteristic.value = value.toString(Charsets.UTF_8)
                     callBack.onCharacteristicChanged(serviceCharacteristic, service)
                 }
@@ -601,7 +603,7 @@ class BLEClient(
         try {
             val s = _listeningServices.filter { it.uuid == service.uuid }.first()
             val c = s.characteristics.filter { it.uuid == characteristic.uuid }.first()
-            Log.d(LOG_TAG, "Writing to characteristic ${characteristic.name} (${characteristic.uuid})  from service ${service.name} (${service.uuid}) with value: ${characteristic.value}")
+            Log.d(LOG_TAG, "Writing to characteristic ${characteristic.name} (${characteristic.uuid}) from service ${service.name} (${service.uuid}) (${characteristic.value.length} chars)")
             _operationQueue!!.enqueue(BLEOperation.WriteCharacteristic(c, characteristic.value.toByteArray()))
         }catch (e: NoSuchElementException){
             Log.d(LOG_TAG,"Service ${service.name} (${service.uuid}) or characteristic ${characteristic.name} ( ${characteristic.uuid}) not found: ${BLEClientExitCode.ERROR_BLUETOOTH_WRITE_SERVICE_OR_CHARACTERISTIC_NOT_FOUND}")
