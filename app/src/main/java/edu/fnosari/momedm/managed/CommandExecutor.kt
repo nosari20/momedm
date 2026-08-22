@@ -8,14 +8,14 @@ import edu.fnosari.momedm.protocol.Message
 interface PolicyActions {
     suspend fun kioskOn(pkg: String): Result<Unit>
     suspend fun kioskOff(): Result<Unit>
-    fun openPlay(pkg: String): Result<Unit>
+    suspend fun openPlay(pkg: String): Result<Unit>
     suspend fun openAddAccount(): Result<Unit>
 }
 
 /** Read-only device state the [CommandExecutor] reports back; implemented by [StatusCollector]. */
 interface StatusSource {
     suspend fun collect(): Message.Status
-    fun launchableApps(): List<AppInfo>
+    suspend fun launchableApps(): List<AppInfo>
 }
 
 /** Maps a [Message.Cmd] to policy actions; returns the messages to send back (RESULT first). Pure Kotlin. */

@@ -13,17 +13,34 @@ import android.util.Log
 import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.Message
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 /** Gathers the fields of [Message.Status] and the launchable app list. */
 class StatusCollector(private val context: Context, private val prefs: ManagedPrefs) : StatusSource {
-    companion object { private const val LOG_TAG = "StatusCollector"; private const val FG_WINDOW_MS = 60_000L }
+    companion object {
+        private const val LOG_TAG = "StatusCollector"
+        private const val FG_WINDOW_MS = 60_000L
+        /**
+         * Upper bound on the packages reported by [launchableApps]. A device with a very long launcher
+         * list would otherwise produce an APPS message that `Framer.split` refuses (> 9999 frames at the
+         * 23-byte fallback MTU) or that takes minutes to push over BLE. 300 apps keeps the encoded
+         * message well inside the frame budget and still covers any realistic managed device.
+         */
+        const val MAX_APPS = 300
+    }
 
-    override suspend fun collect(): Message.Status {
+    /**
+     * Collects the current [Message.Status]. Runs on [Dispatchers.IO]: [AccountManager],
+     * [UsageStatsManager] and [BatteryManager] all make blocking binder calls that must not run on the
+     * main thread (the caller is a main-dispatcher service coroutine).
+     */
+    override suspend fun collect(): Message.Status = withContext(Dispatchers.IO) {
         val kioskOn = prefs.kioskOn.first(); val kioskPkg = prefs.kioskPkg.first().ifEmpty { null }
         val s = Message.Status(kiosk = kioskOn, kioskPkg = kioskPkg, account = hasGoogleAccount(), battery = batteryPercent(),
             currentApp = foregroundApp() ?: if (kioskOn) kioskPkg else null)
-        Log.d(LOG_TAG, "Status: $s"); return s
+        Log.d(LOG_TAG, "Status: $s"); s
     }
 
     /** Current battery charge as a 0-100 percentage. */
@@ -48,12 +65,18 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
         return last
     }
 
-    /** All launcher-visible apps on the device, deduped by package and sorted by label. */
-    override fun launchableApps(): List<AppInfo> {
+    /**
+     * All launcher-visible apps on the device, deduped by package, sorted by label and capped at
+     * [MAX_APPS] so the resulting APPS message stays well under the framing limit.
+     *
+     * Runs on [Dispatchers.IO]: `queryIntentActivities` plus one `loadLabel` per resolved activity is a
+     * long series of blocking [PackageManager] binder calls and must not run on the main thread.
+     */
+    override suspend fun launchableApps(): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+        pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
             .map { AppInfo(it.activityInfo.packageName, it.loadLabel(pm).toString()) }
-            .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }
+            .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }.take(MAX_APPS)
     }
 }

@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.util.Log
 import edu.fnosari.momedm.activities.managed.ManagedHomeActivity
 import edu.fnosari.momedm.persistence.ManagedPrefs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
 /** Thin, logged wrapper around [DevicePolicyManager] for the managed role. */
@@ -33,7 +34,11 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Log.d(LOG_TAG, "Persistent HOME set")
     }
 
-    override suspend fun kioskOn(pkg: String): Result<Unit> = runCatching {
+    // Both kiosk transitions suspend (they write to DataStore), so a plain runCatching would swallow the
+    // CancellationException thrown when the caller's scope is cancelled and report it as an ordinary
+    // command failure, leaving the coroutine machinery to believe the work completed. Cancellation is
+    // rethrown; everything else becomes a Result.failure the controller can surface.
+    override suspend fun kioskOn(pkg: String): Result<Unit> = try {
         val launch = context.packageManager.getLaunchIntentForPackage(pkg) ?: throw IllegalArgumentException("$pkg not installed or not launchable")
         dpm.setLockTaskPackages(admin, arrayOf(pkg, context.packageName, PLAY_PKG, GMS_PKG))
         // NOTIFICATIONS requires HOME to also be enabled or AOSP throws IllegalArgumentException; SYSTEM_INFO alone is safe.
@@ -42,9 +47,10 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         context.startActivity(launch, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
         prefs.setKiosk(true, pkg)
         Log.d(LOG_TAG, "Kiosk on: $pkg")
-    }
+        Result.success(Unit)
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
-    override suspend fun kioskOff(): Result<Unit> = runCatching {
+    override suspend fun kioskOff(): Result<Unit> = try {
         dpm.setLockTaskPackages(admin, emptyArray())   // removing the allowlist forces lock task to end
         prefs.setKiosk(false, null)
         // State is already cleared above; a launch failure here must not resurrect kiosk on the next restoreKiosk().
@@ -53,19 +59,28 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
             context.startActivity(home)
         }.onFailure { Log.w(LOG_TAG, "Failed to launch ManagedHomeActivity after kiosk off", it) }
         Log.d(LOG_TAG, "Kiosk off")
-    }
+        Result.success(Unit)
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
     /** Re-enters kiosk after reboot when it was on. */
     suspend fun restoreKiosk() {
         if (prefs.kioskOn.first()) { val pkg = prefs.kioskPkg.first(); if (pkg.isNotEmpty()) kioskOn(pkg).onFailure { Log.w(LOG_TAG, "Kiosk restore failed", it) } }
     }
 
-    override fun openPlay(pkg: String): Result<Unit> = runCatching {
-        val i = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")).setPackage(PLAY_PKG).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (i.resolveActivity(context.packageManager) == null) throw IllegalStateException("Play Store not available")
-        val opts = ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle()
-        context.startActivity(i, opts)
-        Log.d(LOG_TAG, "Opened Play for $pkg")
+    /**
+     * Opens the Play listing for [pkg]. Lock-task is requested **only while kiosk is on** — asking for it
+     * outside lock task launches Play pinned to the screen on a device the user is otherwise free to
+     * navigate, trapping them in the Play listing with no way back.
+     */
+    override suspend fun openPlay(pkg: String): Result<Unit> {
+        val kiosk = prefs.kioskOn.first()
+        return runCatching {
+            val i = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")).setPackage(PLAY_PKG).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (i.resolveActivity(context.packageManager) == null) throw IllegalStateException("Play Store not available")
+            if (kiosk) context.startActivity(i, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
+            else context.startActivity(i)
+            Log.d(LOG_TAG, "Opened Play for $pkg (kiosk=$kiosk)")
+        }
     }
 
     override suspend fun openAddAccount(): Result<Unit> {

@@ -461,7 +461,10 @@ class BLEServer(
     /**
      * Stops the BLE server and stops advertising.
      *
-     * This function will clear _services and stop any ongoing BLE advertising.
+     * Stops advertising, drains the notify queue, cancels every connection, then **synchronously**
+     * clears the services and closes the GATT server handle before returning — so a `stopServer()`
+     * immediately followed by a `startServer()` can never have a deferred close tear down the newly
+     * started server.
      *
      * @throws BLEException if an error occurs while stopping the server.
      */
@@ -484,14 +487,20 @@ class BLEServer(
             _notifyQueue.clear()
             _notifyInFlight = false
         }
-        for (device in _connectedDevices){
+        // Snapshot first: _connectedDevices is mutated from GATT binder threads (onConnectionStateChange),
+        // and cancelConnection here triggers exactly those callbacks — iterating the live list would risk
+        // a ConcurrentModificationException.
+        for (device in _connectedDevices.toList()){
             _gattServer.cancelConnection(device)
         }
 
-        Handler(Looper.getMainLooper()).postDelayed({
-            _gattServer.close()
-            _gattServer.clearServices()
-        }, 1000)
+        // Closed synchronously and in the right order (clearServices *before* close — the handle is
+        // unusable afterwards). The former 1 s deferred close overlapped a restart: a startServer() in
+        // between would add its services and start advertising, only for the late close to tear down the
+        // freshly rebuilt server.
+        _gattServer.clearServices()
+        _gattServer.close()
+        _connectedDevices.clear()
 
     }
 

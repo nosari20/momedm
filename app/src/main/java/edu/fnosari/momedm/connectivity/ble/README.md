@@ -194,7 +194,10 @@ server.stopServer()
 ```
 
 `server.connectedDevices` exposes the current centrals; `server.serverName` is the
-adapter name being advertised.
+adapter name being advertised. `stopServer()` stops advertising, cancels every
+connection and then closes the GATT server **synchronously** before returning, so
+a `stopServer()` / `startServer()` pair (e.g. to rebuild the server with new state)
+can never have the teardown land on the newly started server.
 
 ## Threading & gotchas
 

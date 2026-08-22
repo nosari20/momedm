@@ -16,7 +16,6 @@ import android.os.Looper
 import android.util.Log
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.connectivity.ble.BLEClient
-import edu.fnosari.momedm.connectivity.ble.BLEException
 import edu.fnosari.momedm.connectivity.ble.characteristics.BLECharacteristic
 import edu.fnosari.momedm.connectivity.ble.services.BLEService
 import edu.fnosari.momedm.link.MdmGatt
@@ -68,6 +67,13 @@ class ManagedLinkService : Service() {
     @Volatile private var backoffMs = BACKOFF_MIN_MS
     @Volatile private var statusJob: Job? = null
     private var lastBattery = -1
+    /**
+     * Guards the stage-then-write pair in [sendFrame]. `gatt.rsp.value` is a single field shared by the
+     * one [MdmService] instance, so two threads staging a frame concurrently (an endpoint callback on a
+     * GATT binder thread and a coroutine reply on the main thread) could interleave and write the wrong
+     * frame twice. Mirrors ControllerService's staging note, which relies on SessionManager's monitor.
+     */
+    private val sendLock = Any()
     /** Set once in [onDestroy]; guards [scan]/[scheduleRescan] against firing after teardown. */
     @Volatile private var destroyed = false
     /**
@@ -206,8 +212,13 @@ class ManagedLinkService : Service() {
     }
 
     private fun sendFrame(frame: String) {
-        gatt.rsp.value = frame
-        try { client?.writeCharacteristic(gatt, gatt.rsp) } catch (e: BLEException) { Log.w(LOG_TAG, "Write failed: ${e.message}") }
+        synchronized(sendLock) {
+            gatt.rsp.value = frame
+            // Any Throwable, not just BLEException: writeCharacteristic can also raise from the platform
+            // stack, and this runs on a GATT binder thread where an escape would take the process down.
+            try { client?.writeCharacteristic(gatt, gatt.rsp) }
+            catch (t: Throwable) { Log.w(LOG_TAG, "Write failed: ${t.message}", t); ManagedLinkState.lastError.value = t.message ?: t::class.simpleName }
+        }
     }
 
     private suspend fun handleCommand(cmd: Message.Cmd) {
@@ -217,7 +228,18 @@ class ManagedLinkService : Service() {
         replies.filterIsInstance<Message.Status>().lastOrNull()?.let { ManagedLinkState.lastStatus.value = it }
     }
 
-    private fun safeSend(m: Message) { try { endpoint?.send(m) } catch (e: IllegalStateException) { Log.w(LOG_TAG, "Not authenticated; dropping ${m::class.simpleName}") } }
+    /**
+     * Sends [m] if the session is live, never throwing. Beyond "not authenticated"
+     * ([IllegalStateException]), an oversized payload makes `Framer.split` raise
+     * [IllegalArgumentException]; both — and anything else the transport raises — are logged and the
+     * message dropped rather than crashing the service.
+     */
+    private fun safeSend(m: Message) {
+        try { endpoint?.send(m) }
+        catch (e: IllegalStateException) { Log.w(LOG_TAG, "Not authenticated; dropping ${m::class.simpleName}") }
+        catch (e: IllegalArgumentException) { Log.w(LOG_TAG, "Payload too large; dropping ${m::class.simpleName}: ${e.message}") }
+        catch (t: Throwable) { Log.w(LOG_TAG, "Send failed; dropping ${m::class.simpleName}", t); ManagedLinkState.lastError.value = t.message ?: t::class.simpleName }
+    }
 
     private fun pushStatus() { scope.launch { val s = status.collect(); ManagedLinkState.lastStatus.value = s; safeSend(s) } }
 

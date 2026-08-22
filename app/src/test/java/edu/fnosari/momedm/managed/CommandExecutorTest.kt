@@ -14,12 +14,12 @@ class CommandExecutorTest {
         var kiosk: String? = null; var played: String? = null; var accountOpened = false
         override suspend fun kioskOn(pkg: String) = if (pkg == "bad") Result.failure(IllegalArgumentException("not installed")) else { kiosk = pkg; Result.success(Unit) }
         override suspend fun kioskOff() = run { kiosk = null; Result.success(Unit) }
-        override fun openPlay(pkg: String) = run { played = pkg; Result.success(Unit) }
+        override suspend fun openPlay(pkg: String) = run { played = pkg; Result.success(Unit) }
         override suspend fun openAddAccount() = if (kiosk != null) Result.failure(IllegalStateException("kiosk is on; turn it off first")) else run { accountOpened = true; Result.success(Unit) }
     }
     private class FakeStatus : StatusSource {
         override suspend fun collect() = Message.Status(false, null, true, 42, "x")
-        override fun launchableApps() = listOf(AppInfo("a", "A"))
+        override suspend fun launchableApps() = listOf(AppInfo("a", "A"))
     }
 
     @Test fun kioskOnReturnsResultThenStatus() = runTest {

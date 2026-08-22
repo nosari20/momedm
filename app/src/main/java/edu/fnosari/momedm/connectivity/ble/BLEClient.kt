@@ -59,6 +59,14 @@ class BLEClient(
 
         private const val REQUESTED_MTU = 517
         private const val DEFAULT_MTU = 23
+
+        /**
+         * How long to wait for [BluetoothGattCallback.onMtuChanged] after a successful `requestMtu`
+         * before giving up and continuing at [DEFAULT_MTU]. Some stacks never deliver the callback,
+         * which would otherwise leave the connection permanently un-subscribed and never report
+         * [BLEClientCallBack.onConnected].
+         */
+        private const val MTU_TIMEOUT_MS = 10_000L
     }
 
     /**
@@ -144,6 +152,19 @@ class BLEClient(
      * reach [BLEClientCallBack.onMtuChanged] but must not re-fire `onConnected`.
      */
     private var _connectedReported: Boolean = false
+
+    /**
+     * Pending [MTU_TIMEOUT_MS] fallback posted after a successful `requestMtu`, cancelled by
+     * [BluetoothGattCallback.onMtuChanged] and by [closeGatt]. See [MTU_TIMEOUT_MS].
+     */
+    private var _mtuWatchdog: Runnable? = null
+
+    /**
+     * Dedicated handler for [_mtuWatchdog]. Deliberately not [_scanHandler]: [stopScan] clears that
+     * handler unconditionally, and a defensive `stopScan()` on an already-connected link would
+     * silently drop the watchdog.
+     */
+    private val _mtuHandler = Handler(Looper.getMainLooper())
 
     /**
      * The Bluetooth Low Energy scanner used to search for available BLE devices.
@@ -276,10 +297,22 @@ class BLEClient(
                 subscribeToNotifyCharacteristics(gatt)
                 callBack.onMtuChanged(DEFAULT_MTU)
                 reportConnectedOnce()
+            } else {
+                // requestMtu was accepted, but onMtuChanged is not guaranteed to arrive on every stack.
+                // Without this watchdog a lost callback means no CCCD subscription and no onConnected()
+                // for the life of the connection — the link looks up but nothing is ever delivered.
+                _mtuWatchdog = Runnable {
+                    if (_connectedReported) return@Runnable
+                    Log.w(LOG_TAG, "MTU callback never arrived; continuing at default MTU")
+                    subscribeToNotifyCharacteristics(gatt)
+                    callBack.onMtuChanged(DEFAULT_MTU)
+                    reportConnectedOnce()
+                }.also { _mtuHandler.postDelayed(it, MTU_TIMEOUT_MS) }
             }
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            cancelMtuWatchdog()
             val effective = if (status == BluetoothGatt.GATT_SUCCESS) mtu else DEFAULT_MTU
             Log.d(LOG_TAG, "MTU changed: $mtu (status $status) -> using $effective")
             if (!_connectedReported) {
@@ -422,7 +455,9 @@ class BLEClient(
                 throw BLEException("BLUETOOTH_CONNECT permission not granted: ${BLEClientExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
             }
             Log.d(LOG_TAG, "Connecting to _server: ${_server!!.name} (${_server!!.address})")
-            _server!!.connectGatt(context, false, _gattCallback)
+            // TRANSPORT_LE explicitly: the 3-arg overload leaves the transport to the stack, which on
+            // dual-mode peers can pick BR/EDR and fail the connection with status 133.
+            _server!!.connectGatt(context, false, _gattCallback, BluetoothDevice.TRANSPORT_LE)
         }
 
     }
@@ -532,6 +567,7 @@ class BLEClient(
      * [BluetoothGatt.close] requires no runtime permission.
      */
     private fun closeGatt() {
+        cancelMtuWatchdog()
         _gattServer?.close()
         _gattServer = null
         _operationQueue = null
@@ -551,6 +587,12 @@ class BLEClient(
             Log.d(LOG_TAG, "Subscribing to ${characteristic.uuid}")
             enableNotifications(gatt, characteristic)
         }
+    }
+
+    /** Cancels the pending MTU fallback, if any. Idempotent. */
+    private fun cancelMtuWatchdog() {
+        _mtuWatchdog?.let { _mtuHandler.removeCallbacks(it) }
+        _mtuWatchdog = null
     }
 
     /** Fires [BLEClientCallBack.onConnected] at most once per connection. */
@@ -604,7 +646,8 @@ class BLEClient(
             val s = _listeningServices.filter { it.uuid == service.uuid }.first()
             val c = s.characteristics.filter { it.uuid == characteristic.uuid }.first()
             Log.d(LOG_TAG, "Writing to characteristic ${characteristic.name} (${characteristic.uuid}) from service ${service.name} (${service.uuid}) (${characteristic.value.length} chars)")
-            _operationQueue!!.enqueue(BLEOperation.WriteCharacteristic(c, characteristic.value.toByteArray()))
+            _operationQueue?.enqueue(BLEOperation.WriteCharacteristic(c, characteristic.value.toByteArray()))
+                ?: Log.w(LOG_TAG, "not connected; dropping op")
         }catch (e: NoSuchElementException){
             Log.d(LOG_TAG,"Service ${service.name} (${service.uuid}) or characteristic ${characteristic.name} ( ${characteristic.uuid}) not found: ${BLEClientExitCode.ERROR_BLUETOOTH_WRITE_SERVICE_OR_CHARACTERISTIC_NOT_FOUND}")
             //Log.d(LOG_TAG)
@@ -624,7 +667,8 @@ class BLEClient(
         try {
             val s = _listeningServices.filter { it.uuid == service.uuid }.first()
             val c = s.characteristics.filter { it.uuid == characteristic.uuid }.first()
-            _operationQueue!!.enqueue(BLEOperation.ReadCharacteristic(c))
+            _operationQueue?.enqueue(BLEOperation.ReadCharacteristic(c))
+                ?: Log.w(LOG_TAG, "not connected; dropping op")
         }catch (e: NoSuchElementException){
             Log.d(LOG_TAG,"Service ${service.name} (${service.uuid}) or characteristic ${characteristic.name} ( ${characteristic.uuid}) not found: ${BLEClientExitCode.ERROR_BLUETOOTH_WRITE_SERVICE_OR_CHARACTERISTIC_NOT_FOUND}")
         }

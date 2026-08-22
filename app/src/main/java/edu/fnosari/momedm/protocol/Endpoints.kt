@@ -20,7 +20,15 @@ internal class FrameLayer(private val sink: FrameSink, private val clock: () -> 
     }
 }
 
-/** Managed-device protocol endpoint: drives the handshake then delivers [Message.Cmd]s. Transport-agnostic. */
+/**
+ * Managed-device protocol endpoint: drives the handshake then delivers [Message.Cmd]s. Transport-agnostic.
+ *
+ * **Threading:** all entry points ([onConnected], [onFrame], [send], [reset]) are synchronized on this
+ * instance; callbacks run on the caller's thread. The host drives this from at least two threads — BLE
+ * GATT callbacks arrive on binder threads while the service's own coroutines run on the main thread —
+ * and the session state (handshake progress, secure channel, sequence numbers, reassembly buffers) is
+ * plain mutable state that must not be touched concurrently.
+ */
 class ManagedEndpoint(
     private val secret: ByteArray,
     private val deviceId: String,
@@ -42,16 +50,16 @@ class ManagedEndpoint(
     val authenticated: Boolean get() = confirmed
 
     /** Call once the link is up and MTU known: resets state and sends HELLO. */
-    fun onConnected(mtu: Int) {
+    @Synchronized fun onConnected(mtu: Int) {
         reset(); frames.mtu = mtu
         handshake = ManagedHandshake(secret, deviceId, model, mtu).also { frames.sendEnvelope(Envelope.plain(it.hello())) }
     }
     /** Clears all session state (handshake progress, secure channel, auth confirmation). After this, the
      * endpoint only resumes when the host calls [onConnected] again — any frame belonging to the old
      * session (e.g. a replayed CHALLENGE/AUTH or a captured sealed message) is then rejected as premature. */
-    fun reset() { handshake = null; channel = null; confirmed = false }
+    @Synchronized fun reset() { handshake = null; channel = null; confirmed = false }
 
-    fun onFrame(frame: String) {
+    @Synchronized fun onFrame(frame: String) {
         val env = try { frames.receive(frame) } catch (e: Exception) { reset(); listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
         val ch = channel
         if (ch == null) {
@@ -76,13 +84,19 @@ class ManagedEndpoint(
     }
 
     /** Sends a sealed message; only valid after authentication. */
-    fun send(m: Message) {
+    @Synchronized fun send(m: Message) {
         val ch = channel ?: throw IllegalStateException("not authenticated")
         frames.sendEnvelope(ch.seal(m))
     }
 }
 
-/** Controller-side endpoint for ONE connected managed device. */
+/**
+ * Controller-side endpoint for ONE connected managed device.
+ *
+ * **Threading:** all entry points ([onFrame], [send], [reset]) are synchronized on this instance;
+ * callbacks run on the caller's thread. Frames arrive on GATT binder threads while sends are issued
+ * from the controller's own threads, and the session state must not be mutated concurrently.
+ */
 class ControllerEndpoint(
     private val secret: ByteArray,
     sink: FrameSink,
@@ -104,9 +118,9 @@ class ControllerEndpoint(
     /** Clears all session state, including the negotiated MTU (reset to the pre-connection default of 23).
      * After this, the endpoint only resumes when it receives a fresh HELLO — a replayed CHALLENGE/AUTH or a
      * captured sealed message from the old session is then rejected as premature. */
-    fun reset() { handshake = null; channel = null; frames.mtu = 23 }
+    @Synchronized fun reset() { handshake = null; channel = null; frames.mtu = 23 }
 
-    fun onFrame(frame: String) {
+    @Synchronized fun onFrame(frame: String) {
         val env = try { frames.receive(frame) } catch (e: Exception) { reset(); listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
         val ch = channel
         if (ch == null) {
@@ -137,7 +151,7 @@ class ControllerEndpoint(
         listener.onMessage(m)
     }
 
-    fun send(m: Message) {
+    @Synchronized fun send(m: Message) {
         val ch = channel ?: throw IllegalStateException("not authenticated")
         frames.sendEnvelope(ch.seal(m))
     }
