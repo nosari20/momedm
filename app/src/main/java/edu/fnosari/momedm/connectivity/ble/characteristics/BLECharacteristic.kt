@@ -28,7 +28,9 @@ abstract class BLECharacteristic(val uuid: UUID, val name: String, open var valu
     enum class Permission {
         READ,
         WRITE,
-        READ_WRITE
+        READ_WRITE,
+        /** Server pushes values; clients subscribe via CCCD. Readable so the last value can be fetched. */
+        NOTIFY
     }
 
 
@@ -40,12 +42,11 @@ abstract class BLECharacteristic(val uuid: UUID, val name: String, open var valu
      * both read and write properties are set. Otherwise, only the read property is set.
      */
     val properties: Int
-        get() {
-            when(permission){
-                Permission.READ -> return BluetoothGattCharacteristic.PROPERTY_READ
-                Permission.WRITE -> return BluetoothGattCharacteristic.PROPERTY_WRITE
-                Permission.READ_WRITE -> return BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE
-            }
+        get() = when (permission) {
+            Permission.READ -> BluetoothGattCharacteristic.PROPERTY_READ
+            Permission.WRITE -> BluetoothGattCharacteristic.PROPERTY_WRITE
+            Permission.READ_WRITE -> BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE
+            Permission.NOTIFY -> BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY
         }
 
     /**
@@ -56,11 +57,13 @@ abstract class BLECharacteristic(val uuid: UUID, val name: String, open var valu
      * Otherwise, only read permission is granted.
      */
     val permissions: Int
-        get() {
-            when(permission){
-                Permission.READ -> return BluetoothGattCharacteristic.PERMISSION_READ
-                Permission.WRITE -> return BluetoothGattCharacteristic.PERMISSION_WRITE
-                Permission.READ_WRITE -> return BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE
-            }
+        get() = when (permission) {
+            Permission.READ -> BluetoothGattCharacteristic.PERMISSION_READ
+            Permission.WRITE -> BluetoothGattCharacteristic.PERMISSION_WRITE
+            Permission.READ_WRITE -> BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE
+            Permission.NOTIFY -> BluetoothGattCharacteristic.PERMISSION_READ
         }
+
+    /** True when a central should subscribe (write the CCCD) for this characteristic. */
+    val notifies: Boolean get() = permission == Permission.NOTIFY
 }

@@ -12,13 +12,14 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelUuid
 import android.util.Log
 import java.util.UUID
 import androidx.annotation.RequiresPermission
@@ -33,11 +34,18 @@ import edu.fnosari.momedm.connectivity.ble.services.BLEService
  * specific BLE services and characteristics.
  *
  * @param context The application context required to access system Bluetooth services.
- * @param serverName The name of the BLE device (_server) to connect to.
+ * @param serverName Advertised device name to match, or null to accept any device passing [serviceUuid].
  * @param servicesToListen A list of BLE services to monitor for characteristic changes.
  * @param callBack A callback interface to notify when important BLE events occur.
+ * @param serviceUuid When non-null, the scan is filtered on this advertised service UUID.
  */
-class BLEClient(private val context: Context, private val serverName: String, private val servicesToListen: List<BLEService>, val callBack: BLEClientCallBack){
+class BLEClient(
+    private val context: Context,
+    private val serverName: String?,
+    private val servicesToListen: List<BLEService>,
+    val callBack: BLEClientCallBack,
+    private val serviceUuid: UUID? = null,
+) {
     companion object {
         private const val LOG_TAG = "BLEClient"
 
@@ -48,6 +56,9 @@ class BLEClient(private val context: Context, private val serverName: String, pr
          * alone only updates the local stack.
          */
         private val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+        private const val REQUESTED_MTU = 517
+        private const val DEFAULT_MTU = 23
     }
 
     /**
@@ -57,6 +68,8 @@ class BLEClient(private val context: Context, private val serverName: String, pr
         fun onCharacteristicChanged(characteristic: BLECharacteristic, service: BLEService)
         fun onConnected()
         fun onDisconnected()
+        /** Negotiated ATT MTU (payload = mtu - 3). Called once per connection, before [onConnected]. */
+        fun onMtuChanged(mtu: Int) {}
     }
 
     /**
@@ -149,7 +162,8 @@ class BLEClient(private val context: Context, private val serverName: String, pr
                 Log.d(LOG_TAG, "Device found: ${deviceName} (${device.address})")
 
                 // If the found device matches the expected _server name, attempt to connect
-                if(device.name == serverName && _server == null){
+                val nameMatches = serverName == null || device.name == serverName || deviceName == serverName
+                if (nameMatches && _server == null) {
                     Log.d(LOG_TAG, "Device name equals to _server name: ${device.name}, connecting.")
                     stopScan()
                     _server = device
@@ -203,29 +217,45 @@ class BLEClient(private val context: Context, private val serverName: String, pr
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                gatt?.services?.forEach { service ->
-                    Log.d(LOG_TAG, "Service discovered: ${service.uuid}")
-                    val serviceToListen = servicesToListen.filter { it.uuid == service.uuid }
-                    if(serviceToListen.isNotEmpty()){
-                        Log.d(LOG_TAG, "Service ${service.uuid} in services to listen")
-                        _listeningServices.add(service)
-                        service.characteristics.forEach { characteristic ->
-                            Log.d(LOG_TAG, "Characteristic discovered: ${characteristic.uuid}")
-
-                            // Only subscribe to characteristics we were asked to listen to.
-                            val sCharacteristic = serviceToListen.first().characteristics
-                                .firstOrNull { it.uuid == characteristic.uuid }
-                            if (sCharacteristic != null) {
-                                Log.d(LOG_TAG, "Listening to changes for characteristic ${sCharacteristic.name} (${sCharacteristic.uuid}) from service ${service.uuid}")
-                                enableNotifications(gatt, characteristic)
-                            }
-                        }
+            if (status != BluetoothGatt.GATT_SUCCESS || gatt == null) {
+                Log.w(LOG_TAG, "Service discovery failed: $status")
+                return
+            }
+            gatt.services?.forEach { service ->
+                Log.d(LOG_TAG, "Service discovered: ${service.uuid}")
+                val serviceToListen = servicesToListen.firstOrNull { it.uuid == service.uuid } ?: return@forEach
+                Log.d(LOG_TAG, "Service ${service.uuid} in services to listen")
+                _listeningServices.add(service)
+                service.characteristics.forEach { characteristic ->
+                    val sCharacteristic = serviceToListen.characteristics.firstOrNull { it.uuid == characteristic.uuid }
+                    if (sCharacteristic != null && sCharacteristic.notifies) {
+                        Log.d(LOG_TAG, "Subscribing to ${sCharacteristic.name} (${sCharacteristic.uuid})")
+                        enableNotifications(gatt, characteristic)
                     }
-
                 }
+            }
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                Log.e(LOG_TAG, "BLUETOOTH_CONNECT permission not granted: ${BLEClientExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
+                return
+            }
+            // MTU negotiation is not a queued GATT op; its callback fires onConnected.
+            if (!gatt.requestMtu(REQUESTED_MTU)) {
+                Log.w(LOG_TAG, "requestMtu failed; assuming default MTU")
+                callBack.onMtuChanged(DEFAULT_MTU)
                 callBack.onConnected()
             }
+        }
+
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            val effective = if (status == BluetoothGatt.GATT_SUCCESS) mtu else DEFAULT_MTU
+            Log.d(LOG_TAG, "MTU changed: $mtu (status $status) -> using $effective")
+            callBack.onMtuChanged(effective)
+            callBack.onConnected()
+        }
+
+        override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
+            Log.d(LOG_TAG, "Descriptor ${descriptor.uuid} write status: $status")
+            _operationQueue?.signalOperationComplete()
         }
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
@@ -394,12 +424,13 @@ class BLEClient(private val context: Context, private val serverName: String, pr
             }
         }, _scanTimeout)
 
-        Log.d(LOG_TAG, "Starting device scan, looking for $serverName")
+        Log.d(LOG_TAG, "Starting device scan, looking for name=$serverName service=$serviceUuid")
 
         val scanSettings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
-        _bluetoothLeScanner.startScan(null, scanSettings, _scanCallback)
+        val filters: List<ScanFilter>? = serviceUuid?.let { listOf(ScanFilter.Builder().setServiceUuid(ParcelUuid(it)).build()) }
+        _bluetoothLeScanner.startScan(filters, scanSettings, _scanCallback)
 
 
     }
@@ -481,15 +512,8 @@ class BLEClient(private val context: Context, private val serverName: String, pr
             return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            gatt.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-        } else {
-            @Suppress("DEPRECATION")
-            cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            @Suppress("DEPRECATION")
-            gatt.writeDescriptor(cccd)
-        }
-        Log.d(LOG_TAG, "Subscribed to notifications on ${characteristic.uuid} (CCCD written)")
+        _operationQueue?.enqueue(BLEOperation.WriteDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE))
+        Log.d(LOG_TAG, "Queued CCCD write for ${characteristic.uuid}")
     }
 
     fun writeCharacteristic(service: BLEService, characteristic: BLECharacteristic) {

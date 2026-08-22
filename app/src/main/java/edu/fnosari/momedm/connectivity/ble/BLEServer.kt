@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattServer
 import android.bluetooth.BluetoothGattServerCallback
 import android.bluetooth.BluetoothGattService
@@ -25,6 +26,7 @@ import edu.fnosari.momedm.connectivity.ble.BLEClient.BLEClientExitCode
 import edu.fnosari.momedm.connectivity.ble.BLEClient.Companion
 import edu.fnosari.momedm.connectivity.ble.characteristics.BLECharacteristic
 import edu.fnosari.momedm.connectivity.ble.services.BLEService
+import java.util.UUID
 
 /**
  * Represents a Bluetooth Low Energy (BLE) server for managing and handling BLE services and characteristics.
@@ -49,10 +51,17 @@ import edu.fnosari.momedm.connectivity.ble.services.BLEService
  *
  * @throws BLEException if any Bluetooth-related operation fails due to permission issues or limitations.
  */
-class BLEServer (private val context: Context, private val clientLimit: Int = 5, private val callBack: BLEServerCallBack) {
+class BLEServer(
+    private val context: Context,
+    private val clientLimit: Int = 5,
+    private val callBack: BLEServerCallBack,
+    private val includeDeviceName: Boolean = true,
+) {
 
     companion object {
         private const val LOG_TAG = "BLEServer"
+        private val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private const val NOTIFY_TIMEOUT_MS = 5000L
     }
 
     /**
@@ -66,6 +75,8 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
         )
         fun onDeviceConnected(device: BluetoothDevice)
         fun onDeviceDisconnected(device: BluetoothDevice)
+        /** ATT MTU negotiated by [device]; payload per notification = mtu - 3. */
+        fun onMtuChanged(device: BluetoothDevice, mtu: Int) {}
     }
 
     /**
@@ -114,6 +125,17 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
                 return _bluetoothAdapter!!.name;
             }
         }
+
+    private data class PendingNotify(val device: BluetoothDevice, val characteristic: BluetoothGattCharacteristic, val value: ByteArray)
+    private val _notifyLock = Any()
+    private val _notifyQueue: ArrayDeque<PendingNotify> = ArrayDeque()
+    private var _notifyInFlight = false
+    private val _notifyHandler = Handler(Looper.getMainLooper())
+    private val _notifyTimeout = Runnable {
+        Log.w(LOG_TAG, "Notification send timed out; advancing notify queue")
+        onNotifyDone()
+    }
+    private var _advertiseCallback: AdvertiseCallback? = null
 
      // Callback class responsible for handling BLE server events.
     private val gattServerCallback = object : BluetoothGattServerCallback() {
@@ -220,6 +242,26 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
                 }
             }
 
+        }
+
+        override fun onDescriptorWriteRequest(device: BluetoothDevice, requestId: Int, descriptor: BluetoothGattDescriptor, preparedWrite: Boolean, responseNeeded: Boolean, offset: Int, value: ByteArray) {
+            Log.d(LOG_TAG, "${device.address} writes descriptor ${descriptor.uuid} on ${descriptor.characteristic.uuid}")
+            if (!responseNeeded) return
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                Log.e(LOG_TAG, "BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
+                return
+            }
+            _gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value)
+        }
+
+        override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+            Log.d(LOG_TAG, "Notification sent to ${device.address}: status $status")
+            onNotifyDone()
+        }
+
+        override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
+            Log.d(LOG_TAG, "MTU for ${device.address}: $mtu")
+            callBack.onMtuChanged(device, mtu)
         }
     }
 
@@ -356,6 +398,10 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
                     characteristic.permissions
                 )
 
+                if (characteristic.notifies) {
+                    c.addDescriptor(BluetoothGattDescriptor(CCCD_UUID, BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE))
+                }
+
                 s.addCharacteristic(c)
             }
 
@@ -371,7 +417,7 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .build()
 
-        val data = AdvertiseData.Builder().setIncludeDeviceName(true)
+        val data = AdvertiseData.Builder().setIncludeDeviceName(includeDeviceName)
 
 
         for(service in _services) {
@@ -387,7 +433,7 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
             throw BLEException("BLUETOOTH_ADVERTISE permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_ADVERTISE_PERMISSION_NOT_GRANTED}")
 
         }
-        advertiser.startAdvertising(settings, data.build(), object : AdvertiseCallback() {
+        _advertiseCallback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
                 super.onStartSuccess(settingsInEffect)
                 Log.d(LOG_TAG, "Advertising started successfully")
@@ -397,7 +443,8 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
                 super.onStartFailure(errorCode)
                 Log.e(LOG_TAG, "Advertising failed: $errorCode")
             }
-        })
+        }
+        advertiser.startAdvertising(settings, data.build(), _advertiseCallback)
 
     }
 
@@ -417,6 +464,10 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
         ) {
             Log.d(LOG_TAG,"BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
             throw BLEException("BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
+        }
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED) {
+            _advertiseCallback?.let { _bluetoothAdapter?.bluetoothLeAdvertiser?.stopAdvertising(it) }
+            _advertiseCallback = null
         }
         for (device in _connectedDevices){
             _gattServer.cancelConnection(device)
@@ -440,21 +491,56 @@ class BLEServer (private val context: Context, private val clientLimit: Int = 5,
      */
     @Throws(BLEException::class)
     fun updateCharacteristic(service: BLEService, characteristic: BLECharacteristic){
-        val c = _gattServer.getService(service.uuid).getCharacteristic(characteristic.uuid)
-        if(c != null) {
-            for (device in _connectedDevices) {
-                if (ActivityCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.BLUETOOTH_CONNECT
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    Log.d(LOG_TAG,"BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
-                    throw BLEException("BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
-                }
-                Log.d(LOG_TAG,"Notify ${device.name} (${device.address}) for characteristic update ${characteristic.name} (${characteristic.uuid}), new value ${characteristic.value}")
-                _gattServer.notifyCharacteristicChanged(device, c , false, characteristic.value.toByteArray(Charsets.UTF_8))
-            }
+        for (device in _connectedDevices) notifyDevice(device, service, characteristic)
+    }
+
+    /** Pushes [characteristic]'s current value to one connected central, serialized with other notifications. */
+    @Throws(BLEException::class)
+    fun notifyDevice(device: BluetoothDevice, service: BLEService, characteristic: BLECharacteristic) {
+        val c = _gattServer.getService(service.uuid)?.getCharacteristic(characteristic.uuid)
+            ?: throw BLEException("Service ${service.uuid} or characteristic ${characteristic.uuid} not found: ${BLEServerExitCode.ERROR_BLUETOOTH_WRITE_SERVICE_OR_CHARACTERISTIC_NOT_FOUND}")
+        synchronized(_notifyLock) {
+            _notifyQueue.add(PendingNotify(device, c, characteristic.value.toByteArray(Charsets.UTF_8)))
         }
+        processNextNotify()
+    }
+
+    /** Drops the link to [device]. */
+    fun disconnectDevice(device: BluetoothDevice) {
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(LOG_TAG, "BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
+            return
+        }
+        Log.d(LOG_TAG, "Disconnecting ${device.address}")
+        _gattServer.cancelConnection(device)
+    }
+
+    private fun processNextNotify() {
+        val next: PendingNotify
+        synchronized(_notifyLock) {
+            if (_notifyInFlight || _notifyQueue.isEmpty()) return
+            _notifyInFlight = true
+            next = _notifyQueue.removeFirst()
+        }
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(LOG_TAG, "BLUETOOTH_CONNECT permission not granted: ${BLEServerExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
+            onNotifyDone()
+            return
+        }
+        Log.d(LOG_TAG, "Notify ${next.device.address} on ${next.characteristic.uuid} (${next.value.size} bytes)")
+        val code = _gattServer.notifyCharacteristicChanged(next.device, next.characteristic, false, next.value)
+        if (code != android.bluetooth.BluetoothStatusCodes.SUCCESS) {
+            Log.w(LOG_TAG, "notifyCharacteristicChanged failed: $code")
+            onNotifyDone()
+        } else {
+            _notifyHandler.postDelayed(_notifyTimeout, NOTIFY_TIMEOUT_MS)
+        }
+    }
+
+    private fun onNotifyDone() {
+        _notifyHandler.removeCallbacks(_notifyTimeout)
+        synchronized(_notifyLock) { _notifyInFlight = false }
+        processNextNotify()
     }
 
 

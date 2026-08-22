@@ -27,6 +27,20 @@ It is plain Android — no DI, no third-party BLE library.
   log-and-return on a missing permission instead of throwing (which would crash).
 - **Version-safe writes.** Uses the API-33 `writeCharacteristic` overload with a
   fallback for API 31–32.
+- **NOTIFY characteristics.** `Permission.NOTIFY` sets `PROPERTY_NOTIFY` +
+  `PERMISSION_READ` and gets a CCCD descriptor (`0x2902`) on the server side.
+- **CCCD writes go through the op queue.** The client's subscription write is a
+  queued `BLEOperation.WriteDescriptor`, serialized with reads/writes like any
+  other GATT op.
+- **MTU negotiation.** The client requests MTU 517 right after service discovery
+  and reports the negotiated value via `onMtuChanged(mtu)` before `onConnected()`.
+- **Per-device serialized notifications.** `BLEServer.notifyDevice` queues one
+  notification per device at a time (`onNotificationSent` advances the queue),
+  so a slow/unresponsive central can't stall notifications to others.
+- **Scan/advertise by service UUID.** `BLEClient(serviceUuid = ...)` filters the
+  scan by advertised service UUID (name optional); `BLEServer(includeDeviceName = ...)`
+  controls whether the advertised device name is included.
+- **`disconnectDevice`.** The server can drop a specific central's link.
 
 ## Requirements
 
@@ -101,6 +115,7 @@ val client = BLEClient(
     callBack = object : BLEClient.BLEClientCallBack {
         override fun onConnected() { /* link up; safe to read/write */ }
         override fun onDisconnected() { /* link down (auto-closed) */ }
+        override fun onMtuChanged(mtu: Int) { /* negotiated MTU; payload = mtu - 3 */ }
         override fun onCharacteristicChanged(
             characteristic: BLECharacteristic,
             service: BLEService
@@ -169,10 +184,11 @@ adapter name being advertised.
 - GATT callbacks arrive on **binder threads**. `BLECharacteristic.value` is a plain
   `String` mutated from those threads — hop to your main/UI thread (or a `StateFlow`)
   before rendering, and don't assume ordering across characteristics.
-- Default ATT MTU is 23 bytes → ~20-byte payloads. For larger values call
-  `requestMtu` (not wrapped here) and fragment/reassemble.
+- Default ATT MTU is 23 bytes → ~20-byte payloads. The client negotiates MTU 517
+  automatically after discovery; `onMtuChanged`/`BLEServer.BLEServerCallBack.onMtuChanged`
+  report the value actually granted (fall back accordingly for large payloads).
 - A characteristic's `properties`/`permissions` are derived from its `Permission`;
-  if you need `NOTIFY`-only or `INDICATE`, extend the `Permission` enum and the
+  if you need `INDICATE`, extend the `Permission` enum and the
   `BLECharacteristic.properties` mapping.
 - `BLEClient` matches and subscribes to characteristics by UUID; UUIDs must be
   unique within a service.

@@ -60,6 +60,7 @@ class BLEOperationQueue(private val gatt: BluetoothGatt) {
         val started: Boolean = when (op) {
             is BLEOperation.ReadCharacteristic -> gatt.readCharacteristic(op.characteristic)
             is BLEOperation.WriteCharacteristic -> startWrite(op)
+            is BLEOperation.WriteDescriptor -> startDescriptorWrite(op)
         }
 
         if (started) {
@@ -86,6 +87,17 @@ class BLEOperationQueue(private val gatt: BluetoothGatt) {
             op.characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             op.characteristic.value = op.value
             gatt.writeCharacteristic(op.characteristic)
+        }
+    }
+
+    @Suppress("DEPRECATION") // pre-Tiramisu descriptor API
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun startDescriptorWrite(op: BLEOperation.WriteDescriptor): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            gatt.writeDescriptor(op.descriptor, op.value) == BluetoothStatusCodes.SUCCESS
+        } else {
+            op.descriptor.value = op.value
+            gatt.writeDescriptor(op.descriptor)
         }
     }
 
