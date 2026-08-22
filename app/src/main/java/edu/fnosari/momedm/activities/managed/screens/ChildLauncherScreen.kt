@@ -8,10 +8,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -26,9 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -41,10 +43,11 @@ import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.managed.ManagedViewModel
 import edu.fnosari.momedm.activities.managed.components.PinDialog
 import edu.fnosari.momedm.managed.ManagedLinkState.LinkState
+import java.util.Locale
 
 /**
- * The child device's home: a grid of big app tiles (allowed apps while child mode is on, all apps otherwise),
- * a slim header (link dot, battery, mode) and — when a parent PIN exists — a lock icon opening [PinDialog].
+ * The child device's home: a grid of big app tiles (allowed apps while locked, all apps otherwise),
+ * a slim header (link state, battery, mode) and — when a parent PIN exists — a lock icon opening [PinDialog].
  * [onUnlocked] is called after a correct PIN; the hosting Activity releases the lock task.
  */
 @Composable
@@ -56,33 +59,34 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
     val pinSet by vm.pinSet.collectAsState()
     val pauseLeft by vm.pauseRemainingMs.collectAsState()
     val pinError by vm.pinError.collectAsState()
-    val pinLockedUntil by vm.pinLockedUntilMs.collectAsState()
-    var showPin by remember { mutableStateOf(false) }
+    val pinLockedRemaining by vm.pinLockedRemainingMs.collectAsState()
+    val showPin by vm.pinDialogOpen.collectAsState()
     val paused = pauseLeft > 0L
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
         // header
         Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(if (config.on) R.string.launcher_child_mode_on else R.string.launcher_child_mode_off), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
                 Text(stringResource(if (link == LinkState.AUTHENTICATED) R.string.launcher_online else R.string.launcher_offline), style = MaterialTheme.typography.labelMedium)
-                status?.let { Text("  ${it.battery}%", style = MaterialTheme.typography.labelMedium) }
-                if (config.on && pinSet) IconButton(onClick = { showPin = true }) { Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.launcher_lock_cd)) }
+                status?.let { Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.launcher_battery, it.battery), style = MaterialTheme.typography.labelMedium) }
+                if (config.on && pinSet) IconButton(onClick = { vm.pinDialogOpen.value = true }) { Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.launcher_lock_cd)) }
             }
         }
         if (paused) {
             Surface(color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     val m = pauseLeft / 60_000L; val s = (pauseLeft / 1_000L) % 60L
-                    Text(stringResource(R.string.launcher_paused, String.format("%02d:%02d", m, s)), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.launcher_paused, String.format(Locale.US, "%02d:%02d", m, s)), style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = { vm.relock() }) { Text(stringResource(R.string.launcher_relock)) }
                 }
             }
         }
         if (apps.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.launcher_no_apps), textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp)) }
+            val emptyText = if (config.on) R.string.launcher_no_apps else R.string.launcher_no_apps_installed
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(emptyText), textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp)) }
         } else {
             LazyVerticalGrid(columns = GridCells.Fixed(3), contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -98,9 +102,9 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
         }
     }
     if (showPin) PinDialog(
-        onDismiss = { showPin = false; vm.clearPinError() },
-        onSubmit = { pin -> vm.tryPin(pin) { showPin = false; onUnlocked() } },
+        onDismiss = { vm.pinDialogOpen.value = false; vm.clearPinError() },
+        onSubmit = { pin -> vm.tryPin(pin) { vm.pinDialogOpen.value = false; onUnlocked() } },
         error = pinError,
-        lockedForMs = (pinLockedUntil - System.currentTimeMillis()).coerceAtLeast(0L),
+        lockedForMs = pinLockedRemaining,
     )
 }

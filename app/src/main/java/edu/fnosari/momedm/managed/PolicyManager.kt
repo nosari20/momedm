@@ -24,8 +24,6 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         private const val LOG_TAG = "PolicyManager"
         const val PLAY_PKG = "com.android.vending"
         const val GMS_PKG = "com.google.android.gms"
-        /** Intent extra: the launcher should immediately start the pinned app (if any). */
-        const val EXTRA_LAUNCH_PINNED = "launch_pinned"
     }
     private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     /** The [AdminReceiver] component this app is (or would be) registered as device owner with. */
@@ -40,11 +38,10 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Log.d(LOG_TAG, "Persistent HOME set")
     }
 
-    /** Launches our launcher in lock task (the config decides what it shows). */
+    /** Launches our launcher in lock task (the config decides what it shows; the launcher itself drives the pinned-app bounce). */
     private fun launchHomeLocked() {
         val home = Intent(context, ManagedHomeActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            .putExtra(EXTRA_LAUNCH_PINNED, true)
         context.startActivity(home, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
     }
 

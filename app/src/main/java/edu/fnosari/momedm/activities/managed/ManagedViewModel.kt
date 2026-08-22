@@ -40,37 +40,60 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     val kioskConfig: StateFlow<KioskConfig> = prefs.kioskConfig.stateIn(viewModelScope, SharingStarted.Eagerly, KioskConfig())
     val pinSet: StateFlow<Boolean> = prefs.childPrefs.map { it.pinHash != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** Bumped by the Activity's ON_RESUME observer; combined with [kioskConfig] to drive the pinned-app bounce. */
+    val resumeTick = MutableStateFlow(0)
+    /** True while [edu.fnosari.momedm.activities.managed.components.PinDialog] is showing — suppresses the pinned-app bounce. */
+    val pinDialogOpen = MutableStateFlow(false)
+
     private val _apps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val launcherApps: StateFlow<List<LauncherApp>> = _apps
     private val _pauseRemaining = MutableStateFlow(0L)
     val pauseRemainingMs: StateFlow<Long> = _pauseRemaining
     private val _pinError = MutableStateFlow<String?>(null)
     val pinError: StateFlow<String?> = _pinError
-    private val _pinLockedUntil = MutableStateFlow(0L)
-    val pinLockedUntilMs: StateFlow<Long> = _pinLockedUntil
+    private val _pinLockedRemaining = MutableStateFlow(0L)
+    /** Milliseconds left on the PIN lockout, ticking every 250 ms; 0 when not locked out. */
+    val pinLockedRemainingMs: StateFlow<Long> = _pinLockedRemaining
+    private var pinLockDeadline = 0L
     private var pinFailures = 0
     private var pauseJob: Job? = null
+    private var pinLockJob: Job? = null
+    private var refreshJob: Job? = null
 
     init {
         viewModelScope.launch { kioskConfig.collect { refreshApps(); trackPause(it) } }
     }
 
-    /** Recomputes the tile list (allowed apps when child mode is on, every launchable app otherwise). */
-    fun refreshApps() { viewModelScope.launch {
-        val c = kioskConfig.value
-        _apps.value = withContext(Dispatchers.IO) {
-            val pm = getApplication<Application>().packageManager
-            val all = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), PackageManager.ResolveInfoFlags.of(0))
-                .filter { it.activityInfo.packageName != getApplication<Application>().packageName }
-                .map { LauncherApp(it.activityInfo.packageName, it.loadLabel(pm).toString(), runCatching { it.loadIcon(pm) }.getOrNull()) }
-                .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }
-            if (c.on) all.filter { it.pkg in c.apps } else all
-        }
-    } }
+    /** Bumps [resumeTick] — called from the Activity's ON_RESUME observer. */
+    fun onResumed() { resumeTick.value++ }
 
+    /** Recomputes the tile list (allowed apps while locked, every launchable app otherwise); cancels any prior run. */
+    fun refreshApps() {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            val c = kioskConfig.value
+            val locked = c.isLocked(System.currentTimeMillis())
+            _apps.value = withContext(Dispatchers.IO) {
+                val pm = getApplication<Application>().packageManager
+                val all = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), PackageManager.ResolveInfoFlags.of(0))
+                    .filter { it.activityInfo.packageName != getApplication<Application>().packageName }
+                    .map { LauncherApp(it.activityInfo.packageName, it.loadLabel(pm).toString(), runCatching { it.loadIcon(pm) }.getOrNull()) }
+                    .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }
+                if (locked) all.filter { it.pkg in c.apps } else all
+            }
+        }
+    }
+
+    /**
+     * Tracks the pause countdown, and resumes lock task as soon as it lapses — including when this
+     * [ManagedViewModel] is recreated (e.g. process death) *after* a stored [KioskConfig.pauseUntil]
+     * has already passed: without this, nothing would ever call [PolicyManager.resume] for it.
+     */
     private fun trackPause(c: KioskConfig) {
         pauseJob?.cancel()
-        if (!c.isPaused(System.currentTimeMillis())) { _pauseRemaining.value = 0L; return }
+        val now = System.currentTimeMillis()
+        if (c.on && c.pauseUntil > 0L && !c.isPaused(now)) { _pauseRemaining.value = 0L; viewModelScope.launch { policy.resume() }; return }
+        if (!c.isPaused(now)) { _pauseRemaining.value = 0L; return }
         pauseJob = viewModelScope.launch {
             while (isActive) {
                 val left = c.pauseUntil - System.currentTimeMillis()
@@ -79,9 +102,6 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
             }
         }
     }
-
-    /** Pinned app to auto-launch when the launcher comes to the front, or null. */
-    fun shouldAutoLaunchPinned(): String? = kioskConfig.value.let { if (it.isLocked(System.currentTimeMillis())) it.pinned else null }
 
     /** Opens [pkg] — via [PolicyManager.launchAllowed], which requests lock task only while locked. */
     fun open(pkg: String) {
@@ -92,17 +112,31 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
 
     /** Verifies [pin]; on success starts a pause and calls [onSuccess] (the Activity then releases lock task). */
     fun tryPin(pin: String, onSuccess: () -> Unit) { viewModelScope.launch {
-        if (System.currentTimeMillis() < _pinLockedUntil.value) return@launch
+        if (System.currentTimeMillis() < pinLockDeadline) return@launch
         if (policy.verifyPin(pin)) {
-            pinFailures = 0; _pinError.value = null; _pinLockedUntil.value = 0L
+            pinFailures = 0; _pinError.value = null; pinLockDeadline = 0L; pinLockJob?.cancel(); _pinLockedRemaining.value = 0L
             policy.pause(); onSuccess()
         } else {
             pinFailures++
             val lock = (PIN_LOCK_BASE_MS shl (pinFailures - 1).coerceAtMost(5)).coerceAtMost(PIN_LOCK_MAX_MS)
-            _pinLockedUntil.value = System.currentTimeMillis() + lock
+            pinLockDeadline = System.currentTimeMillis() + lock
             _pinError.value = getApplication<Application>().getString(edu.fnosari.momedm.R.string.pin_wrong)
+            startPinLockTicker()
         }
     } }
+
+    /** Ticks [pinLockedRemainingMs] down to 0 every 250 ms so the dialog's countdown is observable, not frozen. */
+    private fun startPinLockTicker() {
+        pinLockJob?.cancel()
+        pinLockJob = viewModelScope.launch {
+            while (isActive) {
+                val left = pinLockDeadline - System.currentTimeMillis()
+                if (left <= 0L) { _pinLockedRemaining.value = 0L; break }
+                _pinLockedRemaining.value = left; delay(250L)
+            }
+        }
+    }
+
     fun clearPinError() { _pinError.value = null }
 
     /** Ends a pause now (re-locks). */

@@ -25,10 +25,16 @@ import edu.fnosari.momedm.activities.managed.screens.ChildLauncherScreen
 import edu.fnosari.momedm.ui.components.ButtonRequestPermission
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
 import edu.fnosari.momedm.ui.theme.MomeDMTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 
 /** HOME activity of a managed device: permission gate, then the child launcher (tiles grid, pinned relaunch, PIN dialog). */
 class ManagedHomeActivity : ComponentActivity() {
-    companion object { private const val LOG_TAG = "ManagedHomeActivity" }
+    companion object {
+        private const val LOG_TAG = "ManagedHomeActivity"
+        /** Grace period before bouncing into the pinned app, so a parent can tap the launcher's lock icon first. */
+        private const val PINNED_BOUNCE_DELAY_MS = 1_500L
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,10 +56,20 @@ class ManagedHomeActivity : ComponentActivity() {
                         Column { for (p in missing) ButtonRequestPermission(context, p, p, granted = { required.remove(p) }, denied = { Log.d(LOG_TAG, "$p denied") }) }
                     }
                 } else {
-                    LaunchedEffect(Unit) { vm.ensureLink(); vm.refreshApps() }
-                    // Pinned app: every time the launcher comes to the front while locked, bounce into it.
+                    LaunchedEffect(Unit) { vm.ensureLink() }
+                    // Pinned app: reacts to config changes and to ON_RESUME (via resumeTick) rather than reading a
+                    // one-shot snapshot, so it also fires on a cold start once the persisted config has loaded.
+                    LaunchedEffect(Unit) {
+                        combine(vm.kioskConfig, vm.resumeTick) { c, _ -> c }.collect { c ->
+                            val now = System.currentTimeMillis()
+                            if (c.isLocked(now) && c.pinned != null && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                                delay(PINNED_BOUNCE_DELAY_MS)
+                                if (!vm.pinDialogOpen.value && vm.kioskConfig.value.isLocked(System.currentTimeMillis())) vm.open(c.pinned)
+                            }
+                        }
+                    }
                     DisposableEffect(owner) {
-                        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) vm.shouldAutoLaunchPinned()?.let { vm.open(it) } }
+                        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) vm.onResumed() }
                         owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
                     }
                     ChildLauncherScreen(vm, onUnlocked = {
