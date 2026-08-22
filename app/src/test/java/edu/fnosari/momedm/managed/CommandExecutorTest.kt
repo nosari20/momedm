@@ -1,6 +1,7 @@
 package edu.fnosari.momedm.managed
 
 import edu.fnosari.momedm.protocol.AppInfo
+import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.test.runTest
@@ -11,11 +12,16 @@ import org.junit.Test
 
 class CommandExecutorTest {
     private class FakePolicy : PolicyActions {
-        var kiosk: String? = null; var played: String? = null; var accountOpened = false
-        override suspend fun kioskOn(pkg: String) = if (pkg == "bad") Result.failure(IllegalArgumentException("not installed")) else { kiosk = pkg; Result.success(Unit) }
-        override suspend fun kioskOff() = run { kiosk = null; Result.success(Unit) }
+        var kiosk: List<String>? = null; var pinned: String? = null; var played: String? = null; var accountOpened = false; var prefs: ChildPrefs? = null
+        override suspend fun kioskOn(apps: List<String>, pinned: String?): Result<List<String>> {
+            val ok = apps.filter { it != "bad" }
+            if (ok.isEmpty()) return Result.failure(IllegalArgumentException("no allowed app installed"))
+            kiosk = ok; this.pinned = pinned; return Result.success(ok)
+        }
+        override suspend fun kioskOff() = run { kiosk = null; pinned = null; Result.success(Unit) }
         override suspend fun openPlay(pkg: String) = run { played = pkg; Result.success(Unit) }
         override suspend fun openAddAccount() = if (kiosk != null) Result.failure(IllegalStateException("kiosk is on; turn it off first")) else run { accountOpened = true; Result.success(Unit) }
+        override suspend fun applyPrefs(prefs: ChildPrefs) = run { this.prefs = prefs; Result.success(Unit) }
     }
     private class FakeStatus : StatusSource {
         override suspend fun collect() = Message.Status(false, null, true, 42, "x")
@@ -23,20 +29,31 @@ class CommandExecutorTest {
     }
 
     @Test fun kioskOnReturnsResultThenStatus() = runTest {
-        val p = FakePolicy(); val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("1", CmdType.KIOSK_ON, "com.k"))
-        assertEquals(Message.Result("1", true, "kiosk on com.k"), out[0]); assertTrue(out[1] is Message.Status); assertEquals("com.k", p.kiosk)
+        val p = FakePolicy(); val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("1", CmdType.KIOSK_ON, apps = listOf("com.k", "com.j"), pinned = "com.j"))
+        assertEquals(Message.Result("1", true, "kiosk on (2 apps, pinned com.j)"), out[0]); assertTrue(out[1] is Message.Status)
+        assertEquals(listOf("com.k", "com.j"), p.kiosk); assertEquals("com.j", p.pinned)
+    }
+    @Test fun kioskOnDropsPinnedNotInApps() = runTest {
+        val p = FakePolicy(); val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("1b", CmdType.KIOSK_ON, apps = listOf("com.k"), pinned = "com.zzz"))
+        assertEquals(Message.Result("1b", true, "kiosk on (1 apps, pinned ignored: not in apps)"), out[0]); assertEquals(null, p.pinned)
     }
     @Test fun kioskOnFailure() = runTest {
-        val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("2", CmdType.KIOSK_ON, "bad"))
+        val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("2", CmdType.KIOSK_ON, apps = listOf("bad")))
         val result = out[0] as Message.Result
-        assertFalse(result.ok); assertEquals(1, out.size); assertEquals("not installed", result.msg)
+        assertFalse(result.ok); assertEquals(1, out.size); assertEquals("no allowed app installed", result.msg)
     }
-    @Test fun kioskOnWithoutPkgFails() = runTest {
-        val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("3", CmdType.KIOSK_ON, null))
-        assertFalse((out[0] as Message.Result).ok)
+    @Test fun kioskOnWithoutAppsFails() = runTest {
+        val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("3", CmdType.KIOSK_ON))
+        val r = out[0] as Message.Result; assertFalse(r.ok); assertEquals("no apps", r.msg)
+    }
+    @Test fun setPrefs() = runTest {
+        val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
+        val out = ex.execute(Message.Cmd("11", CmdType.SET_PREFS, prefs = ChildPrefs(language = "fr", theme = "weird")))
+        assertEquals(Message.Result("11", true, "prefs applied"), out[0]); assertEquals("fr", p.prefs?.language); assertEquals("system", p.prefs?.theme)
+        assertFalse((ex.execute(Message.Cmd("12", CmdType.SET_PREFS))[0] as Message.Result).ok)
     }
     @Test fun kioskOffReturnsResultThenStatus() = runTest {
-        val p = FakePolicy(); p.kiosk = "com.k"
+        val p = FakePolicy(); p.kiosk = listOf("com.k")
         val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("8", CmdType.KIOSK_OFF))
         assertEquals(Message.Result("8", true, "kiosk off"), out[0]); assertTrue(out[1] is Message.Status); assertEquals(null, p.kiosk)
     }
@@ -52,7 +69,7 @@ class CommandExecutorTest {
     }
     @Test fun addAccountRefusedWhileKioskOn() = runTest {
         val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
-        ex.execute(Message.Cmd("9", CmdType.KIOSK_ON, "com.k"))
+        ex.execute(Message.Cmd("9", CmdType.KIOSK_ON, apps = listOf("com.k")))
         val out = ex.execute(Message.Cmd("10", CmdType.ADD_ACCOUNT))
         val result = out[0] as Message.Result
         assertFalse(result.ok); assertEquals("kiosk is on; turn it off first", result.msg); assertFalse(p.accountOpened)
