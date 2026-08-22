@@ -57,6 +57,7 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         val allowed = apps.distinct().filter { pm.getLaunchIntentForPackage(it) != null }
         if (allowed.isEmpty()) throw IllegalArgumentException("no allowed app installed")
         val pin = pinned?.takeIf { it in allowed }
+        if (pinned != null && pin == null) Log.w(LOG_TAG, "Requested pinned app $pinned dropped: not installed or not allowed")
         dpm.setLockTaskPackages(admin, (allowed + context.packageName + PLAY_PKG + GMS_PKG).toTypedArray())
         // NOTIFICATIONS requires HOME to also be enabled or AOSP throws IllegalArgumentException; SYSTEM_INFO alone is safe.
         dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
@@ -78,27 +79,41 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Result.success(Unit)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
-    /** Launches [pkg] inside the current lock task (only meaningful while child mode is on and [pkg] is allowed). */
-    fun launchAllowed(pkg: String): Boolean {
+    /**
+     * Launches [pkg] (only meaningful while child mode is on and [pkg] is allowed). Requests lock-task
+     * only when [locked] — pass false during a PIN pause, or this would silently re-pin the device that
+     * the pause is meant to free.
+     */
+    fun launchAllowed(pkg: String, locked: Boolean): Boolean {
         val i = context.packageManager.getLaunchIntentForPackage(pkg) ?: return false
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return runCatching { context.startActivity(i, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle()) }.isSuccess
+        val opts = if (locked) ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle() else null
+        return runCatching { context.startActivity(i, opts) }.isSuccess
     }
 
-    /** Starts a parent-PIN pause: persists the deadline; the launcher Activity releases lock task itself. Returns pauseUntil. */
+    /**
+     * Starts a parent-PIN pause: persists the deadline; the launcher Activity releases lock task itself.
+     * Returns pauseUntil, or 0L (no-op) when child mode is off — there is nothing to pause.
+     */
     suspend fun pause(nowMs: Long = System.currentTimeMillis()): Long {
+        if (!prefs.kioskConfig.first().on) return 0L
         val until = nowMs + KioskConfig.PAUSE_MS
         prefs.setPauseUntil(until); Log.d(LOG_TAG, "Kiosk paused until $until")
         ManagedLinkState.statusPushRequests.tryEmit(Unit)
         return until
     }
 
-    /** Ends a pause (or is a no-op when child mode is off): re-applies the stored config and re-locks. */
+    /**
+     * Ends a pause (or is a no-op when child mode is off): re-applies the stored config and re-locks.
+     * On failure the pause deadline is left untouched (retry stays possible); on success [kioskOn]
+     * itself persists `pauseUntil = 0`, so this never clears the deadline ahead of a confirmed re-lock.
+     */
     suspend fun resume(): Result<List<String>> {
         val c = prefs.kioskConfig.first()
         if (!c.on) return Result.success(emptyList())
-        prefs.setPauseUntil(0L)
-        return kioskOn(c.apps, c.pinned).also { ManagedLinkState.statusPushRequests.tryEmit(Unit) }
+        return kioskOn(c.apps, c.pinned)
+            .onSuccess { ManagedLinkState.statusPushRequests.tryEmit(Unit) }
+            .onFailure { Log.w(LOG_TAG, "Kiosk resume failed; pause deadline left as is", it) }
     }
 
     /** Re-enters child mode after reboot when it was on; a pause never survives a reboot. */
@@ -108,18 +123,20 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
     }
 
     /**
-     * Opens the Play listing for [pkg]. Lock-task is requested **only while kiosk is on** — asking for it
-     * outside lock task launches Play pinned to the screen on a device the user is otherwise free to
-     * navigate, trapping them in the Play listing with no way back.
+     * Opens the Play listing for [pkg]. Lock-task is requested **only while the device is actually
+     * locked** (child mode on and not paused) — gating on raw `kioskOn` would also re-pin the device
+     * during a PIN pause (kiosk stays "on" while paused), asking for lock-task outside an actual lock
+     * launches Play pinned to the screen on a device the user is otherwise free to navigate, trapping
+     * them in the Play listing with no way back.
      */
     override suspend fun openPlay(pkg: String): Result<Unit> {
-        val kiosk = prefs.kioskOn.first()
+        val locked = prefs.kioskConfig.first().isLocked(System.currentTimeMillis())
         return runCatching {
             val i = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")).setPackage(PLAY_PKG).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (i.resolveActivity(context.packageManager) == null) throw IllegalStateException("Play Store not available")
-            if (kiosk) context.startActivity(i, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
+            if (locked) context.startActivity(i, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
             else context.startActivity(i)
-            Log.d(LOG_TAG, "Opened Play for $pkg (kiosk=$kiosk)")
+            Log.d(LOG_TAG, "Opened Play for $pkg (locked=$locked)")
         }
     }
 
