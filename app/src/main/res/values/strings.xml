@@ -16,6 +16,11 @@
     <string name="settings_dialog_confirm">Save</string>
     <string name="settings_dialog_dismiss">Cancel</string>
 
+    <!-- Controller service -->
+    <string name="controller_notif_channel">Controller</string>
+    <string name="controller_notif_title">Môme DM controller</string>
+    <string name="controller_notif_text">Advertising to managed devices (%1$d online)</string>
+
     <!-- Managed link service -->
     <string name="managed_notif_channel">Controller link</string>
     <string name="managed_notif_title">Môme DM</string>
