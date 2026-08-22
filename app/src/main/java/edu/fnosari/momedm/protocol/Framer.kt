@@ -32,20 +32,38 @@ object Framer {
     }
 }
 
-/** Collects frames per msgId; returns the payload when the last chunk lands. Partial messages expire after [timeoutMs]. */
+/**
+ * Collects frames per msgId; returns the payload when the last chunk lands.
+ *
+ * Partial messages expire after [timeoutMs] of *inactivity* — `startedAt` is refreshed on every accepted
+ * frame, so a slow low-MTU transfer with short gaps between chunks survives even if its total duration
+ * exceeds [timeoutMs]. To bound pre-auth memory, at most [MAX_PARTIALS] messages are tracked concurrently;
+ * once full, the globally least-recently-active partial is evicted to make room for a new one.
+ */
 class Reassembler(private val timeoutMs: Long = 10_000) {
-    private class Partial(val count: Int, var startedAt: Long) { val chunks = arrayOfNulls<String>(count); var received = 0 }
-    private val partials = HashMap<Int, Partial>()
+    private class Partial(val count: Int, var startedAt: Long) { val chunks = HashMap<Int, String>() }
+    private val partials = LinkedHashMap<Int, Partial>()
 
     fun feed(frame: String, nowMs: Long): String? {
         val f = Framer.parse(frame) ?: return null
         partials.entries.removeIf { nowMs - it.value.startedAt > timeoutMs }
         var p = partials[f.msgId]
-        if (p == null || p.count != f.count) { p = Partial(f.count, nowMs); partials[f.msgId] = p }
-        if (p.chunks[f.index] == null) p.received++
+        if (p == null || p.count != f.count) {
+            p = Partial(f.count, nowMs)
+            partials[f.msgId] = p
+            if (partials.size > MAX_PARTIALS) partials.remove(partials.entries.minBy { it.value.startedAt }.key)
+        } else {
+            p.startedAt = nowMs
+        }
+        if (partials[f.msgId] !== p) return null // evicted just now to respect MAX_PARTIALS
         p.chunks[f.index] = f.chunk
-        if (p.received < p.count) return null
+        if (p.chunks.size < p.count) return null
         partials.remove(f.msgId)
-        return p.chunks.joinToString("") { it ?: "" }
+        return (0 until p.count).joinToString("") { p.chunks[it] ?: "" }
+    }
+
+    companion object {
+        /** Upper bound on concurrently-tracked incomplete messages, to cap memory before a peer authenticates. */
+        const val MAX_PARTIALS = 16
     }
 }

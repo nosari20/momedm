@@ -38,4 +38,27 @@ class FramerTest {
         assertNull(r.feed("000a:0/2:A1", 0L)); assertNull(r.feed("000b:0/2:B1", 0L))
         assertEquals("B1B2", r.feed("000b:1/2:B2", 0L)); assertEquals("A1A2", r.feed("000a:1/2:A2", 0L))
     }
+    @Test fun reassembleSurvivesLongTransferWithShortGaps() {
+        // Timeout is idle-based (refreshed per accepted frame), not total-duration: a slow low-MTU
+        // transfer whose gaps between chunks stay under timeoutMs must still complete even though the
+        // whole transfer exceeds timeoutMs.
+        val r = Reassembler(timeoutMs = 10_000)
+        val frames = Framer.split(1, "hello", 1) // 5 frames, one char each
+        assertEquals(5, frames.size)
+        assertNull(r.feed(frames[0], 0L))
+        assertNull(r.feed(frames[1], 4_000L))
+        assertNull(r.feed(frames[2], 8_000L))
+        assertNull(r.feed(frames[3], 12_000L))
+        assertEquals("hello", r.feed(frames[4], 16_000L))
+    }
+    @Test fun reassemblerCapsConcurrentPartials() {
+        // Bound pre-auth memory: at most MAX_PARTIALS incomplete messages tracked concurrently.
+        val r = Reassembler()
+        val firstChunks = (0..16).map { msgId -> Framer.split(msgId, "AB", 1) } // 17 distinct 2-chunk messages
+        for ((t, frames) in firstChunks.withIndex()) assertNull(r.feed(frames[0], t.toLong()))
+        // The 17th insertion evicted the oldest (msgId 0): completing it now yields nothing.
+        assertNull(r.feed(firstChunks[0][1], 17L))
+        // The most recently added (msgId 16) is still tracked and completes normally.
+        assertEquals("AB", r.feed(firstChunks[16][1], 18L))
+    }
 }

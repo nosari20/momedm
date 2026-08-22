@@ -13,8 +13,11 @@ internal class FrameLayer(private val sink: FrameSink, private val clock: () -> 
         nextMsgId = (nextMsgId + 1) and 0xffff
         for (f in Framer.split(nextMsgId, payload, Framer.maxChunk(mtu))) sink.send(f)
     }
-    /** Returns a full envelope when [frame] completes one. */
-    fun receive(frame: String): Envelope? = reassembler.feed(frame, clock())?.let { MessageCodec.decodeEnvelope(it) }
+    /** Returns a full envelope when [frame] completes one. @throws ProtocolException if [frame] fails to parse. */
+    fun receive(frame: String): Envelope? {
+        if (Framer.parse(frame) == null) throw ProtocolException("malformed frame")
+        return reassembler.feed(frame, clock())?.let { MessageCodec.decodeEnvelope(it) }
+    }
 }
 
 /** Managed-device protocol endpoint: drives the handshake then delivers [Message.Cmd]s. Transport-agnostic. */
@@ -34,33 +37,38 @@ class ManagedEndpoint(
     private val frames = FrameLayer(sink, clock)
     private var handshake: ManagedHandshake? = null
     private var channel: SecureChannel? = null
-    val authenticated: Boolean get() = channel != null
+    /** True only once the controller's sealed AUTH_OK has been verified — not merely after we sent our AUTH. */
+    private var confirmed = false
+    val authenticated: Boolean get() = confirmed
 
     /** Call once the link is up and MTU known: resets state and sends HELLO. */
     fun onConnected(mtu: Int) {
         reset(); frames.mtu = mtu
         handshake = ManagedHandshake(secret, deviceId, model, mtu).also { frames.sendEnvelope(Envelope.plain(it.hello())) }
     }
-    fun reset() { handshake = null; channel = null }
+    /** Clears all session state (handshake progress, secure channel, auth confirmation). After this, the
+     * endpoint only resumes when the host calls [onConnected] again — any frame belonging to the old
+     * session (e.g. a replayed CHALLENGE/AUTH or a captured sealed message) is then rejected as premature. */
+    fun reset() { handshake = null; channel = null; confirmed = false }
 
     fun onFrame(frame: String) {
-        val env = try { frames.receive(frame) } catch (e: Exception) { listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
+        val env = try { frames.receive(frame) } catch (e: Exception) { reset(); listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
         val ch = channel
         if (ch == null) {
-            val hs = handshake ?: run { listener.onProtocolError("message before HELLO"); return }
-            val m = try { MessageCodec.decodeMessage(env.body) } catch (e: Exception) { listener.onProtocolError("bad handshake body"); return }
-            val c = m as? Message.Challenge ?: run { listener.onProtocolError("expected CHALLENGE, got ${m::class.simpleName}"); return }
-            val auth = hs.onChallenge(c) ?: run { listener.onProtocolError("controller proof invalid"); return }
-            channel = SecureChannel(hs.sessionKey)
+            val hs = handshake ?: run { reset(); listener.onProtocolError("message before HELLO"); return }
+            val m = try { MessageCodec.decodeMessage(env.body) } catch (e: Exception) { reset(); listener.onProtocolError("bad handshake body"); return }
+            val c = m as? Message.Challenge ?: run { reset(); listener.onProtocolError("expected CHALLENGE, got ${m::class.simpleName}"); return }
+            val auth = hs.onChallenge(c) ?: run { reset(); listener.onProtocolError("controller proof invalid"); return }
+            channel = SecureChannel(hs.sessionKey, outDir = 'M', inDir = 'C')
             frames.sendEnvelope(Envelope.plain(auth))
-            // Controller confirms with a sealed AUTH_OK; until then we are optimistic (seq starts at 1 both ways).
+            // Controller confirms with a sealed AUTH_OK; `authenticated` only flips true once that lands (see `confirmed`).
             return
         }
-        val m = try { ch.open(env) } catch (e: ProtocolException) { listener.onProtocolError(e.message ?: "protocol error"); channel = null; return }
+        val m = try { ch.open(env) } catch (e: ProtocolException) { reset(); listener.onProtocolError(e.message ?: "protocol error"); return }
         when (m) {
-            is Message.AuthOk -> listener.onAuthenticated()
+            is Message.AuthOk -> { confirmed = true; listener.onAuthenticated() }
             is Message.Cmd -> listener.onCommand(m)
-            else -> listener.onProtocolError("unexpected ${m::class.simpleName}")
+            else -> { reset(); listener.onProtocolError("unexpected ${m::class.simpleName}") }
         }
     }
 
@@ -90,30 +98,35 @@ class ControllerEndpoint(
     val deviceId: String? get() = handshake?.hello?.deviceId
     val mtu: Int get() = frames.mtu
 
+    /** Clears all session state, including the negotiated MTU (reset to the pre-connection default of 23).
+     * After this, the endpoint only resumes when it receives a fresh HELLO — a replayed CHALLENGE/AUTH or a
+     * captured sealed message from the old session is then rejected as premature. */
     fun reset() { handshake = null; channel = null; frames.mtu = 23 }
 
     fun onFrame(frame: String) {
-        val env = try { frames.receive(frame) } catch (e: Exception) { listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
+        val env = try { frames.receive(frame) } catch (e: Exception) { reset(); listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
         val ch = channel
         if (ch == null) {
-            val m = try { MessageCodec.decodeMessage(env.body) } catch (e: Exception) { listener.onProtocolError("bad handshake body"); return }
+            val m = try { MessageCodec.decodeMessage(env.body) } catch (e: Exception) { reset(); listener.onProtocolError("bad handshake body"); return }
             when (m) {
                 is Message.Hello -> {
-                    frames.mtu = m.mtu
+                    // Clamp to the valid BLE ATT MTU range so a bogus/out-of-range value from the managed
+                    // side can't push our outgoing chunk size below 1 or into an unnegotiated MTU.
+                    frames.mtu = m.mtu.coerceIn(23, 517)
                     handshake = ControllerHandshake(secret).also { frames.sendEnvelope(Envelope.plain(it.onHello(m))) }
                 }
                 is Message.Auth -> {
-                    val hs = handshake ?: run { listener.onProtocolError("AUTH before HELLO"); return }
-                    if (!hs.onAuth(m)) { listener.onProtocolError("managed proof invalid"); return }
-                    val c = SecureChannel(hs.sessionKey); channel = c
+                    val hs = handshake ?: run { reset(); listener.onProtocolError("AUTH before HELLO"); return }
+                    if (!hs.onAuth(m)) { reset(); listener.onProtocolError("managed proof invalid"); return }
+                    val c = SecureChannel(hs.sessionKey, outDir = 'C', inDir = 'M'); channel = c
                     frames.sendEnvelope(c.seal(Message.AuthOk))
                     listener.onAuthenticated(hs.hello!!)
                 }
-                else -> listener.onProtocolError("unexpected ${m::class.simpleName} before auth")
+                else -> { reset(); listener.onProtocolError("unexpected ${m::class.simpleName} before auth") }
             }
             return
         }
-        val m = try { ch.open(env) } catch (e: ProtocolException) { listener.onProtocolError(e.message ?: "protocol error"); channel = null; return }
+        val m = try { ch.open(env) } catch (e: ProtocolException) { reset(); listener.onProtocolError(e.message ?: "protocol error"); return }
         listener.onMessage(m)
     }
 

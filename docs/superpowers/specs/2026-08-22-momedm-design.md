@@ -223,8 +223,13 @@ sessionKey = HMAC(secret, nonceC || nonceS)
 ```
 
 After auth, every message is `{seq, body, mac}` with
-`mac = HMAC(sessionKey, seq || body)`; `seq` monotonic per direction starting
-at 1. Bad MAC / non-increasing seq / unknown msg before auth → disconnect.
+`mac = HMAC(sessionKey, dir|seq|body)` with `dir = 'C'` for controller→managed
+and `'M'` for managed→controller; `seq` monotonic per direction starting at 1.
+Binding the mac to a direction tag stops a captured sealed message from being
+replayed back at its own sender and accepted as if it came from the peer.
+Bad MAC / non-increasing seq / unknown msg before auth → disconnect and reset
+the whole session (handshake + channel), so no captured handshake or sealed
+frame from before the error can be replayed to re-derive or reuse it.
 Managed device on auth failure keeps scanning (another controller may be
 nearby). Controller drops unauthenticated connections after 5 s.
 
