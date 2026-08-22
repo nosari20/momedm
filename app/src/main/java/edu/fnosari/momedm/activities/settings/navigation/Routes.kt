@@ -12,6 +12,7 @@ enum class Routes(
     val icon: ImageVector,
 ) {
     CATEGORIES(R.string.settings_screen_title, Icons.Outlined.Settings),
+    SETTINGS_CONTROLLER(R.string.settings_screen_category_controller, Icons.Outlined.Settings),
     SETTINGS_LEGAL(R.string.settings_screen_category_legal, Icons.Outlined.Info),
     SETTINGS_LICENSES(R.string.settings_screen_category_licenses, Icons.Outlined.Info),
     SETTINGS_EASTEREGG(R.string.settings_screen_category_easteregg, Icons.Outlined.Star),

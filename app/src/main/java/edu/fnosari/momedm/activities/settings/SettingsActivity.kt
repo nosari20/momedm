@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import edu.fnosari.momedm.activities.settings.navigation.Routes
+import edu.fnosari.momedm.activities.settings.screens.SettingsControllerScreen
 import edu.fnosari.momedm.activities.settings.screens.SettingsEasterEgg
 import edu.fnosari.momedm.activities.settings.screens.SettingsMenu
 import edu.fnosari.momedm.activities.settings.screens.SettingsScreen
@@ -37,6 +38,8 @@ class SettingsActivity : ComponentActivity() {
                     startDestination = Routes.CATEGORIES.name
                 ) {
                     composable(Routes.CATEGORIES.name) { SettingsMenu(navController) }
+
+                    composable(Routes.SETTINGS_CONTROLLER.name) { SettingsControllerScreen(navController) }
 
                     composable(Routes.SETTINGS_LEGAL.name) {
                         SettingsScreen(

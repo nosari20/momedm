@@ -32,6 +32,8 @@ fun SettingsMenu(navController: NavHostController) {
 
         LazyColumn(state = listState) {
 
+            item { SettingsCategoryItem(title = context.getString(Routes.SETTINGS_CONTROLLER.label), icon = Routes.SETTINGS_CONTROLLER.icon, onClick = { navController.navigate(Routes.SETTINGS_CONTROLLER.name) }) }
+
             item { SettingsCategoryItem(
                 title = context.getString(Routes.SETTINGS_LEGAL.label),
                 icon = Routes.SETTINGS_LEGAL.icon,

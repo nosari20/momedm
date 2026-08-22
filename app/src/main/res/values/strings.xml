@@ -106,4 +106,11 @@
     <string name="provision_help">Factory-reset the device, tap the welcome screen 6 times and scan this QR.</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
+
+    <!-- Settings: Controller identity -->
+    <string name="settings_controller_id">Controller ID</string>
+    <string name="settings_controller_secret">Secret fingerprint</string>
+    <string name="settings_controller_regenerate">Regenerate secret</string>
+    <string name="settings_controller_regenerate_warning">All devices provisioned with the current secret will stop authenticating until re-provisioned. Continue?</string>
+    <string name="settings_controller_regenerated">Secret regenerated</string>
 </resources>
