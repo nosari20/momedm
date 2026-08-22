@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import edu.fnosari.momedm.persistence.ControllerPrefs
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,9 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     val state: StateFlow<State> = _state.asStateFlow()
     private val hotspot = HotspotManager(context)
     private var http: ApkHttpServer? = null
+    /** The in-flight hotspot IP poll started by [serveAndBuild], if any — cancelled by [stop] so a Stop
+     * during the poll window can't have a late [onIpResolved] resurrect state after the user stopped. */
+    private var pollJob: Job? = null
 
     init { scope.launch { _state.value = State(prefs.wifiMode.first(), prefs.manualSsid.first(), prefs.manualPassword.first(), prefs.customUrl.first()) } }
 
@@ -58,6 +63,7 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     }
 
     private fun serveAndBuild() {
+        pollJob?.cancel(); pollJob = null
         try {
             if (http == null) { http = ApkHttpServer(context.applicationInfo.sourceDir).also { it.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, false) } }
         } catch (e: Exception) {
@@ -65,13 +71,15 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         }
         if (_state.value.mode == ControllerPrefs.MODE_HOTSPOT) {
             // The AP interface's address can take a moment to settle after the hotspot reports ready; poll for it.
-            scope.launch {
+            pollJob = scope.launch {
                 var ip: String? = null
                 for (attempt in 0 until IP_POLL_ATTEMPTS) {
                     ip = NetUtils.localIpv4(preferGateway = true)
                     if (ip != null) break
                     delay(IP_POLL_DELAY_MS)
                 }
+                // stop() may have cancelled this job while it was polling; never apply a stale result.
+                ensureActive()
                 onIpResolved(ip)
             }
         } else {
@@ -103,6 +111,7 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     }
 
     fun stop() {
+        pollJob?.cancel(); pollJob = null
         http?.stop(); http = null; hotspot.stop()
         _state.update { it.copy(hotspotSsid = "", hotspotPassword = "", ip = null, error = null, qrPayload = null, serverRunning = false) }
     }
