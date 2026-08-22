@@ -32,11 +32,20 @@ It is plain Android — no DI, no third-party BLE library.
 - **CCCD writes go through the op queue.** The client's subscription write is a
   queued `BLEOperation.WriteDescriptor`, serialized with reads/writes like any
   other GATT op.
-- **MTU negotiation.** The client requests MTU 517 right after service discovery
-  and reports the negotiated value via `onMtuChanged(mtu)` before `onConnected()`.
-- **Per-device serialized notifications.** `BLEServer.notifyDevice` queues one
-  notification per device at a time (`onNotificationSent` advances the queue),
-  so a slow/unresponsive central can't stall notifications to others.
+- **MTU negotiation before CCCD writes.** The client requests MTU 517
+  immediately after service discovery, then enqueues NOTIFY characteristics'
+  CCCD writes once MTU negotiation settles (`onMtuChanged`) — `requestMtu`
+  isn't a queued op and `BluetoothGatt` allows only one outstanding ATT
+  operation, so starting a CCCD write before/alongside it can drop the write.
+  `onMtuChanged(mtu)` fires before the first `onConnected()`; a later
+  remote-initiated MTU change still calls `onMtuChanged` but not `onConnected`
+  again.
+- **Serialized notifications.** `BLEServer.notifyDevice` queues notifications
+  with one send in flight at a time across *all* connected centrals (Android
+  allows only one outstanding server notification total), advanced by
+  `onNotificationSent` with a 5 s watchdog per send — a stalled/unresponsive
+  central can delay notifications to others by up to 5 s per queued send, not
+  block them indefinitely.
 - **Scan/advertise by service UUID.** `BLEClient(serviceUuid = ...)` filters the
   scan by advertised service UUID (name optional); `BLEServer(includeDeviceName = ...)`
   controls whether the advertised device name is included.

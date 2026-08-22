@@ -37,6 +37,7 @@ import java.util.UUID
  *
  * @param context The context used to access system services related to Bluetooth.
  * @param clientLimit The maximum number of clients that can connect to the server.
+ * @param includeDeviceName Whether the advertised device name is included in advertise data.
  *
  * @property context The application context.
  * @property clientLimit The maximum number of clients allowed.
@@ -468,6 +469,11 @@ class BLEServer(
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED) {
             _advertiseCallback?.let { _bluetoothAdapter?.bluetoothLeAdvertiser?.stopAdvertising(it) }
             _advertiseCallback = null
+        }
+        _notifyHandler.removeCallbacks(_notifyTimeout)
+        synchronized(_notifyLock) {
+            _notifyQueue.clear()
+            _notifyInFlight = false
         }
         for (device in _connectedDevices){
             _gattServer.cancelConnection(device)

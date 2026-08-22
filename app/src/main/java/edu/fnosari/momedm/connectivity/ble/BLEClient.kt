@@ -66,9 +66,17 @@ class BLEClient(
      */
     interface BLEClientCallBack {
         fun onCharacteristicChanged(characteristic: BLECharacteristic, service: BLEService)
+        /**
+         * Fired once per connection, after MTU negotiation completes and NOTIFY
+         * characteristics have been subscribed (their CCCD writes enqueued).
+         */
         fun onConnected()
         fun onDisconnected()
-        /** Negotiated ATT MTU (payload = mtu - 3). Called once per connection, before [onConnected]. */
+        /**
+         * Negotiated ATT MTU (payload = mtu - 3). The first call always precedes
+         * [onConnected]. May fire again later for a remote-initiated MTU change on an
+         * already-connected link — that later call does not re-trigger [onConnected].
+         */
         fun onMtuChanged(mtu: Int) {}
     }
 
@@ -120,6 +128,22 @@ class BLEClient(
      * Initialized empty so reads/writes issued before a scan don't crash.
      */
     private var _listeningServices: MutableList<BluetoothGattService> = mutableListOf()
+
+    /**
+     * NOTIFY characteristics discovered during [BluetoothGattCallback.onServicesDiscovered],
+     * remembered so their CCCD subscription can be enqueued after MTU negotiation completes
+     * instead of racing it — [BluetoothGatt] allows only one outstanding ATT operation per
+     * connection, and `requestMtu` is not a queued [BLEOperationQueue] op. Cleared on
+     * [closeGatt] and [startScan].
+     */
+    private var _notifyCharacteristics: MutableList<BluetoothGattCharacteristic> = mutableListOf()
+
+    /**
+     * Whether [BLEClientCallBack.onConnected] has already fired for the current connection.
+     * `onMtuChanged` can fire again later for a remote-initiated MTU change; that must still
+     * reach [BLEClientCallBack.onMtuChanged] but must not re-fire `onConnected`.
+     */
+    private var _connectedReported: Boolean = false
 
     /**
      * The Bluetooth Low Energy scanner used to search for available BLE devices.
@@ -221,6 +245,7 @@ class BLEClient(
                 Log.w(LOG_TAG, "Service discovery failed: $status")
                 return
             }
+            _notifyCharacteristics.clear()
             gatt.services?.forEach { service ->
                 Log.d(LOG_TAG, "Service discovered: ${service.uuid}")
                 val serviceToListen = servicesToListen.firstOrNull { it.uuid == service.uuid } ?: return@forEach
@@ -229,8 +254,8 @@ class BLEClient(
                 service.characteristics.forEach { characteristic ->
                     val sCharacteristic = serviceToListen.characteristics.firstOrNull { it.uuid == characteristic.uuid }
                     if (sCharacteristic != null && sCharacteristic.notifies) {
-                        Log.d(LOG_TAG, "Subscribing to ${sCharacteristic.name} (${sCharacteristic.uuid})")
-                        enableNotifications(gatt, characteristic)
+                        Log.d(LOG_TAG, "Will subscribe to ${sCharacteristic.name} (${sCharacteristic.uuid})")
+                        _notifyCharacteristics.add(characteristic)
                     }
                 }
             }
@@ -238,19 +263,27 @@ class BLEClient(
                 Log.e(LOG_TAG, "BLUETOOTH_CONNECT permission not granted: ${BLEClientExitCode.ERROR_BLUETOOTH_CONNECT_PERMISSION_NOT_GRANTED}")
                 return
             }
-            // MTU negotiation is not a queued GATT op; its callback fires onConnected.
+            // MTU negotiation is not a queued GATT op, and BluetoothGatt allows only one
+            // outstanding ATT operation per connection — request it before enqueuing any
+            // CCCD write, or the write can be silently dropped/fail. CCCD writes for
+            // _notifyCharacteristics are enqueued from onMtuChanged (or right here if
+            // requestMtu fails to even start).
             if (!gatt.requestMtu(REQUESTED_MTU)) {
                 Log.w(LOG_TAG, "requestMtu failed; assuming default MTU")
+                subscribeToNotifyCharacteristics(gatt)
                 callBack.onMtuChanged(DEFAULT_MTU)
-                callBack.onConnected()
+                reportConnectedOnce()
             }
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
             val effective = if (status == BluetoothGatt.GATT_SUCCESS) mtu else DEFAULT_MTU
             Log.d(LOG_TAG, "MTU changed: $mtu (status $status) -> using $effective")
+            if (!_connectedReported) {
+                subscribeToNotifyCharacteristics(gatt)
+            }
             callBack.onMtuChanged(effective)
-            callBack.onConnected()
+            reportConnectedOnce()
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
@@ -401,6 +434,8 @@ class BLEClient(
 
         _isScanning = true
         _listeningServices = mutableListOf()
+        _notifyCharacteristics = mutableListOf()
+        _connectedReported = false
         _server = null
         _gattServer = null
 
@@ -483,7 +518,28 @@ class BLEClient(
         _gattServer = null
         _operationQueue = null
         _listeningServices = mutableListOf()
+        _notifyCharacteristics = mutableListOf()
+        _connectedReported = false
         _server = null
+    }
+
+    /**
+     * Enqueues the CCCD subscription for every NOTIFY characteristic remembered from
+     * [BluetoothGattCallback.onServicesDiscovered]. Must only be called once MTU
+     * negotiation has been requested/settled — see [_notifyCharacteristics].
+     */
+    private fun subscribeToNotifyCharacteristics(gatt: BluetoothGatt) {
+        _notifyCharacteristics.forEach { characteristic ->
+            Log.d(LOG_TAG, "Subscribing to ${characteristic.uuid}")
+            enableNotifications(gatt, characteristic)
+        }
+    }
+
+    /** Fires [BLEClientCallBack.onConnected] at most once per connection. */
+    private fun reportConnectedOnce() {
+        if (_connectedReported) return
+        _connectedReported = true
+        callBack.onConnected()
     }
 
     /**
