@@ -45,7 +45,7 @@
     <!-- Managed home UI -->
     <string name="managed_activity_title">Môme DM</string>
     <string name="managed_allow">Allow</string>
-    <string name="managed_no">No</string>
+    <string name="managed_usage_unavailable">Usage access settings unavailable</string>
 
     <!-- Child launcher (ManagedHomeActivity: ChildLauncherScreen, PinDialog) -->
     <string name="launcher_child_mode_on">Child mode</string>
@@ -95,7 +95,6 @@
     <string name="device_result">%1$s: %2$s</string>
     <string name="device_allowed_apps">Allowed apps</string>
     <string name="device_allowed_count">%1$d allowed</string>
-    <string name="device_choose_apps">Choose apps…</string>
     <string name="device_pinned">Single app</string>
     <string name="device_paused">Paused until %1$s</string>
     <string name="device_relock">Lock again</string>
@@ -107,7 +106,6 @@
     <string name="apps_loading">Fetching apps…</string>
     <string name="apps_cancel">Cancel</string>
     <string name="apps_pin_one">Pin a single app</string>
-    <string name="apps_pin_none">None</string>
     <string name="apps_confirm">Activate</string>
     <string name="apps_search">Search</string>
     <string name="provision_title">Provision a device</string>

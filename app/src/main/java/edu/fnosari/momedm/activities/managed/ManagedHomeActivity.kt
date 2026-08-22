@@ -27,6 +27,7 @@ import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
 import edu.fnosari.momedm.ui.theme.MomeDMTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 
 /** HOME activity of a managed device: permission gate, then the child launcher (tiles grid, pinned relaunch, PIN dialog). */
 class ManagedHomeActivity : ComponentActivity() {
@@ -59,12 +60,17 @@ class ManagedHomeActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { vm.ensureLink() }
                     // Pinned app: reacts to config changes and to ON_RESUME (via resumeTick) rather than reading a
                     // one-shot snapshot, so it also fires on a cold start once the persisted config has loaded.
+                    // filterNotNull skips the "still loading" seed — there is nothing to bounce into yet.
                     LaunchedEffect(Unit) {
-                        combine(vm.kioskConfig, vm.resumeTick) { c, _ -> c }.collect { c ->
+                        combine(vm.kioskConfig, vm.resumeTick) { c, _ -> c }.filterNotNull().collect { c ->
                             val now = System.currentTimeMillis()
                             if (c.isLocked(now) && c.pinned != null && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
                                 delay(PINNED_BOUNCE_DELAY_MS)
-                                if (!vm.pinDialogOpen.value && vm.kioskConfig.value.isLocked(System.currentTimeMillis())) vm.open(c.pinned)
+                                // RESUMED is re-checked after the grace period too: the child may have opened
+                                // another allowed app while we waited, and bouncing from a launcher that is no
+                                // longer in front would yank them straight back out of it.
+                                if (!vm.pinDialogOpen.value && vm.kioskConfig.value?.isLocked(System.currentTimeMillis()) == true &&
+                                    lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) vm.open(c.pinned)
                             }
                         }
                     }

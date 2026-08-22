@@ -53,7 +53,7 @@ import java.util.Locale
 @Composable
 fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
     val apps by vm.launcherApps.collectAsState()
-    val config by vm.kioskConfig.collectAsState()
+    val loadedConfig by vm.kioskConfig.collectAsState()
     val link by vm.linkState.collectAsState()
     val status by vm.lastStatus.collectAsState()
     val pinSet by vm.pinSet.collectAsState()
@@ -62,6 +62,11 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
     val pinLockedRemaining by vm.pinLockedRemainingMs.collectAsState()
     val showPin by vm.pinDialogOpen.collectAsState()
     val paused = pauseLeft > 0L
+
+    // Config still loading (null): draw a bare surface rather than guessing. Rendering the "All apps"
+    // header and every installed tile for what turns out to be a locked-down device would be a real
+    // escape hatch, however briefly it flashed.
+    val config = loadedConfig ?: run { Box(Modifier.fillMaxSize()); return }
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
         // header

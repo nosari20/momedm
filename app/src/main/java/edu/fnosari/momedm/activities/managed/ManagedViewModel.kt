@@ -8,6 +8,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import edu.fnosari.momedm.R
 import edu.fnosari.momedm.managed.ManagedLinkService
 import edu.fnosari.momedm.managed.ManagedLinkState
 import edu.fnosari.momedm.managed.ManagedSetup
@@ -20,6 +21,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -37,7 +40,15 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     val linkState: StateFlow<ManagedLinkState.LinkState> = ManagedLinkState.state
     val lastStatus = ManagedLinkState.lastStatus
     val lastError = ManagedLinkState.lastError
-    val kioskConfig: StateFlow<KioskConfig> = prefs.kioskConfig.stateIn(viewModelScope, SharingStarted.Eagerly, KioskConfig())
+    /**
+     * The persisted child-mode config, or **null while it is still loading**.
+     *
+     * Seeding with `KioskConfig()` instead would claim "child mode off" for the first frames of a
+     * cold start, and a device that is actually in child mode would flash its whole app list (and
+     * skip the pinned-app bounce) before the real config landed. Callers must treat null as "not
+     * known yet": no tiles, no bounce, no resume.
+     */
+    val kioskConfig: StateFlow<KioskConfig?> = prefs.kioskConfig.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val pinSet: StateFlow<Boolean> = prefs.childPrefs.map { it.pinHash != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Bumped by the Activity's ON_RESUME observer; combined with [kioskConfig] to drive the pinned-app bounce. */
@@ -61,17 +72,28 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     private var refreshJob: Job? = null
 
     init {
-        viewModelScope.launch { kioskConfig.collect { refreshApps(); trackPause(it) } }
+        // The lockout survives process death: restore it before the first tryPin can run, or
+        // force-stopping the launcher would reset the brute-force backoff to zero every time.
+        viewModelScope.launch {
+            pinFailures = prefs.pinFailures.first()
+            pinLockDeadline = prefs.pinLockUntil.first()
+            if (pinLockDeadline > System.currentTimeMillis()) startPinLockTicker()
+        }
+        viewModelScope.launch { kioskConfig.filterNotNull().collect { refreshApps(); trackPause(it) } }
     }
 
     /** Bumps [resumeTick] — called from the Activity's ON_RESUME observer. */
     fun onResumed() { resumeTick.value++ }
 
-    /** Recomputes the tile list (allowed apps while locked, every launchable app otherwise); cancels any prior run. */
+    /**
+     * Recomputes the tile list (allowed apps while locked, every launchable app otherwise); cancels
+     * any prior run. A no-op while [kioskConfig] is still null — we cannot tell yet which of the two
+     * lists to show, and showing the wrong one is worse than showing none.
+     */
     fun refreshApps() {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            val c = kioskConfig.value
+            val c = kioskConfig.value ?: return@launch
             val locked = c.isLocked(System.currentTimeMillis())
             _apps.value = withContext(Dispatchers.IO) {
                 val pm = getApplication<Application>().packageManager
@@ -105,22 +127,31 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
 
     /** Opens [pkg] — via [PolicyManager.launchAllowed], which requests lock task only while locked. */
     fun open(pkg: String) {
-        val locked = kioskConfig.value.isLocked(System.currentTimeMillis())
+        // Config not loaded yet: no tiles are rendered, so this can only be a stale bounce request —
+        // never ask for lock task on a guess.
+        val locked = kioskConfig.value?.isLocked(System.currentTimeMillis()) == true
         val ok = policy.launchAllowed(pkg, locked)
         if (!ok) Log.w(LOG_TAG, "Could not open $pkg")
     }
 
-    /** Verifies [pin]; on success starts a pause and calls [onSuccess] (the Activity then releases lock task). */
+    /**
+     * Verifies [pin]; on success starts a pause and calls [onSuccess] (the Activity then releases
+     * lock task). The failure counter and lockout deadline are persisted on every transition so the
+     * backoff cannot be reset by killing the launcher. Neither the clear PIN nor its hash is stored
+     * or logged here.
+     */
     fun tryPin(pin: String, onSuccess: () -> Unit) { viewModelScope.launch {
         if (System.currentTimeMillis() < pinLockDeadline) return@launch
         if (policy.verifyPin(pin)) {
             pinFailures = 0; _pinError.value = null; pinLockDeadline = 0L; pinLockJob?.cancel(); _pinLockedRemaining.value = 0L
+            prefs.setPinLock(0, 0L)
             policy.pause(); onSuccess()
         } else {
             pinFailures++
             val lock = (PIN_LOCK_BASE_MS shl (pinFailures - 1).coerceAtMost(5)).coerceAtMost(PIN_LOCK_MAX_MS)
             pinLockDeadline = System.currentTimeMillis() + lock
-            _pinError.value = getApplication<Application>().getString(edu.fnosari.momedm.R.string.pin_wrong)
+            prefs.setPinLock(pinFailures, pinLockDeadline)
+            _pinError.value = getApplication<Application>().getString(R.string.pin_wrong)
             startPinLockTicker()
         }
     } }
@@ -142,11 +173,15 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     /** Ends a pause now (re-locks). */
     fun relock() { viewModelScope.launch { policy.resume() } }
 
+    // Plan 2: re-exposed in the redesigned launcher
     fun addAccount() { viewModelScope.launch { policy.openAddAccount() } }
+    // Plan 2: re-exposed in the redesigned launcher
     fun openUsageAccess() {
-        runCatching { getApplication<Application>().startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            .onFailure { Log.w(LOG_TAG, "Usage access settings unavailable", it); ManagedLinkState.lastError.value = "Usage access settings unavailable" }
+        val app = getApplication<Application>()
+        runCatching { app.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .onFailure { Log.w(LOG_TAG, "Usage access settings unavailable", it); ManagedLinkState.lastError.value = app.getString(R.string.managed_usage_unavailable) }
     }
+    // Plan 2: re-exposed in the redesigned launcher
     fun restartLink() = ManagedLinkService.restart(getApplication())
     fun ensureLink() { if (ManagedLinkState.state.value == ManagedLinkState.LinkState.IDLE) ManagedLinkService.start(getApplication()) }
 }

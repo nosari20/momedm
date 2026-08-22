@@ -30,6 +30,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -112,6 +114,7 @@ class ManagedLinkService : Service() {
         status = StatusCollector(this, prefs)
         executor = CommandExecutor(policy, status)
         scope.launch { ManagedLinkState.statusPushRequests.collect { pushStatus() } }
+        startPauseWatchdog()
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification(getString(R.string.managed_notif_scanning)), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
         // minSdk 34: RECEIVER_EXPORTED/RECEIVER_NOT_EXPORTED is mandatory when registering a context-registered receiver.
@@ -203,6 +206,31 @@ class ManagedLinkService : Service() {
             // here or a sustained outage (e.g. Bluetooth left off) would retry forever at the
             // base interval and never back off toward BACKOFF_MAX_MS.
             bumpBackoff(); scheduleRescan()
+        }
+    }
+
+    /**
+     * Durable end-of-pause guarantee: re-locks the device when a parent-PIN pause lapses.
+     *
+     * The launcher's `ManagedViewModel` runs its own countdown, but that one exists only to drive the
+     * UI banner and dies with the Activity — a child who swipes the launcher away (or whose process
+     * gets reclaimed) mid-pause would otherwise stay unlocked until something else happened to touch
+     * the config. This service outlives the launcher, so it is what actually calls
+     * [PolicyManager.resume]. `collectLatest` restarts the wait whenever the config changes (a new
+     * pause, a KIOSK_OFF, a re-lock), and the deadline is re-read after the delay so a pause that was
+     * extended or cancelled while we slept is not resumed out from under the parent.
+     */
+    private fun startPauseWatchdog() = scope.launch {
+        prefs.kioskConfig.collectLatest { c ->
+            val now = System.currentTimeMillis()
+            if (c.on && c.pauseUntil > 0L) {
+                val wait = c.pauseUntil - now
+                if (wait > 0) delay(wait)
+                if (prefs.kioskConfig.first().let { it.on && it.pauseUntil > 0L && it.pauseUntil <= System.currentTimeMillis() }) {
+                    Log.d(LOG_TAG, "Pause lapsed; re-locking")
+                    policy.resume()
+                }
+            }
         }
     }
 

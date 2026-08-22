@@ -24,7 +24,11 @@ import kotlinx.coroutines.launch
 
 /** Controller UI state: registry, online set, advertising flag, command results; owns the provisioning controller. */
 class ControllerViewModel(application: Application) : AndroidViewModel(application) {
-    companion object { private const val LOG_TAG = "ControllerViewModel" }
+    companion object {
+        private const val LOG_TAG = "ControllerViewModel"
+        /** Cap on in-flight command ids kept for result matching; see [announce]. */
+        private const val MAX_PENDING = 64
+    }
 
     private val prefs = ControllerPrefs(DataStorePreferencesProvider(application))
     private val registry = DeviceRegistry(prefs, viewModelScope)
@@ -40,10 +44,25 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     private val _appsFor = MutableStateFlow<Pair<String, List<AppInfo>?>?>(null)
     /** (deviceId, apps) while the picker is open; apps == null while loading. */
     val appsFor: StateFlow<Pair<String, List<AppInfo>?>?> = _appsFor
+    /**
+     * Ids of commands *this* view model sent, awaiting their RESULT.
+     *
+     * [ControllerLink.results] is process-wide and also carries results for commands the service
+     * originates on its own — notably the SET_PREFS pushed after every successful auth and every
+     * prefs change — which the parent never asked for and which used to pop a snackbar each time a
+     * child reconnected. Only ids in this set are announced. Confined to [viewModelScope]'s main
+     * dispatcher (every send path and the collector below run there), so a plain set is safe.
+     */
+    private val pendingIds = mutableSetOf<String>()
 
     init {
         val app = application
-        viewModelScope.launch { ControllerLink.results.collect { (id, r) -> _events.emit(app.getString(R.string.device_result, if (r.ok) "OK" else "ERR", r.msg)) } }
+        viewModelScope.launch {
+            ControllerLink.results.collect { (_, r) ->
+                if (pendingIds.remove(r.cmdId)) _events.emit(app.getString(R.string.device_result, if (r.ok) "OK" else "ERR", r.msg))
+                else Log.d(LOG_TAG, "Ignoring result for foreign cmd ${r.cmdId}")
+            }
+        }
         viewModelScope.launch { ControllerLink.apps.collect { (id, a) -> if (_appsFor.value?.first == id) _appsFor.value = id to a.apps } }
         viewModelScope.launch { ControllerLink.errors.collect { _events.emit(it) } }
         // Service-side registry writes land in DataStore; re-read the blob so the UI list refreshes.
@@ -97,8 +116,17 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     }
     fun clearApps() { _appsFor.value = null }
 
+    /**
+     * Tells the parent whether the command went out, and remembers [id] so its RESULT is announced
+     * too (see [pendingIds]). A command whose RESULT never arrives (device went offline mid-flight)
+     * would leak an id, so the set is trimmed oldest-first — it is a `LinkedHashSet`.
+     */
     private fun announce(id: String?) {
         val app = getApplication<Application>()
+        if (id != null) {
+            pendingIds += id
+            while (pendingIds.size > MAX_PENDING) pendingIds.iterator().let { it.next(); it.remove() }
+        }
         viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.device_offline_msg) else app.getString(R.string.device_sent)) }
     }
 }
