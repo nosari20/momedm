@@ -22,4 +22,18 @@
     <string name="managed_notif_scanning">Looking for controller…</string>
     <string name="managed_notif_connected">Connected to controller</string>
     <string name="managed_notif_authenticated">Managed by controller</string>
+
+    <!-- Provisioning setup wizard -->
+    <string name="setup_title">Set up Môme DM</string>
+    <string name="setup_account_title">Google account</string>
+    <string name="setup_account_text">Add a Google account so Play Store installs requested by the controller can work. You can skip and do it later.</string>
+    <string name="setup_account_button">Add Google account</string>
+    <string name="setup_usage_title">Usage access</string>
+    <string name="setup_usage_text">Allow usage access so the controller can see the current app. Optional.</string>
+    <string name="setup_usage_button">Open usage access settings</string>
+    <string name="setup_skip">Skip</string>
+    <string name="setup_next">Next</string>
+    <string name="setup_done">Finish</string>
+    <string name="setup_status_done">Done</string>
+    <string name="setup_status_missing">Not yet</string>
 </resources>
