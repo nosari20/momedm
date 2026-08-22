@@ -14,7 +14,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class DeviceRecord(val deviceId: String, val model: String, val lastSeen: Long, val lastStatus: Message.Status? = null)
+data class DeviceRecord(val deviceId: String, val model: String, val lastSeen: Long, val lastStatus: Message.Status? = null, val nickname: String? = null)
 
 /** JSON codec for the registry blob persisted in [ControllerPrefs]. */
 object DeviceRegistryCodec {
@@ -42,16 +42,18 @@ class DeviceRegistry(private val prefs: ControllerPrefs, scope: CoroutineScope) 
     /** Re-reads the persisted blob (another process/service wrote it). */
     suspend fun reload() { _devices.value = DeviceRegistryCodec.decode(prefs.registryJson.first()) }
 
-    /** Records that [deviceId] (model [model]) was seen at [nowMs], preserving its last known status. */
+    /** Records that [deviceId] (model [model]) was seen at [nowMs], preserving its last known status and nickname. */
     suspend fun upsertSeen(deviceId: String, model: String, nowMs: Long) = mutate { list ->
         val old = list.firstOrNull { it.deviceId == deviceId }
-        list.filter { it.deviceId != deviceId } + DeviceRecord(deviceId, model, nowMs, old?.lastStatus)
+        list.filter { it.deviceId != deviceId } + DeviceRecord(deviceId, model, nowMs, old?.lastStatus, old?.nickname)
     }
     /** Records a fresh [status] for [deviceId] at [nowMs], synthesizing a placeholder record if it wasn't known yet. */
     suspend fun updateStatus(deviceId: String, status: Message.Status, nowMs: Long) = mutate { list ->
         val old = list.firstOrNull { it.deviceId == deviceId } ?: DeviceRecord(deviceId, "?", nowMs)
         list.filter { it.deviceId != deviceId } + old.copy(lastSeen = nowMs, lastStatus = status)
     }
+    /** Sets (or clears with null) the parent-chosen display name. */
+    suspend fun rename(deviceId: String, nickname: String?) = mutate { list -> list.map { if (it.deviceId == deviceId) it.copy(nickname = nickname?.trim()?.ifEmpty { null }) else it } }
     private suspend fun mutate(f: (List<DeviceRecord>) -> List<DeviceRecord>) {
         loaded.join()
         mutex.withLock {

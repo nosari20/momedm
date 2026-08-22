@@ -1,8 +1,11 @@
 package edu.fnosari.momedm.persistence
 
+import edu.fnosari.momedm.protocol.ChildPrefs
+import edu.fnosari.momedm.protocol.PinHash
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -46,5 +49,22 @@ class ControllerPrefsTest {
         assertTrue(p.advertiseOnLaunch.first())
         p.setAdvertiseOnLaunch(false)
         assertEquals(false, p.advertiseOnLaunch.first())
+    }
+
+    @Test fun pinAndChildPrefs() = runTest {
+        val p = ControllerPrefs(InMemoryPreferencesProvider())
+        assertFalse(p.pinSet.first()); assertEquals(ChildPrefs(), p.childPrefsNow())
+        p.setUiPrefs("fr", "dark", 0x11223344)
+        p.setPin("4321")
+        assertTrue(p.pinSet.first())
+        val cp = p.childPrefsNow()
+        assertEquals("fr", cp.language); assertEquals("dark", cp.theme); assertEquals(0x11223344, cp.accent)
+        assertTrue(PinHash.verify("4321", cp.pinSalt!!, cp.pinHash!!)); assertFalse(PinHash.verify("1234", cp.pinSalt!!, cp.pinHash!!))
+        p.clearPin(); assertFalse(p.pinSet.first()); assertEquals(null, p.childPrefsNow().pinHash)
+    }
+    @Test fun setPinRejectsInvalid() = runTest {
+        val p = ControllerPrefs(InMemoryPreferencesProvider())
+        assertFalse(p.setPin("12")); assertFalse(p.setPin("abcd")); assertFalse(p.pinSet.first())
+        assertTrue(p.setPin("123456"))
     }
 }

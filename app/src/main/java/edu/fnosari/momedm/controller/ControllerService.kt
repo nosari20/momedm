@@ -20,6 +20,7 @@ import edu.fnosari.momedm.link.MdmService
 import edu.fnosari.momedm.persistence.ControllerPrefs
 import edu.fnosari.momedm.persistence.DeviceRegistry
 import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
+import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,8 @@ class ControllerService : Service() {
     private var sessions: SessionManager? = null
     /** The session-tick loop launched by the current [startServer] call; cancelled before restarting so a stale loop can't keep ticking an orphaned [SessionManager]. */
     private var tickJob: Job? = null
+    /** Collects [ControllerLink.prefsChanged] and re-pushes SET_PREFS to every online child; cancelled before restarting for the same reason as [tickJob]. */
+    private var prefsJob: Job? = null
     /** Mutated from binder threads (device connect/disconnect callbacks), read from the main scope's coroutines. */
     private val devicesByKey = ConcurrentHashMap<String, BluetoothDevice>()
     private lateinit var prefs: ControllerPrefs
@@ -79,6 +82,7 @@ class ControllerService : Service() {
     /** Tears down the current BLE server/session state and starts fresh, picking up whatever identity [ControllerPrefs.ensureIdentity] now returns. */
     private suspend fun restartServer() {
         tickJob?.cancel(); tickJob = null
+        prefsJob?.cancel(); prefsJob = null
         try { server?.stopServer() } catch (e: BLEException) { Log.w(LOG_TAG, "restart stop failed: ${e.message}") }
         server = null
         devicesByKey.clear()
@@ -103,7 +107,10 @@ class ControllerService : Service() {
         }, object : SessionManager.Events {
             override fun onAuthenticated(key: String, hello: Message.Hello) {
                 Log.d(LOG_TAG, "Authenticated ${hello.deviceId} (${hello.model})")
-                scope.launch { registry.upsertSeen(hello.deviceId, hello.model, System.currentTimeMillis()); refreshOnline() }
+                // `sessions` (not the local `sm`, which isn't in scope while its own initializer — this
+                // anonymous object — is still being constructed) is guaranteed set by the time this callback
+                // actually fires, since it only fires after `sm` finishes construction and `sessions = sm` runs.
+                scope.launch { registry.upsertSeen(hello.deviceId, hello.model, System.currentTimeMillis()); refreshOnline(); sessions?.let { pushPrefs(it, hello.deviceId) } }
             }
             override fun onMessage(key: String, deviceId: String, m: Message) {
                 when (m) {
@@ -118,6 +125,8 @@ class ControllerService : Service() {
         })
         sessions = sm
         ControllerLink.commander = { deviceId, cmd -> sm.send(deviceId, cmd) }
+        prefsJob?.cancel()
+        prefsJob = scope.launch { ControllerLink.prefsChanged.collect { sm.onlineDeviceIds().forEach { pushPrefs(sm, it) } } }
         try {
             val s = BLEServer(this, clientLimit = 7, callBack = object : BLEServer.BLEServerCallBack {
                 override fun onDeviceConnected(device: BluetoothDevice) { devicesByKey[device.address] = device; sm.onConnected(device.address) }
@@ -138,6 +147,12 @@ class ControllerService : Service() {
         tickJob = scope.launch { while (isActive) { delay(1_000); sm.tick(System.currentTimeMillis()) } }
     }
 
+    /** Sends the current [ControllerPrefs.childPrefsNow] to [deviceId] via [sm], logging (not throwing) if it's offline. */
+    private suspend fun pushPrefs(sm: SessionManager, deviceId: String) {
+        val cmd = Message.Cmd(java.util.UUID.randomUUID().toString().substring(0, 8), CmdType.SET_PREFS, prefs = prefs.childPrefsNow())
+        if (!sm.send(deviceId, cmd)) Log.w(LOG_TAG, "SET_PREFS not sent to $deviceId (offline)")
+    }
+
     private fun refreshOnline() {
         val online = sessions?.onlineDeviceIds() ?: emptySet()
         ControllerLink.online.value = online
@@ -149,6 +164,7 @@ class ControllerService : Service() {
         .setContentText(getString(R.string.controller_notif_text, online)).setOngoing(true).build()
 
     override fun onDestroy() {
+        tickJob?.cancel(); prefsJob?.cancel()
         ControllerLink.commander = null
         ControllerLink.advertising.value = false; ControllerLink.online.value = emptySet()
         try { server?.stopServer() } catch (e: BLEException) { Log.w(LOG_TAG, "stop failed: ${e.message}") }

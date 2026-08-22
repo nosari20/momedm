@@ -23,4 +23,12 @@ class DeviceRegistryCodecTest {
         assertNull(reg.get("nope"))
         assertEquals(DeviceRegistryCodec.encode(reg.devices.value), DeviceRegistryCodec.decode(DeviceRegistryCodec.encode(reg.devices.value)).let { DeviceRegistryCodec.encode(it) })
     }
+    @Test fun nicknameRoundTripAndRename() = runTest {
+        val list = listOf(DeviceRecord("d1", "Pixel", 1L, null, "Tablette de Léa"))
+        assertEquals(list, DeviceRegistryCodec.decode(DeviceRegistryCodec.encode(list)))
+        val reg = DeviceRegistry(ControllerPrefs(InMemoryPreferencesProvider()), this)
+        reg.upsertSeen("d1", "Pixel", 1L); reg.rename("d1", "Léa")
+        assertEquals("Léa", reg.get("d1")?.nickname); reg.upsertSeen("d1", "Pixel", 2L); assertEquals("Léa", reg.get("d1")?.nickname)
+        reg.rename("d1", null); assertEquals(null, reg.get("d1")?.nickname)
+    }
 }
