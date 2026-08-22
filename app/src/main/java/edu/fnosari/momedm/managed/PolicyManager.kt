@@ -68,7 +68,7 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
 
     override suspend fun kioskOff(): Result<Unit> = try {
         dpm.setLockTaskPackages(admin, emptyArray())   // removing the allowlist forces lock task to end
-        prefs.setKiosk(false, null)
+        prefs.setKiosk(false, null)  // also clears any pause deadline so the pause watchdog cannot fire a stale resume() on the next KIOSK_ON
         // State is already cleared above; a launch failure here must not resurrect kiosk on the next restoreKiosk().
         runCatching {
             val home = Intent(context, ManagedHomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)

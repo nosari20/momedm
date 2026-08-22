@@ -59,11 +59,12 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         if (existing.isNotEmpty()) return existing
         return UUID.randomUUID().toString().also { p.write(KEY_DEVICE_ID, it) }
     }
-    /** Persists the kiosk on/off state and the kiosk package (empty string when [pkg] is null). */
-    suspend fun setKiosk(on: Boolean, pkg: String?) { p.write(KEY_KIOSK_ON, on); p.write(KEY_KIOSK_PKG, pkg ?: "") }
+    /** Persists the kiosk on/off state and the kiosk package (empty string when [pkg] is null); also clears the pause deadline so a lapsed pause never survives a kiosk on/off via this legacy setter. */
+    suspend fun setKiosk(on: Boolean, pkg: String?) { p.write(KEY_KIOSK_PAUSE_UNTIL, "0"); p.write(KEY_KIOSK_ON, on); p.write(KEY_KIOSK_PKG, pkg ?: "") }
     /** Persists the full child-mode configuration. */
     suspend fun setKioskConfig(c: KioskConfig) {
-        p.write(KEY_KIOSK_ON, c.on); p.write(KEY_KIOSK_PKG, c.pinned ?: ""); p.write(KEY_KIOSK_APPS, KioskConfig.encodeApps(c.apps)); p.write(KEY_KIOSK_PAUSE_UNTIL, c.pauseUntil.toString())
+        // pauseUntil first: the service's pause watchdog collects kioskConfig and must never observe on=true with a stale deadline
+        p.write(KEY_KIOSK_PAUSE_UNTIL, c.pauseUntil.toString()); p.write(KEY_KIOSK_ON, c.on); p.write(KEY_KIOSK_PKG, c.pinned ?: ""); p.write(KEY_KIOSK_APPS, KioskConfig.encodeApps(c.apps))
     }
     suspend fun setPauseUntil(t: Long) = p.write(KEY_KIOSK_PAUSE_UNTIL, t.toString())
     suspend fun setChildPrefs(c: ChildPrefs) {
