@@ -44,19 +44,51 @@ off), plus per-command `RESULT`.
 
 ## 2. Approach
 
-Single Gradle module `app`. Packages:
+Single Gradle module `app`. App scaffolding (activities, navigation, layouts,
+theme, preferences, settings screens) is **reused from BLEController**
+(`com.nosari20.blecontroller`) — copied and re-namespaced, same conventions:
+
+- `activities/<name>/<Name>Activity.kt` = `ComponentActivity` + `setContent`,
+  `enableEdgeToEdge`, theme wrapper, permission gate (`ButtonRequestPermission`
+  list until all granted), then `Layout.BasicLayoutWithTopBarAndDrawer` +
+  `NavHost` over an `activities/<name>/navigation/Routes` enum
+  (`label: Int` string res, `icon: ImageVector`).
+- `activities/<name>/screens/*Screen.kt` composables taking `navController`
+  (+ view model); `activities/<name>/components/*` for banners/indicators.
+- `activities/settings/SettingsActivity` with slide transitions,
+  `SettingsMenu` categories, `SettingsScreen` driven by typed
+  `Preference<T>` + `PreferencesProvider`, app-version row + easter egg.
+- `ui/layouts/{Layout,BasicLayoutWithTopBar}.kt`, `ui/theme/*` (renamed
+  `MomeDMTheme`), `persistence/preferences/*` (spelling fixed from
+  `persistance`), `utils/AppVersion.kt`, private `LOG_TAG` companions,
+  KDoc style, strings in `res/values/strings.xml`.
+
+Packages:
 
 ```
 edu.fnosari.momedm/
-├── connectivity/ble/        # copied framework (+ extensions), app-agnostic
-├── protocol/                # pure Kotlin: framing, auth, messages (JVM-tested)
-├── managed/                 # DPC: AdminReceiver, provisioning activities,
-│                            #   ManagedLinkService, PolicyManager, StatusCollector, home UI
-├── controller/              # ControllerService, SessionManager, registry,
-│                            #   provisioning (hotspot, http, QR), screens
-├── persistence/             # DataStore-backed prefs (both roles)
-├── ui/                      # theme, shared composables
-└── MainActivity.kt          # role switch
+├── connectivity/ble/              # copied framework (+ extensions), app-agnostic
+├── protocol/                      # pure Kotlin: framing, auth, messages (JVM-tested)
+├── activities/
+│   ├── main/MainActivity.kt       # launcher: DO? → ManagedHomeActivity, else controller UI
+│   │   ├── ControllerViewModel.kt # link to ControllerService, device list/status StateFlows
+│   │   ├── navigation/Routes.kt   # DEVICES, PROVISION
+│   │   ├── screens/               # DevicesScreen, DeviceScreen, ProvisionScreen
+│   │   └── components/            # ServiceBanner, OnlineIndicator, AppPickerDialog
+│   ├── managed/                   # ManagedHomeActivity (HOME), ManagedViewModel,
+│   │   │                          #   navigation/Routes (HOME), screens/HomeScreen,
+│   │   │                          #   components/LinkBanner
+│   │   └── provisioning/          # GetProvisioningModeActivity, PolicyComplianceActivity
+│   └── settings/SettingsActivity.kt  # categories: Controller (id, regenerate secret),
+│                                  #   Legal, Licenses, version/easter egg
+├── managed/                       # non-UI: AdminReceiver, BootReceiver, ManagedLinkService,
+│                                  #   PolicyManager, StatusCollector
+├── controller/                    # non-UI: ControllerService, SessionManager, DeviceRegistry,
+│                                  #   provisioning/{ProvisioningController, ApkHttpServer,
+│                                  #   SignatureChecksum, QrPayloadBuilder}
+├── persistence/preferences/       # Preference<T>, PreferencesProvider, DataStore impl
+├── ui/{layouts,theme}/            # copied
+└── utils/AppVersion.kt            # copied
 ```
 
 Toolchain: AGP 9.3.1 (built-in Kotlin 2.2.x), Compose + Material3, minSdk 34,
@@ -229,8 +261,14 @@ Controller → managed: `CHALLENGE`, `CMD{id,type,args}` with types
   ("com.google")` (DO has account visibility), `UsageStatsManager` events
   (if `PACKAGE_USAGE_STATS` op granted) else `kioskPkg`/`unknown`, launchable
   apps via `queryIntentActivities(MAIN/LAUNCHER)`.
-- **`ManagedHomeActivity`** (Compose, acts as HOME): link state, status, buttons
-  "Add Google account", "Grant usage access".
+- **`ManagedHomeActivity`** (`activities/managed`, manifest `HOME` + `DEFAULT`
+  intent filter, no LAUNCHER): same pattern as BLEController `MainActivity` —
+  permission gate (`BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`), then
+  `Layout.BasicLayoutWithTopBarAndDrawer` + `NavHost` over `Routes { HOME }`;
+  `LinkBanner` (copy of `ConnectionBanner`) shows scanning/disconnected;
+  `HomeScreen` shows status card + buttons "Add Google account", "Grant usage
+  access". `ManagedViewModel` exposes link state + status as `StateFlow`
+  (bound to `ManagedLinkService`).
 - **Persistence** (`DataStore` prefs): `controllerId`, `secret`, `deviceId`,
   `kioskPkg`, `kioskOn`.
 
@@ -244,14 +282,27 @@ Controller → managed: `CHALLENGE`, `CMD{id,type,args}` with types
   lastStatus}]`. Online = session authenticated.
 - **Provisioning** (`ProvisioningController`): hotspot / manual / custom-URL
   mode, `ApkHttpServer`, `SignatureChecksum`, `QrPayloadBuilder`, QR bitmap.
-- **Screens** (Navigation-Compose):
-  - *Devices*: list with online dot, advertising toggle, FAB → Provision.
-  - *Device*: status card; Kiosk ON → sends `LIST_APPS`, shows picker → `KIOSK_ON`;
-    Kiosk OFF; Install → pkg text field → `INSTALL`; Add account; Refresh
-    (`GET_STATUS`); `RESULT` shown as snackbar.
-  - *Provision*: Wi-Fi mode, server state/IP, QR.
-  - *Settings*: controller id, "Regenerate secret" (warning: disconnects all
-    provisioned devices until re-provisioned).
+- **`MainActivity`** (`activities/main`, LAUNCHER): in `onCreate`, if
+  `isDeviceOwnerApp` → `startActivity(ManagedHomeActivity)` + `finish()`.
+  Otherwise BLEController `MainActivity` pattern: permission gate
+  (`BLUETOOTH_CONNECT`, `BLUETOOTH_SCAN`, `BLUETOOTH_ADVERTISE`,
+  `POST_NOTIFICATIONS`, `NEARBY_WIFI_DEVICES`), then
+  `Layout.BasicLayoutWithTopBarAndDrawer` (right action: `OnlineIndicator`
+  (n online) + Settings icon → `SettingsActivity`) + `ServiceBanner`
+  (advertising stopped) + `NavHost` over `Routes { DEVICES, PROVISION }`;
+  `DeviceScreen` reached via `"device/{deviceId}"` route. `ControllerViewModel`
+  binds `ControllerService`, exposes registry + sessions as `StateFlow`.
+- **Screens** (`activities/main/screens`):
+  - *DevicesScreen*: list with online dot, advertising toggle, FAB → Provision.
+  - *DeviceScreen*: status card; Kiosk ON → sends `LIST_APPS`, `AppPickerDialog`
+    → `KIOSK_ON`; Kiosk OFF; Install → pkg text field → `INSTALL`; Add account;
+    Refresh (`GET_STATUS`); `RESULT` shown as snackbar.
+  - *ProvisionScreen*: Wi-Fi mode, server state/IP, QR.
+- **`SettingsActivity`** (`activities/settings`, copied): `SettingsMenu`
+  categories → *Controller* (`SettingsScreen` with controller id read-only +
+  "Regenerate secret" action w/ confirm dialog: disconnects all provisioned
+  devices until re-provisioned), *Legal*, *Licenses*; version row + easter egg
+  kept.
 - **Identity**: `controllerId` UUID + `secret` generated on first launch,
   persisted.
 
