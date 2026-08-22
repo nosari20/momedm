@@ -33,6 +33,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.lifecycleScope
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.managed.ManagedLinkService
+import edu.fnosari.momedm.managed.ManagedLinkState
 import edu.fnosari.momedm.managed.ManagedSetup
 import edu.fnosari.momedm.managed.PolicyManager
 import edu.fnosari.momedm.managed.StatusCollector
@@ -68,7 +69,10 @@ class PolicyComplianceActivity : ComponentActivity() {
                         0 -> StepCard(getString(R.string.setup_account_title), getString(R.string.setup_account_text), getString(R.string.setup_account_button), accountOk,
                             onAction = { lifecycleScope.launch { policy.openAddAccount() } }, onNext = { step = 1 })
                         else -> StepCard(getString(R.string.setup_usage_title), getString(R.string.setup_usage_text), getString(R.string.setup_usage_button), usageOk,
-                            onAction = { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }, onNext = { finishSetup(policy) }, last = true)
+                            onAction = {
+                                runCatching { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+                                    .onFailure { Log.w(LOG_TAG, "Usage access settings unavailable", it); ManagedLinkState.lastError.value = "Usage access settings unavailable" }
+                            }, onNext = { finishSetup(policy) }, last = true)
                     }
                 }
             }
