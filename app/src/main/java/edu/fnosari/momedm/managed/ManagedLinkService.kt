@@ -70,6 +70,16 @@ class ManagedLinkService : Service() {
     private var lastBattery = -1
     /** Set once in [onDestroy]; guards [scan]/[scheduleRescan] against firing after teardown. */
     @Volatile private var destroyed = false
+    /**
+     * Synchronous in-flight guard for [startLink]. Both call sites — [onStartCommand] and
+     * [scan]'s `client == null` retry — run on the main thread, so a plain check-and-set here
+     * is atomic and closes the check-then-act race that [startLink] itself can't guard against:
+     * it suspends on [ManagedPrefs.secretBytes]/[ManagedPrefs.ensureDeviceId] *before* assigning
+     * [client], so two overlapping callers (e.g. a boot start racing a post-provisioning start)
+     * could otherwise both see `client == null` and each construct their own `BLEClient`/
+     * `ManagedEndpoint`, orphaning one scanning client and cross-wiring callbacks.
+     */
+    @Volatile private var linkStarting = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -96,8 +106,14 @@ class ManagedLinkService : Service() {
         val fromBoot = intent?.getBooleanExtra(EXTRA_FROM_BOOT, false) == true
         // No separate "started" latch: the link is (re)kicked off whenever there is no live
         // client yet. This keeps a "Not provisioned" first call a genuine no-op that a later
-        // start(context) — e.g. right after provisioning completes — can retry.
-        if (client == null) { scope.launch { if (fromBoot) policy.restoreKiosk(); startLink() } }
+        // start(context) — e.g. right after provisioning completes — can retry. linkStarting
+        // guards the window before startLink() (a suspend fun) gets around to assigning client.
+        if (client == null && !linkStarting) {
+            linkStarting = true
+            scope.launch {
+                try { if (fromBoot) policy.restoreKiosk(); startLink() } finally { linkStarting = false }
+            }
+        }
         return START_STICKY
     }
 
@@ -163,7 +179,13 @@ class ManagedLinkService : Service() {
         if (c == null) {
             // Construction of the BLEClient itself failed last time (e.g. Bluetooth was off) —
             // retry the whole link setup rather than looping on a scan call that can never run.
-            scope.launch { startLink() }
+            // scan() runs on the main thread (direct call from startLink(), or via the main
+            // Handler in scheduleRescan()), so this check-and-set of linkStarting is atomic and
+            // shares the same in-flight guard as onStartCommand.
+            if (!linkStarting) {
+                linkStarting = true
+                scope.launch { try { startLink() } finally { linkStarting = false } }
+            }
             return
         }
         setState(LinkState.SCANNING)
