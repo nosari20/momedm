@@ -16,7 +16,9 @@ import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.PinHash
 import edu.fnosari.momedm.ui.AppLocale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 /** Thin, logged wrapper around [DevicePolicyManager] for the managed role. */
 class PolicyManager(private val context: Context, private val prefs: ManagedPrefs) : PolicyActions {
@@ -153,10 +155,24 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Result.success(Unit)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
-    /** True when [pin] matches the pushed parent PIN; false when none is set. */
-    suspend fun verifyPin(pin: String): Boolean {
+    /**
+     * True when [pin] matches the pushed parent PIN; false when none is set.
+     *
+     * Never throws. A salt/hash pair persisted before [ChildPrefs.sanitized] started validating it
+     * (odd length, non-hex) makes `Hex.decode` raise, and this runs straight off the child's PIN
+     * dialog — a malformed stored pair must read as "wrong PIN", not take the launcher down. The
+     * PBKDF2 work (20k iterations) runs on [Dispatchers.Default] so the caller's main-thread
+     * coroutine never blocks on it. Cancellation is rethrown, as everywhere else in this class.
+     * The clear PIN is never logged.
+     */
+    suspend fun verifyPin(pin: String): Boolean = runCatching {
         val p = prefs.childPrefs.first()
-        val salt = p.pinSalt ?: return false; val hash = p.pinHash ?: return false
-        return PinHash.verify(pin, salt, hash)
+        val salt = p.pinSalt ?: return@runCatching false
+        val hash = p.pinHash ?: return@runCatching false
+        withContext(Dispatchers.Default) { PinHash.verify(pin, salt, hash) }
+    }.getOrElse { t ->
+        if (t is CancellationException) throw t
+        Log.w(LOG_TAG, "PIN verification failed (malformed stored salt/hash?): ${t::class.simpleName}")
+        false
     }
 }

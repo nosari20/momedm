@@ -47,5 +47,13 @@ class MessagesTest {
         val p = ChildPrefs(language = "de", theme = "neon", accent = 1).sanitized()
         assertEquals("system", p.language); assertEquals("system", p.theme); assertEquals(1, p.accent)
         assertEquals(ChildPrefs(), ChildPrefs(language = "system", theme = "system").sanitized())
+        // A half or malformed PIN pair is dropped wholesale: PinHash.verify would throw on it.
+        assertEquals(ChildPrefs(), ChildPrefs(pinSalt = "00".repeat(16)).sanitized())
+        assertEquals(ChildPrefs(), ChildPrefs(pinHash = "ab".repeat(32)).sanitized())
+        assertEquals(ChildPrefs(), ChildPrefs(pinSalt = "0".repeat(31), pinHash = "ab".repeat(32)).sanitized())
+        assertEquals(ChildPrefs(), ChildPrefs(pinSalt = "ZZ".repeat(16), pinHash = "ab".repeat(32)).sanitized())
+        assertEquals(ChildPrefs(), ChildPrefs(pinSalt = "00".repeat(16), pinHash = "ab".repeat(31)).sanitized())
+        val valid = ChildPrefs(pinSalt = "00".repeat(16), pinHash = "ab".repeat(32))
+        assertEquals(valid, valid.sanitized())
     }
 }

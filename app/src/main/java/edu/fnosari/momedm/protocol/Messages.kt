@@ -20,17 +20,31 @@ data class ChildPrefs(
     /** Hex [PinHash.hash] of the parent PIN; null = no PIN set. */
     val pinHash: String? = null,
 ) {
-    /** Replaces unsupported language/theme values with "system"; the accent is any ARGB int. */
-    fun sanitized(): ChildPrefs = copy(
-        language = if (language in LANGUAGES) language else "system",
-        theme = if (theme in THEMES) theme else "system",
-        pinSalt = pinSalt?.takeIf { pinHash != null }, pinHash = pinHash?.takeIf { pinSalt != null },
-    )
+    /**
+     * Replaces unsupported language/theme values with "system"; the accent is any ARGB int.
+     *
+     * The PIN pair is kept only when *both* halves are well-formed lower-case hex of the exact length
+     * [PinHash] produces (16-byte salt, 32-byte hash); anything else — a half pair, an odd-length or
+     * non-hex string from a peer — nulls both. Otherwise `PinHash.verify` would later raise on
+     * `Hex.decode`, turning a malformed push into a crash on the child's PIN dialog.
+     */
+    fun sanitized(): ChildPrefs {
+        val validPin = pinSalt != null && pinHash != null && SALT_RE.matches(pinSalt) && HASH_RE.matches(pinHash)
+        return copy(
+            language = if (language in LANGUAGES) language else "system",
+            theme = if (theme in THEMES) theme else "system",
+            pinSalt = if (validPin) pinSalt else null, pinHash = if (validPin) pinHash else null,
+        )
+    }
     companion object {
         /** MaClasse green — the default seed colour of both apps. */
         const val DEFAULT_ACCENT: Int = 0xFF16866F.toInt()
         val LANGUAGES = setOf("system", "fr", "en")
         val THEMES = setOf("system", "light", "dark")
+        /** 16 bytes of lower-case hex — what [PinHash.newSalt] emits. */
+        private val SALT_RE = Regex("^[0-9a-f]{32}$")
+        /** 32 bytes of lower-case hex — what [PinHash.hash] emits. */
+        private val HASH_RE = Regex("^[0-9a-f]{64}$")
     }
 }
 

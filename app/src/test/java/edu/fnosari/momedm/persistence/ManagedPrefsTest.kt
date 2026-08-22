@@ -29,4 +29,12 @@ class ManagedPrefsTest {
         val cp = edu.fnosari.momedm.protocol.ChildPrefs("fr", "dark", 7, "00".repeat(16), "11".repeat(32))
         p.setChildPrefs(cp); assertEquals(cp, p.childPrefs.first())
     }
+    @Test fun pinLockoutRoundTrip() = runTest {
+        val p = ManagedPrefs(InMemoryPreferencesProvider())
+        assertEquals(0, p.pinFailures.first()); assertEquals(0L, p.pinLockUntil.first())
+        p.setPinLock(3, 1_700_000_000_000L)
+        assertEquals(3, p.pinFailures.first()); assertEquals(1_700_000_000_000L, p.pinLockUntil.first())
+        p.setPinLock(0, 0L)
+        assertEquals(0, p.pinFailures.first()); assertEquals(0L, p.pinLockUntil.first())
+    }
 }

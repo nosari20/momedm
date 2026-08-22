@@ -6,6 +6,7 @@ import edu.fnosari.momedm.protocol.ChildPrefs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 /** Managed-role settings: controller identity from the QR, our device id, kiosk state. */
@@ -23,6 +24,8 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         const val KEY_PREF_ACCENT = "managed_pref_accent"
         const val KEY_PIN_SALT = "managed_pin_salt"
         const val KEY_PIN_HASH = "managed_pin_hash"
+        const val KEY_PIN_FAILURES = "managed_pin_failures"
+        const val KEY_PIN_LOCK_UNTIL = "managed_pin_lock_until"
     }
     val controllerId: Flow<String> = p.readString(KEY_CONTROLLER_ID, "")
     val secretBase64: Flow<String> = p.readString(KEY_SECRET, "")
@@ -39,6 +42,10 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         p.readInt(KEY_PREF_ACCENT, ChildPrefs.DEFAULT_ACCENT), p.readString(KEY_PIN_SALT, ""), p.readString(KEY_PIN_HASH, "")) { l, t, a, s, h ->
         ChildPrefs(l, t, a, s.ifEmpty { null }, h.ifEmpty { null })
     }
+    /** Consecutive wrong parent-PIN attempts; drives the launcher's lockout backoff across process death. */
+    val pinFailures: Flow<Int> = p.readInt(KEY_PIN_FAILURES, 0)
+    /** Epoch ms until which the PIN dialog refuses input; 0 = not locked out. */
+    val pinLockUntil: Flow<Long> = p.readString(KEY_PIN_LOCK_UNTIL, "0").map { it.toLongOrNull() ?: 0L }  // Long stored as string (provider has no Long)
 
     /** Persists the controller identity (id + secret) received from the QR admin extras. */
     suspend fun saveProvisioning(controllerId: String, secretBase64: String) { p.write(KEY_CONTROLLER_ID, controllerId); p.write(KEY_SECRET, secretBase64) }
@@ -63,4 +70,11 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         p.write(KEY_PREF_LANGUAGE, c.language); p.write(KEY_PREF_THEME, c.theme); p.write(KEY_PREF_ACCENT, c.accent)
         p.write(KEY_PIN_SALT, c.pinSalt ?: ""); p.write(KEY_PIN_HASH, c.pinHash ?: "")
     }
+    /**
+     * Persists the PIN brute-force lockout: [failures] consecutive wrong attempts and the epoch-ms
+     * deadline [untilMs] until which the dialog refuses input (both 0 to reset after a correct PIN).
+     * Only the counter and the deadline are stored — never a PIN, clear or hashed — so force-stopping
+     * the launcher no longer wipes the backoff.
+     */
+    suspend fun setPinLock(failures: Int, untilMs: Long) { p.write(KEY_PIN_FAILURES, failures); p.write(KEY_PIN_LOCK_UNTIL, untilMs.toString()) }
 }

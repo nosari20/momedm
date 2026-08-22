@@ -6,10 +6,12 @@ import edu.fnosari.momedm.protocol.Base64Std
 import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.Crypto
 import edu.fnosari.momedm.protocol.PinHash
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /** Controller-role settings: identity/secret, provisioning Wi-Fi choices, device registry blob. */
 class ControllerPrefs(private val p: PreferencesProvider) {
@@ -80,7 +82,10 @@ class ControllerPrefs(private val p: PreferencesProvider) {
      */
     suspend fun setPin(pin: String): Boolean {
         if (!PinHash.isValidPin(pin)) return false
-        val salt = PinHash.newSalt(); p.write(KEY_PIN_SALT, salt); p.write(KEY_PIN_HASH, PinHash.hash(pin, salt)); return true
+        val salt = PinHash.newSalt()
+        // 20k PBKDF2 iterations; the caller is the settings screen's main-thread coroutine.
+        val hash = withContext(Dispatchers.Default) { PinHash.hash(pin, salt) }
+        p.write(KEY_PIN_SALT, salt); p.write(KEY_PIN_HASH, hash); return true
     }
     /**
      * Clears the stored PIN salt/hash: no PIN required after this.

@@ -31,4 +31,22 @@ class DeviceRegistryCodecTest {
         assertEquals("Léa", reg.get("d1")?.nickname); reg.upsertSeen("d1", "Pixel", 2L); assertEquals("Léa", reg.get("d1")?.nickname)
         reg.rename("d1", null); assertEquals(null, reg.get("d1")?.nickname)
     }
+    /**
+     * Two registries share one persisted blob (the controller service owns one, the view model
+     * another): a write through B must not resurrect the stale snapshot B loaded before A's rename.
+     */
+    @Test fun twoInstancesDoNotClobberEachOther() = runTest {
+        val prefs = ControllerPrefs(InMemoryPreferencesProvider())
+        val a = DeviceRegistry(prefs, this)
+        val b = DeviceRegistry(prefs, this)
+        a.upsertSeen("d1", "Pixel", 1L)
+        a.rename("d1", "Léa")
+        b.upsertSeen("d1", "Pixel", 2L)
+        b.updateStatus("d1", Message.Status(false, null, false, 1, null), 3L)
+        a.reload()
+        assertEquals("Léa", a.get("d1")?.nickname)
+        assertEquals("Léa", b.get("d1")?.nickname)
+        assertEquals(3L, a.get("d1")?.lastSeen)
+        assertEquals(3L, b.get("d1")?.lastSeen)
+    }
 }

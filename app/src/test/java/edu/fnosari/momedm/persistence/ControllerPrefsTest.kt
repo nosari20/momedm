@@ -60,7 +60,8 @@ class ControllerPrefsTest {
         val cp = p.childPrefsNow()
         assertEquals("fr", cp.language); assertEquals("dark", cp.theme); assertEquals(0x11223344, cp.accent)
         assertTrue(PinHash.verify("4321", cp.pinSalt!!, cp.pinHash!!)); assertFalse(PinHash.verify("1234", cp.pinSalt!!, cp.pinHash!!))
-        p.clearPin(); assertFalse(p.pinSet.first()); assertEquals(null, p.childPrefsNow().pinHash)
+        p.clearPin(); assertFalse(p.pinSet.first())
+        assertEquals(null, p.childPrefsNow().pinHash); assertEquals(null, p.childPrefsNow().pinSalt)
     }
     @Test fun setPinRejectsInvalid() = runTest {
         val p = ControllerPrefs(InMemoryPreferencesProvider())

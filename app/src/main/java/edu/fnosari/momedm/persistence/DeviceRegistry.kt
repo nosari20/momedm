@@ -54,10 +54,18 @@ class DeviceRegistry(private val prefs: ControllerPrefs, scope: CoroutineScope) 
     }
     /** Sets (or clears with null) the parent-chosen display name. */
     suspend fun rename(deviceId: String, nickname: String?) = mutate { list -> list.map { if (it.deviceId == deviceId) it.copy(nickname = nickname?.trim()?.ifEmpty { null }) else it } }
+    /**
+     * Applies [f] to the *persisted* list rather than to the in-memory snapshot. Two registries live
+     * over the same blob (one in `ControllerService`, one in `ControllerViewModel`), so the other
+     * instance may have written since this one last read: re-reading under the mutex is what keeps a
+     * service-side `upsertSeen`/`updateStatus` from writing back a pre-rename snapshot and dropping
+     * the parent's nickname (and, symmetrically, a UI-side `rename` from dropping a fresh status).
+     */
     private suspend fun mutate(f: (List<DeviceRecord>) -> List<DeviceRecord>) {
         loaded.join()
         mutex.withLock {
-            _devices.value = f(_devices.value).sortedByDescending { it.lastSeen }
+            val current = DeviceRegistryCodec.decode(prefs.registryJson.first())
+            _devices.value = f(current).sortedByDescending { it.lastSeen }
             prefs.saveRegistry(DeviceRegistryCodec.encode(_devices.value))
         }
     }
