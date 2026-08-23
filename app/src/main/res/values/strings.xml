@@ -84,13 +84,8 @@
     <!-- Core / shared -->
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
-    <string name="ok">OK</string>
     <string name="back">Back</string>
-    <string name="close">Close</string>
-    <string name="loading">Loading…</string>
     <string name="search">Search</string>
-    <string name="done">Done</string>
-    <string name="failed">Failed: %1$s</string>
 
     <!-- Appearance & language (MaClasse-aligned keys) -->
     <string name="language">Language</string>

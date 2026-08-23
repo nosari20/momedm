@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -39,7 +38,6 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     private val policy = PolicyManager(application, prefs)
     val linkState: StateFlow<ManagedLinkState.LinkState> = ManagedLinkState.state
     val lastStatus = ManagedLinkState.lastStatus
-    val lastError = ManagedLinkState.lastError
     /**
      * The persisted child-mode config, or **null while it is still loading**.
      *
@@ -173,15 +171,5 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     /** Ends a pause now (re-locks). */
     fun relock() { viewModelScope.launch { policy.resume() } }
 
-    // Plan 2: re-exposed in the redesigned launcher
-    fun addAccount() { viewModelScope.launch { policy.openAddAccount() } }
-    // Plan 2: re-exposed in the redesigned launcher
-    fun openUsageAccess() {
-        val app = getApplication<Application>()
-        runCatching { app.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            .onFailure { Log.w(LOG_TAG, "Usage access settings unavailable", it); ManagedLinkState.lastError.value = app.getString(R.string.managed_usage_unavailable) }
-    }
-    // Plan 2: re-exposed in the redesigned launcher
-    fun restartLink() = ManagedLinkService.restart(getApplication())
     fun ensureLink() { if (ManagedLinkState.state.value == ManagedLinkState.LinkState.IDLE) ManagedLinkService.start(getApplication()) }
 }

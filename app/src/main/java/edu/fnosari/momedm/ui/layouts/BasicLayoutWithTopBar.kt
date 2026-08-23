@@ -19,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import edu.fnosari.momedm.R
 import edu.fnosari.momedm.ui.common.pronoteTopBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,7 +56,7 @@ fun BasicLayoutWithTopBar(
                 navigationIcon = {
                     if (leftAction != null) {
                         IconButton(onClick = leftAction) {
-                            Icon(leftActionIcon, contentDescription = "Go back")
+                            Icon(leftActionIcon, contentDescription = stringResource(R.string.back))
                         }
                     }
                 },
