@@ -24,6 +24,7 @@ is fully bilingual and that contrast is intentional.
 | `child-pin-dialog.png` | "Code PIN parental" dialog opened by long-pressing the header clock/greeting area — empty input field. |
 | `child-paused.png` | Launcher showing the "Mode enfant en pause" banner with "Menu" and "Reverrouiller" — during a pause every installed app is listed, not just the allowed ones. |
 | `child-parent-menu.png` | The parent menu on the child's phone: rules in force, the parent link, device facts, then Pause / Re-pair / Close. Reached by long-pressing the header and entering the PIN. |
+| `enrolment.svg` | Hand-drawn six-step enrolment walkthrough, written for a parent rather than an engineer — deliberately not a UML diagram. Hand-authored SVG: edit it directly, and keep the sketchy stroke and the handwriting font stack (it falls back to `cursive`, so the wobble in the geometry is what carries the look). |
 
 ## Notes for re-capture
 

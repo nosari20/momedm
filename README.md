@@ -166,12 +166,27 @@ string files kept key-for-key in sync by a test that fails the build otherwise.
 <img src="docs/images/parent-appearance.png" width="245" alt="Theme, accent colour and language">
 </div>
 
+### Keeping an eye on the link itself
+
+BLE is invisible when it works and baffling when it doesn't, so the parent's app
+has a screen for it: whether this phone is currently visible to children, how many
+are connected, and a log of recent activity — including the case that actually
+happens, a phone that connects but was set up with a *different* pairing code, and
+which says so in those words instead of failing silently.
+
+The same settings hold the pairing key's fingerprint and a **regenerate** button.
+Regenerating invalidates every enrolled child until each is paired again, which the
+confirmation says plainly before you do it.
+
 ### Setting up a child's phone
 
-From a factory-reset phone: tap the welcome screen six times, scan the code the
-parent's app shows, and the child's phone downloads the app and installs it as
-device owner. The parent's phone can even provide the Wi-Fi itself through a
-local hotspot, so no existing network is needed.
+Three ways to get the child's phone online for the download — your home Wi-Fi, the
+parent's phone acting as a hotspot so no existing network is needed, or a plain
+link if you would rather host the APK yourself.
+
+<div align="center">
+<img src="docs/images/enrolment.svg" width="720" alt="Setting up a child's phone in six steps: wipe it, pick the network, show the code, tap the welcome screen six times, scan, and the two phones pair over Bluetooth">
+</div>
 
 <div align="center">
 <img src="docs/images/parent-provision.png" width="245" alt="The enrolment screen with the pairing code">
@@ -180,6 +195,9 @@ local hotspot, so no existing network is needed.
 *The pairing code and Wi-Fi password are blurred in this screenshot on purpose —
 that code carries the shared secret, so treat the real one as sensitive while it
 is on screen.*
+
+Afterwards the child's phone can be given a name of its own, and a Google account
+can be added to it from the parent's phone without leaving the launcher.
 
 ## Requirements
 
