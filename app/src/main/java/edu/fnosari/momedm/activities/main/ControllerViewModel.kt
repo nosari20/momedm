@@ -59,7 +59,7 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         val app = application
         viewModelScope.launch {
             ControllerLink.results.collect { (_, r) ->
-                if (pendingIds.remove(r.cmdId)) _events.emit(app.getString(R.string.device_result, if (r.ok) "OK" else "ERR", r.msg))
+                if (pendingIds.remove(r.cmdId)) _events.emit(app.getString(R.string.child_result, "${if (r.ok) "OK" else "ERR"}: ${r.msg}"))
                 else Log.d(LOG_TAG, "Ignoring result for foreign cmd ${r.cmdId}")
             }
         }
@@ -127,6 +127,6 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
             pendingIds += id
             while (pendingIds.size > MAX_PENDING) pendingIds.iterator().let { it.next(); it.remove() }
         }
-        viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.device_offline_msg) else app.getString(R.string.device_sent)) }
+        viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.child_offline_msg) else app.getString(R.string.child_sent)) }
     }
 }

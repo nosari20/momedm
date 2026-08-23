@@ -24,6 +24,6 @@ fun OnlineIndicator(advertising: Boolean, online: Int, modifier: Modifier = Modi
     val color = if (advertising) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.padding(horizontal = 8.dp)) {
         Spacer(Modifier.size(12.dp).clip(CircleShape).background(color)); Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.main_online_count, online), style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.children_online_count, online), style = MaterialTheme.typography.labelLarge)
     }
 }

@@ -17,7 +17,7 @@ import edu.fnosari.momedm.R
 fun ServiceBanner(advertising: Boolean) {
     AnimatedVisibility(visible = !advertising) {
         Surface(color = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.main_banner_stopped), Modifier.padding(16.dp, 10.dp), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.children_not_visible), Modifier.padding(16.dp, 10.dp), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
                 val missing = required.filter { ActivityCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
                 Log.d(LOG_TAG, "Missing permissions: $missing")
                 if (missing.isNotEmpty()) {
-                    BasicLayoutWithTopBar(title = context.getString(R.string.main_activity_title)) {
+                    BasicLayoutWithTopBar(title = context.getString(R.string.children_title)) {
                         Column { for (p in missing) ButtonRequestPermission(context, p, p, granted = { required.remove(p) }, denied = { Log.d(LOG_TAG, "$p denied") }) }
                     }
                 } else {
@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { vm.events.collect { snackbar.showSnackbar(it) } }
                     LaunchedEffect(Unit) { vm.startServiceIfWanted() }
                     Layout.BasicLayoutWithTopBarAndDrawer(
-                        title = context.getString(R.string.main_activity_title),
+                        title = context.getString(R.string.children_title),
                         rightActions = {
                             OnlineIndicator(advertising, online.size)
                             IconButton(onClick = { context.startActivity(Intent(context, SettingsActivity::class.java)) }) { Icon(Icons.Filled.Settings, contentDescription = context.getString(R.string.main_settings_button)) }
