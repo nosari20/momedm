@@ -1,7 +1,7 @@
 package edu.fnosari.momedm.activities.managed.screens
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,98 +14,163 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.managed.ManagedViewModel
+import edu.fnosari.momedm.activities.managed.components.AppTile
 import edu.fnosari.momedm.activities.managed.components.PinDialog
 import edu.fnosari.momedm.managed.ManagedLinkState.LinkState
+import java.util.Calendar
 import java.util.Locale
 
 /**
- * The child device's home: a grid of big app tiles (allowed apps while locked, all apps otherwise),
- * a slim header (link state, battery, mode) and — when a parent PIN exists — a lock icon opening [PinDialog].
- * [onUnlocked] is called after a correct PIN; the hosting Activity releases the lock task.
+ * The child device's home screen — designed to be friendly for kids up to ~14, not toddler-cartoonish.
+ * A soft accent gradient behind a calm header (big clock + time-of-day greeting + a small connection dot)
+ * and a grid of big rounded app tiles (allowed apps while child mode is on, all apps otherwise). No MDM
+ * jargon, no battery %, no visible lock button: a long-press on the header opens the parent [PinDialog]
+ * (only when child mode is on and a PIN exists). [onUnlocked] is called after a correct PIN; the hosting
+ * Activity releases the lock task.
  */
 @Composable
 fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
     val apps by vm.launcherApps.collectAsState()
     val loadedConfig by vm.kioskConfig.collectAsState()
     val link by vm.linkState.collectAsState()
-    val status by vm.lastStatus.collectAsState()
     val pinSet by vm.pinSet.collectAsState()
     val pauseLeft by vm.pauseRemainingMs.collectAsState()
     val pinError by vm.pinError.collectAsState()
     val pinLockedRemaining by vm.pinLockedRemainingMs.collectAsState()
     val showPin by vm.pinDialogOpen.collectAsState()
     val paused = pauseLeft > 0L
+    val connected = link == LinkState.AUTHENTICATED
 
-    // Config still loading (null): draw a bare surface rather than guessing. Rendering the "All apps"
-    // header and every installed tile for what turns out to be a locked-down device would be a real
-    // escape hatch, however briefly it flashed.
+    // Config still loading (null): draw a bare surface rather than guessing. Rendering every installed
+    // tile for what turns out to be a locked-down device would be a real escape hatch, however briefly.
     val config = loadedConfig ?: run { Box(Modifier.fillMaxSize()); return }
 
-    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
-        // header
-        Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(if (config.on) R.string.launcher_child_mode else R.string.launcher_all_apps), style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.weight(1f))
-                Text(stringResource(if (link == LinkState.AUTHENTICATED) R.string.launcher_online else R.string.launcher_offline), style = MaterialTheme.typography.labelMedium)
-                status?.let { Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.launcher_battery, it.battery), style = MaterialTheme.typography.labelMedium) }
-                if (config.on && pinSet) IconButton(onClick = { vm.pinDialogOpen.value = true }) { Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.launcher_lock_cd)) }
-            }
+    // A slow clock: recompute the current minute periodically. `tick` just forces recomposition.
+    var tick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000L)
+            tick++
         }
-        if (paused) {
-            Surface(color = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val m = pauseLeft / 60_000L; val s = (pauseLeft / 1_000L) % 60L
-                    Text(stringResource(R.string.launcher_paused, String.format(Locale.US, "%02d:%02d", m, s)), style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { vm.relock() }) { Text(stringResource(R.string.launcher_relock)) }
+    }
+    val cal = remember(tick) { Calendar.getInstance() }
+    val hour = cal.get(Calendar.HOUR_OF_DAY)
+    val clock = remember(tick) { String.format(Locale.getDefault(), "%02d:%02d", hour, cal.get(Calendar.MINUTE)) }
+    val greeting = when {
+        hour < 12 -> R.string.launcher_greeting_morning
+        hour < 18 -> R.string.launcher_greeting_afternoon
+        else -> R.string.launcher_greeting_evening
+    }
+
+    // Soft accent gradient (accent-tinted primaryContainer fading into the themed background), calm in
+    // both light and dark because it is built from theme roles rather than fixed colors.
+    val gradient = Brush.verticalGradient(
+        listOf(
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+            MaterialTheme.colorScheme.background,
+        ),
+    )
+    val canUnlock = config.on && pinSet
+
+    Box(Modifier.fillMaxSize().background(gradient)) {
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
+            // Header — long-press anywhere on it reveals the parent PIN pad (kids can't discover it by sight).
+            val headerA11y = stringResource(R.string.launcher_lock_cd)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (canUnlock) Modifier
+                            .semantics { contentDescription = headerA11y }
+                            .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
+                        else Modifier,
+                    )
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(clock, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                    Text(stringResource(greeting), style = MaterialTheme.typography.titleMedium)
+                }
+                Spacer(Modifier.weight(1f))
+                val dotColor = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                val dotCd = stringResource(if (connected) R.string.launcher_online else R.string.launcher_offline)
+                Box(
+                    Modifier
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(dotColor)
+                        .semantics { contentDescription = dotCd },
+                )
+            }
+
+            if (paused) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val m = pauseLeft / 60_000L
+                        val s = (pauseLeft / 1_000L) % 60L
+                        Text(stringResource(R.string.launcher_paused, String.format(Locale.US, "%02d:%02d", m, s)), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { vm.relock() }) { Text(stringResource(R.string.launcher_relock)) }
+                    }
                 }
             }
-        }
-        if (apps.isEmpty()) {
-            val emptyText = if (config.on) R.string.launcher_no_apps else R.string.launcher_no_apps_installed
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(emptyText), textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp)) }
-        } else {
-            LazyVerticalGrid(columns = GridCells.Fixed(3), contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(apps, key = { it.pkg }) { app ->
-                    Column(Modifier.fillMaxWidth().clickable { vm.open(app.pkg) }.padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        val bmp = remember(app.pkg) { app.icon?.toBitmap(144, 144)?.asImageBitmap() }
-                        if (bmp != null) Image(bmp, contentDescription = app.label, modifier = Modifier.size(72.dp))
-                        else Box(Modifier.size(72.dp))
-                        Text(app.label, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+
+            if (apps.isEmpty()) {
+                val emptyText = if (config.on) R.string.launcher_no_apps else R.string.launcher_no_apps_installed
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(stringResource(emptyText), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp))
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 150.dp),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(apps, key = { it.pkg }) { app ->
+                        AppTile(app = app, onClick = { vm.open(app.pkg) })
                     }
                 }
             }
         }
     }
+
     if (showPin) PinDialog(
         onDismiss = { vm.pinDialogOpen.value = false; vm.clearPinError() },
         onSubmit = { pin -> vm.tryPin(pin) { vm.pinDialogOpen.value = false; onUnlocked() } },
