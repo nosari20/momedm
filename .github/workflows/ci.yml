@@ -27,6 +27,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # The executable bit is set in git (100755), but a commit made from Windows
+      # can silently drop it and the runner then fails with "Permission denied".
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest
 
