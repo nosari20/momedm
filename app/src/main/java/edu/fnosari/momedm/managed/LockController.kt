@@ -48,6 +48,29 @@ class LockController(private val context: Context, private val prefs: ManagedPre
             return
         }
 
+        // A pause deadline that has *lapsed* (0 < pauseUntil <= now) must be cleared here, before
+        // applying state below. kioskOn() (via restoreNormal()) incidentally clears it when the
+        // outcome is "restore child mode", but lockComplete() never touches it — so without this, a
+        // stale deadline would survive under an active complete lock forever. That is exactly the
+        // busy loop this fixes: lockComplete() calls launchHomeLocked(), which CLEAR_TASKs the
+        // launcher Activity and so recreates its ManagedViewModel; that ViewModel's trackPause() sees
+        // kioskConfig with the same stale pauseUntil > 0, decides the pause has lapsed, and calls
+        // reevaluate() again — forever, with no persisted state ever changing between iterations.
+        // Clearing it here breaks the cycle at the one place that knows both facts at once: that the
+        // pause is over, and that the outcome might be a lock lockComplete() won't clear it for.
+        //
+        // This does not persist a lock *decision* — only that a specific pause deadline has passed,
+        // which is a fact about elapsed time, not about which lock state was chosen. It also cannot
+        // oscillate: the write only happens when pauseUntil is genuinely > 0 here, so once it lands,
+        // the next kioskConfig emission carries pauseUntil = 0 and every collector gated on
+        // `pauseUntil > 0` (this branch, ManagedViewModel.trackPause's lapse branch, the service's
+        // pause watchdog) reads that as "no pause" and does not re-trigger reevaluate() from this
+        // cause. A caller with a genuinely fresh pause instead takes the `pauseUntil > now` branch
+        // above and returns before ever reaching this write.
+        if (pauseUntil > 0L) {
+            prefs.setPauseUntil(0L)
+        }
+
         val state = LockState.evaluate(schedule, manual, pauseUntil, now, zone)
         Log.d(LOG_TAG, "Re-evaluated: locked=${state.locked} reason=${state.reason}")
 

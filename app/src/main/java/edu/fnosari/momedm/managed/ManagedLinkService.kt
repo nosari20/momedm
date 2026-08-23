@@ -139,7 +139,13 @@ class ManagedLinkService : Service() {
         if (client == null && !linkStarting) {
             linkStarting = true
             scope.launch {
-                try { if (fromBoot) policy.restoreKiosk(); startLink() } finally { linkStarting = false }
+                // Boot-time restore goes through LockController rather than calling a kiosk-only
+                // restore directly: a plain kiosk restore has no idea a complete lock should
+                // currently outrank child mode, and racing BootReceiver's own reevaluate() (which
+                // does know) is exactly how a complete lock got silently downgraded to the ordinary
+                // child-mode allowlist on reboot. reevaluate() re-applies child mode whenever that is
+                // genuinely all that applies, so it is a strict superset of the old restore.
+                try { if (fromBoot) LockController(this@ManagedLinkService, prefs, policy).reevaluate(); startLink() } finally { linkStarting = false }
             }
         }
         return START_STICKY
@@ -216,9 +222,11 @@ class ManagedLinkService : Service() {
      * UI banner and dies with the Activity — a child who swipes the launcher away (or whose process
      * gets reclaimed) mid-pause would otherwise stay unlocked until something else happened to touch
      * the config. This service outlives the launcher, so it is what actually calls
-     * [PolicyManager.resume]. `collectLatest` restarts the wait whenever the config changes (a new
-     * pause, a KIOSK_OFF, a re-lock), and the deadline is re-read after the delay so a pause that was
-     * extended or cancelled while we slept is not resumed out from under the parent.
+     * [LockController.reevaluate] — not a direct kiosk re-apply, since only [LockController] knows
+     * whether a complete lock should apply instead of plain child mode. `collectLatest` restarts the
+     * wait whenever the config changes (a new pause, a KIOSK_OFF, a re-lock), and the deadline is
+     * re-read after the delay so a pause that was extended or cancelled while we slept is not resumed
+     * out from under the parent.
      */
     private fun startPauseWatchdog() = scope.launch {
         prefs.kioskConfig.collectLatest { c ->
@@ -227,8 +235,12 @@ class ManagedLinkService : Service() {
                 val wait = c.pauseUntil - now
                 if (wait > 0) delay(wait)
                 if (prefs.kioskConfig.first().let { it.on && it.pauseUntil > 0L && it.pauseUntil <= System.currentTimeMillis() }) {
-                    Log.d(LOG_TAG, "Pause lapsed; re-locking")
-                    policy.resume()
+                    Log.d(LOG_TAG, "Pause lapsed; re-evaluating")
+                    // Re-evaluate rather than calling policy.resume() (plain kiosk re-apply) directly:
+                    // this watchdog only knows a pause has lapsed, not whether a complete lock should
+                    // apply instead of child mode. LockController does know, and also clears the
+                    // stale pauseUntil that would otherwise re-trigger this same branch forever.
+                    LockController(this@ManagedLinkService, prefs, policy).reevaluate()
                 }
             }
         }

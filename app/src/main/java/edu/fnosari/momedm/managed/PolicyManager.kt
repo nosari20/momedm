@@ -77,8 +77,8 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
 
     override suspend fun kioskOff(): Result<Unit> = try {
         dpm.setLockTaskPackages(admin, emptyArray())   // removing the allowlist forces lock task to end
-        prefs.setKiosk(false, null)  // also clears any pause deadline so the pause watchdog cannot fire a stale resume() on the next KIOSK_ON
-        // State is already cleared above; a launch failure here must not resurrect kiosk on the next restoreKiosk().
+        prefs.setKiosk(false, null)  // also clears any pause deadline so the pause watchdog cannot fire a stale re-lock on the next KIOSK_ON
+        // State is already cleared above; a launch failure here must not resurrect kiosk on the next reevaluate().
         runCatching { launchHomePlain() }.onFailure { Log.w(LOG_TAG, "Failed to launch ManagedHomeActivity after kiosk off", it) }
         Log.d(LOG_TAG, "Kiosk off")
         Result.success(Unit)
@@ -156,25 +156,6 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
             Log.w(LOG_TAG, "Post-pause re-evaluation failed; re-lock alarm may be unset until the next trigger", t)
         }
         return until
-    }
-
-    /**
-     * Ends a pause (or is a no-op when child mode is off): re-applies the stored config and re-locks.
-     * On failure the pause deadline is left untouched (retry stays possible); on success [kioskOn]
-     * itself persists `pauseUntil = 0`, so this never clears the deadline ahead of a confirmed re-lock.
-     */
-    suspend fun resume(): Result<List<String>> {
-        val c = prefs.kioskConfig.first()
-        if (!c.on) return Result.success(emptyList())
-        return kioskOn(c.apps, c.pinned)
-            .onSuccess { ManagedLinkState.statusPushRequests.tryEmit(Unit) }
-            .onFailure { Log.w(LOG_TAG, "Kiosk resume failed; pause deadline left as is", it) }
-    }
-
-    /** Re-enters child mode after reboot when it was on; a pause never survives a reboot. */
-    suspend fun restoreKiosk() {
-        val c = prefs.kioskConfig.first()
-        if (c.on && c.apps.isNotEmpty()) kioskOn(c.apps, c.pinned).onFailure { Log.w(LOG_TAG, "Kiosk restore failed", it) }
     }
 
     /**
