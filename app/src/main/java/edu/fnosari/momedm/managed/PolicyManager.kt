@@ -131,9 +131,22 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * [kioskOn] directly (see its comment).
      */
     private fun applyKiosk(allowed: List<String>, pinned: String?) {
+        // Claimed here, not once at provisioning: enabling the home button below is only safe while we
+        // are the device's HOME, and nothing else guarantees that still holds — a reinstall drops the
+        // preferred-activity entry, and home would then land the child on the stock launcher.
+        setAsDefaultHome()
         dpm.setLockTaskPackages(admin, (allowed + context.packageName + PLAY_PKG + GMS_PKG + listOfNotNull(emergencyDialerPackage())).toTypedArray())
-        // NOTIFICATIONS requires HOME to also be enabled or AOSP throws IllegalArgumentException; SYSTEM_INFO alone is safe.
-        dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
+        // HOME and OVERVIEW give the child the two buttons they expect from a phone: home returns to
+        // our launcher (we are the persistent HOME), and recents lists only the allowed apps, because
+        // lock task hides everything else. Neither widens what is launchable — the allowlist above
+        // still decides that — so the phone feels ordinary without loosening a single restriction.
+        // NOTIFICATIONS requires HOME to also be enabled or AOSP throws IllegalArgumentException.
+        dpm.setLockTaskFeatures(
+            admin,
+            DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or
+                DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
+                DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW,
+        )
         launchHomeLocked()
         Log.d(LOG_TAG, "Kiosk on: ${allowed.size} apps, pinned=$pinned")
     }
@@ -141,6 +154,9 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
     /** Releases the DPM allowlist and returns to a plain home. Same call-site restriction as [applyKiosk]. */
     private fun clearKiosk() {
         dpm.setLockTaskPackages(admin, emptyArray())   // removing the allowlist forces lock task to end
+        // Child mode off means an ordinary phone again, so give the device its own launcher back.
+        runCatching { dpm.clearPackagePersistentPreferredActivities(admin, context.packageName) }
+            .onFailure { Log.w(LOG_TAG, "Could not release HOME: ${it::class.simpleName}") }
         // A launch failure here must not resurrect kiosk on the next reevaluate(); nothing else depends on it succeeding.
         runCatching { launchHomePlain() }.onFailure { Log.w(LOG_TAG, "Failed to launch ManagedHomeActivity after kiosk off", it) }
         Log.d(LOG_TAG, "Kiosk off")
@@ -187,6 +203,7 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         // flag set, long-pressing power under lock task produces no menu at all, so the power-menu
         // route to the emergency dialer simply does not exist. Allowlisting the dialer is what makes
         // the bedtime screen's Emergency button able to launch it.
+        setAsDefaultHome()
         dpm.setLockTaskPackages(admin, (listOf(context.packageName) + listOfNotNull(emergencyDialerPackage())).toTypedArray())
         dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
         launchHomeLocked()

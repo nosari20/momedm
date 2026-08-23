@@ -3,6 +3,7 @@ package edu.fnosari.momedm.activities.managed
 import android.Manifest.permission.BLUETOOTH_CONNECT
 import android.Manifest.permission.BLUETOOTH_SCAN
 import android.Manifest.permission.POST_NOTIFICATIONS
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -21,6 +22,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.managed.screens.BedtimeScreen
@@ -46,6 +48,20 @@ class ManagedHomeActivity : ComponentActivity() {
         private const val LOG_TAG = "ManagedHomeActivity"
         /** Grace period before bouncing into the pinned app, so a parent can tap the launcher's lock icon first. */
         private const val PINNED_BOUNCE_DELAY_MS = 1_500L
+    }
+
+    /**
+     * HOME lands on the launcher, never back on the parent's menu.
+     *
+     * Enabling the home button in lock task made this reachable: this activity is `singleTask` and is
+     * the device's HOME, so pressing home delivers a new intent here instead of starting anything —
+     * and a child pressing home while the menu happened to be open would be handed the parent's menu.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == Intent.ACTION_MAIN) {
+            ViewModelProvider(this)[ManagedViewModel::class.java].menuOpen.value = false
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

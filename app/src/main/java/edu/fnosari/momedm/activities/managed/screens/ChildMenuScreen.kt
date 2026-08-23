@@ -2,6 +2,7 @@ package edu.fnosari.momedm.activities.managed.screens
 
 import android.content.Intent
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,6 +56,11 @@ fun ChildMenuScreen(vm: ManagedViewModel, onPause: () -> Unit) {
     val controllerId by vm.controllerId.collectAsState()
     val pauseLeft by vm.pauseRemainingMs.collectAsState()
     val version = remember { getAppVersion(context)?.versionName ?: "?" }
+
+    // Back closes the menu. Without this the gesture falls through to a launcher that deliberately
+    // ignores it, so the only way out is the Close button at the very bottom of a long scroll — and
+    // a parent who scrolled past it is stuck on a screen with no visible exit.
+    BackHandler { vm.menuOpen.value = false }
 
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).padding(16.dp).verticalScroll(rememberScrollState()),
