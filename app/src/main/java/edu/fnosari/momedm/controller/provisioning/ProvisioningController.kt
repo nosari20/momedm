@@ -43,7 +43,23 @@ class ProvisioningController(private val context: Context, private val prefs: Co
 
     init { scope.launch { _state.value = State(prefs.wifiMode.first(), prefs.manualSsid.first(), prefs.manualPassword.first(), prefs.customUrl.first()) } }
 
-    fun setMode(mode: String) { _state.update { it.copy(mode = mode) }; persist() }
+    fun setMode(mode: String) { _state.update { it.copy(mode = mode) }; persist(); invalidate() }
+
+    /**
+     * Throws away a code that no longer matches the settings on screen, and tears down whatever was
+     * serving it.
+     *
+     * A QR encodes the Wi-Fi credentials and download URL of the mode it was built for, so leaving it
+     * on screen after the parent switches mode invites them to scan a code that points the child at
+     * the wrong network — and a hotspot started for the previous mode would stay up as well. Cheap to
+     * regenerate, so discard rather than try to patch it.
+     */
+    private fun invalidate() {
+        val s = _state.value
+        if (s.qrPayload == null && !s.serverRunning && s.hotspotSsid.isBlank()) return
+        Log.d(LOG_TAG, "Pairing settings changed; discarding the generated code")
+        stop()
+    }
 
     /**
      * Fills the Shared Wi-Fi name with the network this phone is currently joined to, when the parent
@@ -58,8 +74,8 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         Log.d(LOG_TAG, "Pre-filled the Wi-Fi name from the current connection")
         setManual(ssid, s.password)
     }
-    fun setManual(ssid: String, pass: String) { _state.update { it.copy(ssid = ssid, password = pass) }; persist() }
-    fun setCustomUrl(url: String) { _state.update { it.copy(customUrl = url) }; persist() }
+    fun setManual(ssid: String, pass: String) { _state.update { it.copy(ssid = ssid, password = pass) }; persist(); invalidate() }
+    fun setCustomUrl(url: String) { _state.update { it.copy(customUrl = url) }; persist(); invalidate() }
     /** Persists only the user's manual Wi-Fi choice — never the transient hotspot credentials. */
     private fun persist() = scope.launch { val s = _state.value; prefs.setWifi(s.mode, s.ssid, s.password, s.customUrl) }
 
