@@ -15,6 +15,12 @@ roles selected automatically at launch (`DevicePolicyManager.isDeviceOwnerApp`):
 There is no role picker and no cloud/Play EMM involved — the transport is BLE
 only.
 
+The app is fully localized in **French and English**; the parent picks
+language, light/dark theme, and an accent colour under **Settings →
+Appearance & language**, and every choice pushes to connected children live
+(`SET_PREFS`) — a child device always shows its parent's chosen look, not its
+own setting.
+
 ## Architecture
 
 ```

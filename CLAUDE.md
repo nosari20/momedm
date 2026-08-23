@@ -113,11 +113,20 @@ app/src/main/java/edu/fnosari/momedm/
 │   │   │                          #   (masked numeric PIN, lockout countdown)
 │   │   └── provisioning/          #   GetProvisioningModeActivity, PolicyComplianceActivity (setup wizard steps)
 │   └── settings/                  # SettingsActivity (copied), navigation/Routes, screens/{SettingsCategories,
-│                                  #   SettingsScreen, SettingsEasterEgg, SettingsControllerScreen}, components/
+│                                  #   SettingsScreen, SettingsEasterEgg, SettingsAppearanceScreen (language/theme/
+│                                  #   accent pickers), SettingsPinScreen (parent PIN, own screen), SettingsAdvancedScreen
+│                                  #   (parent id + pairing-key fingerprint + regenerate)}, components/ColorDialogs.kt
+│                                  #   (AccentDialog preset grid + CustomColorDialog hex/HSV picker)
 │
 ├── ui/{layouts,theme}/            # Layout.BasicLayoutWithTopBarAndDrawer, BasicLayoutWithTopBar, MomeDMTheme (copied)
+│   ├── theme/Palette.kt           #   Seed-accent maths (blend/lighten/darken, WCAG luminance, hex parse) — pure
+│   │                              #   Kotlin, unit-tested, usable outside Compose (e.g. MainActivity system bars)
+│   └── common/Pronote.kt          #   stripeEdge, AccentPill, SectionLabel, pronoteTopBarColors — shared Pronote-
+│                                  #   style Compose bits used by both roles' screens
 ├── ui/components/ButtonRequestPermission.kt  # Permission-gate button used by activity onCreate flows
 ├── ui/AppLocale.kt                # Applies a ChildPrefs language override (per-app locale) at runtime
+├── ui/UiPrefsState.kt             # UiPrefs(language,theme,accent) + ControllerPrefs/ManagedPrefs.uiPrefs(),
+│                                  #   SystemBars, ControllerThemed/ManagedThemed (theme wrapper per role)
 └── utils/AppVersion.kt            # Copied
 
 app/src/test/java/edu/fnosari/momedm/
@@ -245,10 +254,20 @@ screens.
   `RESULT`s on the process-wide `ControllerLink.results`, so
   `ControllerViewModel` announces only results whose `cmdId` it sent itself —
   otherwise the parent gets a snackbar every time a child reconnects.
-- **`ChildPrefs.theme` and `accent` are stored on the child but drive
-  nothing yet** — only `language` is applied (through `ui/AppLocale`). The
-  other two are wired end to end (controller settings → `SET_PREFS` →
-  `ManagedPrefs`) and wait for the Plan 2 launcher redesign to be honoured.
+- **Both roles are themed from the same `UiPrefs(language, theme, accent)`
+  shape** (`ui/UiPrefsState.kt`), just sourced differently: the parent's
+  `ControllerThemed` reads live from `ControllerPrefs.{language,theme,accent}`;
+  the child's `ManagedThemed` reads from the pushed `ManagedPrefs.childPrefs`
+  (i.e. whatever the parent last sent via `SET_PREFS`). `MomeDMTheme(darkTheme,
+  seed)` recolours the Material scheme around `seed` (an ARGB int, `Palette.
+  primaryFor`/`withSeed`); `theme` resolves through `isDarkTheme(pref,
+  systemDark)` (`THEME_SYSTEM`/`LIGHT`/`DARK`); only `language` goes through
+  `ui/AppLocale` separately (per-app locale, not part of `MomeDMTheme`). A
+  parent-side change immediately emits `ControllerLink.prefsChanged` → pushes
+  `SET_PREFS` → the child's `ManagedThemed`/`AppLocale` pick it up live via the
+  DataStore flow, no recreate needed on API 34's `LocaleManager` path.
+  `Palette.DEFAULT == ChildPrefs.DEFAULT_ACCENT == 0xFF16866F` (both roles
+  default to the same green before any parent customization).
 - **`ManagedHomeActivity` is a launcher for both modes**: with child mode
   off it shows every launchable app (`ChildLauncherScreen`, header "All
   apps"); with child mode on it shows only the allowed apps (header "Child
@@ -289,6 +308,16 @@ screens.
 - **Hotspot IP selection** prefers an interface address ending in `.1` (the
   local-only-hotspot gateway convention), polling briefly for it to appear
   rather than failing immediately if the interface isn't up yet.
+- **A newer Compose-foundation overload can compile clean and still crash at
+  runtime** against the pinned BOM (2024.09.00). Found on the emulator:
+  `AccentDialog` used `androidx.compose.foundation.layout.FlowRow` (carried
+  over from MaClasse) and threw `NoSuchMethodError` the first time the dialog
+  opened, despite building without error — the artifact on the classpath at
+  runtime didn't have the symbol the compiled call site expected. Fixed by
+  dropping `FlowRow` for a plain `list.chunked(n)` → `Column`/`Row` grid
+  (commit `d794a09`). When adding a layout composable, prefer the well-worn
+  `Column`/`Row`/`LazyColumn` primitives over newer `foundation.layout`
+  additions unless you've exercised them on-device against this BOM.
 
 ## House rules for changes
 
@@ -303,3 +332,18 @@ screens.
 - BLE/DPM behavior can't be verified in CI; use the two-emulator rig in
   `docs/testing.md` (or real devices) and say which you used. Update
   `docs/testing.md` if a change alters the manual checklist.
+- **`values/strings.xml` (EN) and `values-fr/strings.xml` (FR) change
+  together, in the same commit** (MaClasse's rule) — add/remove/rename a key
+  in both files, never just one. `edu.fnosari.momedm.res.StringsParityTest`
+  (a plain JVM test, runs with the rest of `testDebugUnitTest`) parses both
+  files and fails the build if the key sets ever diverge; run it directly
+  with `./gradlew :app:testDebugUnitTest --tests "edu.fnosari.momedm.res.*"`
+  after touching either file.
+- **No kiosk/provision/MDM/GATT jargon in parent-facing strings.** The parent
+  UI speaks in plain-language child/device vocabulary, not device-management
+  terms: "My children"/"Mes enfants" (not "Devices"), "Child mode"/"Mode
+  enfant" (not "Kiosk"), "Allowed apps"/"Apps autorisées" (not "Lock task
+  allowlist"), "Pair a device"/"Associer un appareil" (not "Provision"),
+  "Visible to children"/"Visible par les enfants" (not "Advertising"). Code
+  identifiers (`KioskConfig`, `ControllerLink`, GATT UUIDs, etc.) keep the
+  precise technical names — only user-facing strings get de-jargoned.

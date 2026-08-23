@@ -105,3 +105,43 @@ launcher instead of `ManagedHomeActivity` — expected, since only the real
 provisioning flow (or QR/SUW) sets the persistent-preferred-HOME activity;
 while child mode is *on*, lock task itself keeps Home inside our launcher/pinned
 app regardless.
+
+## F. Localization & theming
+
+Verified on the emulator rig 2026-08-23 (same two-AVD rig as section E:
+controller = emulator-5554, managed = emulator-5556, both API 35). Both
+locale files (`res/values/strings.xml`, `res/values-fr/strings.xml`) must
+keep an identical key set at all times — enforced by the JVM test
+`edu.fnosari.momedm.res.StringsParityTest`, which parses both files and
+diffs the key sets; run it with `./gradlew :app:testDebugUnitTest --tests
+"edu.fnosari.momedm.res.*"` after touching either file.
+
+- [x] Parent Settings → Appearance & language → **Français** → parent UI
+  switches to French immediately (drawer "Mes enfants", "Associer un
+  appareil", "Réglages"); the child receives `SET_PREFS` and its launcher
+  header/labels switch to French, logcat `PolicyManager: Prefs applied
+  (lang=fr…)`. — **PASS**.
+- [x] Theme → **Sombre** → both parent and child render dark
+  (`MomeDMTheme(darkTheme = true, …)` on both roles). — **PASS**.
+- [x] App colour → pick a preset (blue) and then a custom colour via the
+  hex/HSV dialog → parent top bar + primary buttons recolour immediately;
+  child launcher header recolours after the `SET_PREFS` push
+  (`ManagedThemed` reads the pushed `ChildPrefs.accent`). — **PASS**, after
+  the `AccentDialog` fix below.
+- [x] Back to **English** + **System** theme + default green accent
+  (`Palette.DEFAULT`) → child follows on next push. — **PASS**.
+- [x] Parent PIN set/change/remove still works from its own *Parent PIN*
+  settings screen (moved off the Advanced/Controller screen); child PIN pad
+  shows French labels while the child is set to FR. — **PASS**.
+- [x] Full child-mode flow (multi-app allow-list, pin one app, PIN pause) on
+  the redesigned French device page — same behavior as section E, French
+  strings throughout, no missing keys. — **PASS**.
+
+**Crash found and fixed on the rig:** the accent picker (`AccentDialog` in
+`activities/settings/components/ColorDialogs.kt`), carried over from
+MaClasse, used `androidx.compose.foundation.layout.FlowRow` to lay out the
+colour swatches. On this project's pinned Compose BOM (2024.09.00) that threw
+`NoSuchMethodError` at runtime on first open, even though it compiled cleanly
+— caught during this emulator pass and fixed by replacing `FlowRow` with a
+plain `Palette.PRESETS.chunked(4)` → `Column`/`Row` grid (commit `d794a09`).
+See the matching gotcha in `CLAUDE.md`.
