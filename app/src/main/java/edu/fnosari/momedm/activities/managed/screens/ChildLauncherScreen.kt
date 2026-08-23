@@ -58,11 +58,11 @@ import java.util.Locale
  * A soft accent gradient behind a calm header (big clock + time-of-day greeting + a small connection dot)
  * and a grid of big rounded app tiles (allowed apps while child mode is on, all apps otherwise). No MDM
  * jargon, no battery %, no visible lock button: a long-press on the header opens the parent [PinDialog]
- * (only when child mode is on and a PIN exists). [onUnlocked] is called after a correct PIN; the hosting
- * Activity releases the lock task.
+ * (only when child mode is on and a PIN exists). A correct PIN opens the parent menu; lock task is
+ * released only when the parent actually pauses child mode from there.
  */
 @Composable
-fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
+fun ChildLauncherScreen(vm: ManagedViewModel) {
     val apps by vm.launcherApps.collectAsState()
     val loadedConfig by vm.kioskConfig.collectAsState()
     val link by vm.linkState.collectAsState()
@@ -119,12 +119,24 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
                         // re-pairing — otherwise the gesture is simply dead, and a family that never
                         // set a PIN would have no way to re-pair a child device at all, which is
                         // exactly the situation a lost or replaced parent phone creates.
+                        // onPress holds the pinned-app bounce off for as long as the finger is down, so
+                        // the long-press can be completed at leisure instead of raced against a grace period.
                         if (canUnlock) Modifier
                             .semantics { contentDescription = headerA11y }
-                            .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = { vm.headerPressed.value = true; tryAwaitRelease(); vm.headerPressed.value = false },
+                                    onLongPress = { vm.pinDialogOpen.value = true },
+                                )
+                            }
                         else if (config.on) Modifier
                             .semantics { contentDescription = headerA11y }
-                            .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.menuOpen.value = true }) }
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onPress = { vm.headerPressed.value = true; tryAwaitRelease(); vm.headerPressed.value = false },
+                                    onLongPress = { vm.menuOpen.value = true },
+                                )
+                            }
                         else Modifier,
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp),
@@ -188,7 +200,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
 
     if (showPin) PinDialog(
         onDismiss = { vm.pinDialogOpen.value = false; vm.clearPinError() },
-        onSubmit = { pin -> vm.tryPin(pin) { vm.pinDialogOpen.value = false; onUnlocked() } },
+        onSubmit = { pin -> vm.tryPin(pin) },
         error = pinError,
         lockedForMs = pinLockedRemaining,
     )

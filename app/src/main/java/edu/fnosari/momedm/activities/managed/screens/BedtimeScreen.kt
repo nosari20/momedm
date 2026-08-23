@@ -43,7 +43,7 @@ import java.util.Locale
  * a PIN is set) — the same hidden affordance as the day launcher, so a child cannot find it by sight.
  */
 @Composable
-fun BedtimeScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
+fun BedtimeScreen(vm: ManagedViewModel) {
     val lock by vm.lockState.collectAsState()
     val pinSet by vm.pinSet.collectAsState()
     val pinError by vm.pinError.collectAsState()
@@ -114,7 +114,7 @@ fun BedtimeScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
 
     if (showPin) PinDialog(
         onDismiss = { vm.pinDialogOpen.value = false; vm.clearPinError() },
-        onSubmit = { pin -> vm.tryPin(pin) { vm.pinDialogOpen.value = false; onUnlocked() } },
+        onSubmit = { pin -> vm.tryPin(pin) },
         error = pinError,
         lockedForMs = pinLockedRemaining,
     )

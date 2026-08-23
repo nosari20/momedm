@@ -64,6 +64,15 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
      */
     val menuOpen = MutableStateFlow(false)
 
+    /**
+     * True while a finger is down on the launcher header.
+     *
+     * The pinned-app bounce waits for this to clear. Without it the parent had to complete a
+     * long-press inside the bounce's grace period — the gesture alone takes most of it — so with an
+     * app pinned the parent menu was, in practice, unreachable.
+     */
+    val headerPressed = MutableStateFlow(false)
+
     /** Everything the menu shows, read locally so it still works with no parent in range. */
     val controllerId: StateFlow<String> = prefs.controllerId.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val lockSchedule: StateFlow<LockSchedule> = prefs.lockSchedule.stateIn(viewModelScope, SharingStarted.Eagerly, LockSchedule())
@@ -187,12 +196,18 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Verifies [pin]; on success starts a pause and calls [onSuccess] (the Activity then releases
-     * lock task). The failure counter and lockout deadline are persisted on every transition so the
-     * backoff cannot be reset by killing the launcher. Neither the clear PIN nor its hash is stored
-     * or logged here.
+     * Verifies [pin]; on success closes the dialog and opens the parent menu.
+     *
+     * It deliberately does NOT release lock task. Releasing it here — which both callers used to do —
+     * left the device unlocked with no pause recorded, so the next `reevaluate()` re-applied the kiosk
+     * and relaunched this Activity with CLEAR_TASK, taking the ViewModel and the just-opened menu with
+     * it. The menu appeared and vanished, which with an app pinned made the parent menu unreachable.
+     * Lock task is released by [pauseFromMenu], after a pause deadline has actually been persisted.
+     *
+     * The failure counter and lockout deadline are persisted on every transition so the backoff cannot
+     * be reset by killing the launcher. Neither the clear PIN nor its hash is stored or logged here.
      */
-    fun tryPin(pin: String, onSuccess: () -> Unit) { viewModelScope.launch {
+    fun tryPin(pin: String) { viewModelScope.launch {
         if (System.currentTimeMillis() < pinLockDeadline) return@launch
         if (policy.verifyPin(pin)) {
             pinFailures = 0; _pinError.value = null; pinLockDeadline = 0L; pinLockJob?.cancel(); _pinLockedRemaining.value = 0L
@@ -201,8 +216,8 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
             // proved themselves is usually here to look at something, and pausing is one tap away
             // inside it. The pause itself still happens through [pauseFromMenu], which is what
             // releases lock task.
+            pinDialogOpen.value = false
             menuOpen.value = true
-            onSuccess()
         } else {
             pinFailures++
             val lock = (PIN_LOCK_BASE_MS shl (pinFailures - 1).coerceAtMost(5)).coerceAtMost(PIN_LOCK_MAX_MS)

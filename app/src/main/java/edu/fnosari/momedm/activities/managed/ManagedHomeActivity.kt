@@ -48,6 +48,7 @@ class ManagedHomeActivity : ComponentActivity() {
         private const val LOG_TAG = "ManagedHomeActivity"
         /** Grace period before bouncing into the pinned app, so a parent can tap the launcher's lock icon first. */
         private const val PINNED_BOUNCE_DELAY_MS = 1_500L
+
     }
 
     /**
@@ -63,6 +64,7 @@ class ManagedHomeActivity : ComponentActivity() {
             ViewModelProvider(this)[ManagedViewModel::class.java].menuOpen.value = false
         }
     }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,12 +93,20 @@ class ManagedHomeActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         combine(vm.kioskConfig, vm.resumeTick) { c, _ -> c }.filterNotNull().collect { c ->
                             val now = System.currentTimeMillis()
-                            if (vm.lockState.value?.locked != true && c.isLocked(now) && c.pinned != null && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            if (vm.lockState.value?.locked != true && c.isLocked(now) && c.pinned != null &&
+                                !vm.menuOpen.value && !vm.pinDialogOpen.value && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
                                 delay(PINNED_BOUNCE_DELAY_MS)
+                                // A finger on the header means someone is starting the long-press that
+                                // opens the parent menu. Waiting it out costs the child nothing — they
+                                // are held on the launcher, not let out of it — and it is what makes the
+                                // menu reachable at all when an app is pinned.
+                                while (vm.headerPressed.value) delay(200L)
                                 // RESUMED is re-checked after the grace period too: the child may have opened
                                 // another allowed app while we waited, and bouncing from a launcher that is no
-                                // longer in front would yank them straight back out of it.
-                                if (vm.lockState.value?.locked != true && !vm.pinDialogOpen.value && vm.kioskConfig.value?.isLocked(System.currentTimeMillis()) == true &&
+                                // longer in front would yank them straight back out of it. The menu is checked
+                                // for the same reason — a parent reading it must not be thrown out of it.
+                                if (vm.lockState.value?.locked != true && !vm.pinDialogOpen.value && !vm.menuOpen.value &&
+                                    vm.kioskConfig.value?.isLocked(System.currentTimeMillis()) == true &&
                                     lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) vm.open(c.pinned)
                             }
                         }
@@ -116,8 +126,8 @@ class ManagedHomeActivity : ComponentActivity() {
                         // it has to call stopLockTask(), which only the Activity holding the lock task
                         // can do.
                         menuOpen -> ChildMenuScreen(vm, onPause = { vm.pauseFromMenu(onUnlocked) })
-                        lock?.locked == true -> BedtimeScreen(vm, onUnlocked)
-                        else -> ChildLauncherScreen(vm, onUnlocked)
+                        lock?.locked == true -> BedtimeScreen(vm)
+                        else -> ChildLauncherScreen(vm)
                     }
                 }
             }
