@@ -171,8 +171,8 @@
     <string name="child_locked_until">Locked until %1$s</string>
     <string name="child_locked_manual">Locked by you</string>
     <string name="child_unlocked">Unlocked</string>
-    <string name="child_install">Install an app (Play Store)</string>
-    <string name="child_install_hint">App name (e.g. org.mozilla.firefox)</string>
+    <string name="child_install">Find it on the Play Store</string>
+    <string name="child_install_hint">App name, or package id</string>
     <string name="child_add_account">Add a Google account</string>
     <string name="child_refresh">Refresh</string>
     <string name="child_rename">Rename</string>

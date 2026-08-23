@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS, SET_SCHEDULE, LOCK_NOW, UNLOCK }
+enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS, SET_SCHEDULE, LOCK_NOW, UNLOCK, SEARCH_APP }
 
 @Serializable
 data class AppInfo(val pkg: String, val label: String)

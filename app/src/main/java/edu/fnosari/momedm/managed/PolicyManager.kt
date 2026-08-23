@@ -251,14 +251,27 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * launches Play pinned to the screen on a device the user is otherwise free to navigate, trapping
      * them in the Play listing with no way back.
      */
-    override suspend fun openPlay(pkg: String): Result<Unit> {
+    override suspend fun openPlay(pkg: String): Result<Unit> =
+        openPlayUri("market://details?id=${Uri.encode(pkg)}", "listing for $pkg")
+
+    /**
+     * Opens Play's *search results* for [term] rather than a specific listing.
+     *
+     * There is no public Play catalogue API, so the parent cannot be shown results inside this app.
+     * Handing the search to the child's own Play Store is the honest alternative, and it removes the
+     * real friction: the parent types "Firefox" instead of having to know `org.mozilla.firefox`.
+     */
+    override suspend fun openPlaySearch(term: String): Result<Unit> =
+        openPlayUri("market://search?q=${Uri.encode(term)}&c=apps", "search for \"$term\"")
+
+    private suspend fun openPlayUri(uri: String, what: String): Result<Unit> {
         val locked = prefs.kioskConfig.first().isLocked(System.currentTimeMillis())
         return runCatching {
-            val i = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")).setPackage(PLAY_PKG).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val i = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).setPackage(PLAY_PKG).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (i.resolveActivity(context.packageManager) == null) throw IllegalStateException("Play Store not available")
             if (locked) context.startActivity(i, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
             else context.startActivity(i)
-            Log.d(LOG_TAG, "Opened Play for $pkg (locked=$locked)")
+            Log.d(LOG_TAG, "Opened Play $what (locked=$locked)")
         }
     }
 

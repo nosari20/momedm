@@ -171,8 +171,8 @@
     <string name="child_locked_until">Verrouillé jusqu\'à %1$s</string>
     <string name="child_locked_manual">Verrouillé par vous</string>
     <string name="child_unlocked">Déverrouillé</string>
-    <string name="child_install">Installer une app (Play Store)</string>
-    <string name="child_install_hint">Nom de l\'app (ex. org.mozilla.firefox)</string>
+    <string name="child_install">Chercher sur le Play Store</string>
+    <string name="child_install_hint">Nom de l\'app, ou identifiant</string>
     <string name="child_add_account">Ajouter un compte Google</string>
     <string name="child_refresh">Actualiser</string>
     <string name="child_rename">Renommer</string>

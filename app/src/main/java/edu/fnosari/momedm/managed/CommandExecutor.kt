@@ -12,6 +12,8 @@ interface PolicyActions {
     suspend fun kioskOn(apps: List<String>, pinned: String?): Result<List<String>>
     suspend fun kioskOff(): Result<Unit>
     suspend fun openPlay(pkg: String): Result<Unit>
+    /** Opens Play's search results for a plain-language app name (no package id needed). */
+    suspend fun openPlaySearch(term: String): Result<Unit>
     suspend fun openAddAccount(): Result<Unit>
     /** Stores and applies parent-pushed preferences (language, theme, accent, PIN). */
     suspend fun applyPrefs(prefs: ChildPrefs): Result<Unit>
@@ -42,6 +44,11 @@ class CommandExecutor(private val policy: PolicyActions, private val status: Sta
             }
             CmdType.KIOSK_OFF -> { val r = policy.kioskOff(); if (r.isSuccess) listOf(res(r, "kiosk off"), status.collect()) else listOf(res(r, "")) }
             CmdType.INSTALL -> { val pkg = cmd.pkg ?: return listOf(Message.Result(cmd.id, false, "missing pkg")); listOf(res(policy.openPlay(pkg), "play opened for $pkg")) }
+            CmdType.SEARCH_APP -> {
+                val term = cmd.pkg?.trim().orEmpty()
+                if (term.isEmpty()) return listOf(Message.Result(cmd.id, false, "missing search term"))
+                listOf(res(policy.openPlaySearch(term), "play search opened"))
+            }
             CmdType.ADD_ACCOUNT -> listOf(res(policy.openAddAccount(), "account flow opened"))
             CmdType.LIST_APPS -> listOf(Message.Result(cmd.id, true, "apps"), Message.Apps(status.launchableApps()))
             CmdType.GET_STATUS -> listOf(Message.Result(cmd.id, true, "status"), status.collect())

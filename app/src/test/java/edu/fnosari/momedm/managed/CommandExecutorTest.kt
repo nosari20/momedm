@@ -21,6 +21,8 @@ class CommandExecutorTest {
         }
         override suspend fun kioskOff() = run { kiosk = null; pinned = null; Result.success(Unit) }
         override suspend fun openPlay(pkg: String) = run { played = pkg; Result.success(Unit) }
+        var searched: String? = null
+        override suspend fun openPlaySearch(term: String) = run { searched = term; Result.success(Unit) }
         override suspend fun openAddAccount() = if (kiosk != null) Result.failure(IllegalStateException("kiosk is on; turn it off first")) else run { accountOpened = true; Result.success(Unit) }
         override suspend fun applyPrefs(prefs: ChildPrefs) = run { this.prefs = prefs; Result.success(Unit) }
         var schedule: LockSchedule? = null; var manual: Boolean? = null
@@ -50,6 +52,23 @@ class CommandExecutorTest {
         val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("3", CmdType.KIOSK_ON))
         val r = out[0] as Message.Result; assertFalse(r.ok); assertEquals("no apps", r.msg)
     }
+    @Test fun searchAppOpensPlaySearch() = runTest {
+        val p = FakePolicy()
+        val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("30", CmdType.SEARCH_APP, pkg = "  Firefox  "))
+        assertEquals(Message.Result("30", true, "play search opened"), out[0])
+        assertEquals("Firefox", p.searched)   // trimmed before it reaches the policy
+        assertEquals(null, p.played)          // and never treated as a package id
+    }
+
+    @Test fun searchAppWithoutATermFails() = runTest {
+        val p = FakePolicy()
+        for (cmd in listOf(Message.Cmd("31", CmdType.SEARCH_APP), Message.Cmd("32", CmdType.SEARCH_APP, pkg = "   "))) {
+            val r = CommandExecutor(p, FakeStatus()).execute(cmd)[0] as Message.Result
+            assertFalse(r.ok); assertEquals("missing search term", r.msg)
+        }
+        assertEquals(null, p.searched)
+    }
+
     @Test fun setPrefs() = runTest {
         val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
         val out = ex.execute(Message.Cmd("11", CmdType.SET_PREFS, prefs = ChildPrefs(language = "fr", theme = "weird")))

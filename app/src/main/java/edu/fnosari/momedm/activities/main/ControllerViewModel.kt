@@ -29,6 +29,8 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         private const val LOG_TAG = "ControllerViewModel"
         /** Cap on in-flight command ids kept for result matching; see [announce]. */
         private const val MAX_PENDING = 64
+        /** Two or more dot-separated segments starting with a letter — the shape of an Android package id. */
+        private val PACKAGE_ID = Regex("""^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$""")
     }
 
     private val prefs = ControllerPrefs(DataStorePreferencesProvider(application))
@@ -116,7 +118,22 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     fun unlock(deviceId: String) { send(deviceId, CmdType.UNLOCK) }
 
     fun kioskOff(deviceId: String) { send(deviceId, CmdType.KIOSK_OFF) }
-    fun install(deviceId: String, pkg: String) { send(deviceId, CmdType.INSTALL, pkg) }
+    /**
+     * Asks the child's Play Store to open [query].
+     *
+     * A parent should not have to know package ids, so anything that does not *look* like one is
+     * treated as a name to search for. There is no public Play catalogue API, so the search happens
+     * on the child's own store rather than in this app.
+     */
+    fun install(deviceId: String, query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        send(deviceId, if (looksLikePackageId(q)) CmdType.INSTALL else CmdType.SEARCH_APP, q)
+    }
+
+    /** Dotted, no spaces, ASCII — e.g. `org.mozilla.firefox`. Anything else is a search term. */
+    private fun looksLikePackageId(s: String): Boolean =
+        PACKAGE_ID.matches(s)
     fun addAccount(deviceId: String) { send(deviceId, CmdType.ADD_ACCOUNT) }
     fun refresh(deviceId: String) { send(deviceId, CmdType.GET_STATUS) }
     fun requestApps(deviceId: String) {
