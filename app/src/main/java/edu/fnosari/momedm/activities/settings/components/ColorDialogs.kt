@@ -5,8 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -83,7 +81,6 @@ fun ChoiceDialog(
 }
 
 /** Grid of [Palette.PRESETS] swatches, with a checkmark on the current [current] colour and a "Custom…" escape hatch. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AccentDialog(
     current: Int,
@@ -95,25 +92,26 @@ fun AccentDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.accent_color)) },
         text = {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Palette.PRESETS.forEach { preset ->
-                    Box(
-                        Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color(preset))
-                            .clickable { onPick(preset) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (preset == current) {
-                            Icon(
-                                Icons.Default.Check,
-                                stringResource(R.string.accent_color),
-                                tint = Color(Palette.onColor(preset)),
-                            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Palette.PRESETS.chunked(4).forEach { rowItems ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        rowItems.forEach { preset ->
+                            Box(
+                                Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(preset))
+                                    .clickable { onPick(preset) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (preset == current) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        stringResource(R.string.accent_color),
+                                        tint = Color(Palette.onColor(preset)),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
