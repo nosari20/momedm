@@ -162,6 +162,15 @@
     <string name="child_start">Start child mode</string>
     <string name="child_stop">Stop child mode</string>
     <string name="child_relock">Lock again</string>
+    <string name="child_night_section">Night lock</string>
+    <string name="child_night_enable">Lock the phone at night</string>
+    <string name="child_night_school">School nights (Sun–Thu)</string>
+    <string name="child_night_weekend">Friday and Saturday nights</string>
+    <string name="child_lock_now">Lock now</string>
+    <string name="child_unlock">Unlock</string>
+    <string name="child_locked_until">Locked until %1$s</string>
+    <string name="child_locked_manual">Locked by you</string>
+    <string name="child_unlocked">Unlocked</string>
     <string name="child_install">Install an app (Play Store)</string>
     <string name="child_install_hint">App name (e.g. org.mozilla.firefox)</string>
     <string name="child_add_account">Add a Google account</string>

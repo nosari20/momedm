@@ -18,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +35,8 @@ import androidx.navigation.NavHostController
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.main.ControllerViewModel
 import edu.fnosari.momedm.activities.main.components.AppPickerDialog
+import edu.fnosari.momedm.activities.main.components.TimeRangeRow
+import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.ui.common.AccentPill
 import edu.fnosari.momedm.ui.common.SectionLabel
 import java.text.DateFormat
@@ -72,6 +75,35 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 if (s?.kioskPaused == true) Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                     Text(stringResource(R.string.child_paused_until, s.pauseEndsAt?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) } ?: "—"))
                 }
+            }
+        }
+        val schedule = s?.schedule ?: LockSchedule()
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(R.string.child_night_section))
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.child_night_enable), modifier = Modifier.weight(1f))
+                    Switch(checked = schedule.enabled, onCheckedChange = { viewModel.setSchedule(deviceId, schedule.copy(enabled = it)) })
+                }
+                TimeRangeRow(stringResource(R.string.child_night_school), schedule.weekdayStart, schedule.weekdayEnd) { st, en ->
+                    viewModel.setSchedule(deviceId, schedule.copy(weekdayStart = st, weekdayEnd = en))
+                }
+                TimeRangeRow(stringResource(R.string.child_night_weekend), schedule.weekendStart, schedule.weekendEnd) { st, en ->
+                    viewModel.setSchedule(deviceId, schedule.copy(weekendStart = st, weekendEnd = en))
+                }
+                Text(
+                    when {
+                        s?.lockReason == "manual" -> stringResource(R.string.child_locked_manual)
+                        s?.locked == true -> stringResource(R.string.child_locked_until,
+                            s.lockUntil?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) } ?: "—")
+                        else -> stringResource(R.string.child_unlocked)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(
+                    onClick = { if (s?.locked == true) viewModel.unlock(deviceId) else viewModel.lockNow(deviceId) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(if (s?.locked == true) R.string.child_unlock else R.string.child_lock_now)) }
             }
         }
         Button(onClick = { if (s?.kiosk == true) viewModel.kioskOff(deviceId) else viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
