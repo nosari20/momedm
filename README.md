@@ -206,6 +206,13 @@ link if you would rather host the APK yourself.
 that code carries the shared secret, so treat the real one as sensitive while it
 is on screen.*
 
+And the same thing again with the traffic drawn in, for anyone who wants to know
+what their phones are actually saying to each other:
+
+<div align="center">
+<img src="docs/images/enrolment-sequence.svg" width="760" alt="Enrolment in order: the parent's phone makes a pairing secret and serves the app over Wi-Fi; the child's phone scans the code, joins that Wi-Fi, downloads and verifies the app, installs as device owner and keeps the parent id and secret; from then on the two phones talk over Bluetooth, proving the secret both ways">
+</div>
+
 Afterwards the child's phone can be given a name of its own, and a Google account
 can be added to it from the parent's phone without leaving the launcher.
 

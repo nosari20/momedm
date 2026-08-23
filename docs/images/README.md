@@ -26,6 +26,7 @@ is fully bilingual and that contrast is intentional.
 | `child-parent-menu.png` | The parent menu on the child's phone: rules in force, the parent link, device facts, then Pause / Re-pair / Close. Reached by long-pressing the header and entering the PIN. |
 | `enrolment.svg` | Hand-drawn six-step enrolment walkthrough, written for a parent rather than an engineer — deliberately not a UML diagram. Hand-authored SVG: edit it directly, and keep the sketchy stroke and the handwriting font stack (it falls back to `cursive`, so the wobble in the geometry is what carries the look). |
 | `connectivity.svg` | Hand-drawn explanation of what Wi-Fi is for (once, to install) versus what Bluetooth is for (everything after), and that out of range changes nothing. Same style and same caveats as `enrolment.svg`. |
+| `enrolment-sequence.svg` | The same enrolment, drawn as a sequence: who says what to whom, in order, split into the Wi-Fi phase and the Bluetooth phase. Hand-drawn on purpose — it is a sequence diagram in shape only, not in notation. |
 
 ## Notes for re-capture
 
