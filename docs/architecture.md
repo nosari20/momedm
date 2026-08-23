@@ -73,9 +73,55 @@ services, DataStore).
 5. The app's provisioning wizard runs: **Add Google account** step, then
    **Grant usage access** step (both skippable), then the managed home screen
    is shown as device HOME.
+6. Before finishing, the child **grants itself** the runtime permissions it needs
+   to reach the parent (see below), and the link service starts scanning.
 
 See [`testing.md`](testing.md) for the full manual walkthrough on two physical
 devices.
+
+### Two platform requirements that fail silently
+
+Both of these produce a hang with no error on either screen, so they are worth
+knowing before debugging a pairing that "just doesn't work".
+
+**Local network access (parent, Android 16+).** Serving the APK to the child is
+local-network traffic, which newer Android gates behind the *dangerous* runtime
+permission `android.permission.ACCESS_LOCAL_NETWORK`. Without the grant the
+platform completes the TCP handshake and then discards the traffic: the socket
+accepts, the request never reaches `serve()`, and the download times out. The
+pairing screen asks for it in context and refuses to generate a code until it is
+granted. Note that a successful TCP connect proves nothing here — only that the
+kernel accepted into the listen backlog.
+
+**Runtime BLE permissions (child).** `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` and
+`POST_NOTIFICATIONS` are runtime permissions, and nobody will ever tap a
+permission dialog on a child's phone: it is handed to a child, the link service
+starts at boot with no one looking, and without `BLUETOOTH_SCAN` the client never
+starts scanning at all (`ERROR_BLUETOOTH_SCAN_PERMISSION_NOT_GRANTED`). From the
+parent that is indistinguishable from a failed pairing. Because the app is the
+device owner it grants its own, via
+`DevicePolicyManager.setPermissionGrantState` — at the end of provisioning and
+again on every service start, so a device enrolled by an older build heals itself
+rather than needing re-enrolment.
+
+### Which address the QR advertises
+
+In hotspot mode the phone has two `wlan*` interfaces — the network it is joined
+to and the access point it is hosting — and nothing in their names says which is
+which. Android's local-only hotspot also picks a *randomised* subnet and does not
+necessarily take the `.1` of it, so a "gateway address" heuristic finds nothing
+and plain interface-name ordering picks the client interface. The QR then tells
+the child to fetch the APK from an address that does not exist on the network it
+just joined.
+
+`NetUtils` therefore excludes the client Wi-Fi address, found via
+`ConnectivityManager` (which knows which network carries the Wi-Fi transport),
+and skips 464XLAT clat addresses (`192.0.0.0/29`) that appear alongside mobile
+data. Verified on a real pair: parent AP `10.47.248.185`, child joined at
+`10.47.248.127`, 32 MB APK served over the hotspot.
+
+Changing the mode, network or URL discards any code already on screen and tears
+down the server, so a stale QR encoding the previous settings cannot be scanned.
 
 ## Commands
 
@@ -88,10 +134,16 @@ devices.
 | `ADD_ACCOUNT` | Open system "Add Google account" flow |
 | `LIST_APPS` | Reply with installed launchable apps |
 | `GET_STATUS` | Reply with status |
+| `SET_SCHEDULE {schedule}` | Push the nightly complete-lock window (weekday + weekend); sanitized on receipt, then the lock is re-evaluated immediately |
+| `LOCK_NOW` | Lock the device completely, right now, until the parent unlocks |
+| `UNLOCK` | Clear a manual lock (a *night* window keeps its own schedule — see below) |
 
-Out of scope v1: lock/reboot/wipe, user restrictions, APK streaming over BLE,
-sideload URL, silent Play install (requires registered EMM — not available to
-a custom DPC).
+`Status` carries `locked`, `lockReason` (`night` / `manual` / null), `lockUntil`
+and the child's current `schedule`, so the parent can render real values after a
+restart rather than guessing.
+
+Out of scope: reboot/wipe, user restrictions, APK streaming over BLE, silent
+Play install (requires a registered EMM — not available to a custom DPC).
 
 ### Child mode
 
@@ -111,6 +163,44 @@ with *Lock again*, or a wrong PIN triggers a growing lockout. The pause does
 on boot. The PIN itself is hashed (PBKDF2) on the controller before it's
 sent — the managed device only ever stores/compares the hash, never the
 plaintext PIN.
+
+### Complete lock (night schedule and manual)
+
+Separate from child mode and independent of it: a child device can be locked
+**completely** on a nightly schedule, or on the parent's command. While locked it
+shows a bedtime screen with no apps at all, and only this app is launchable.
+
+The design property that matters: **lock state is never persisted.** It is a pure
+function of `(schedule, manualLock, pauseUntil, now)`, recomputed by
+`LockController.reevaluate()` at every trigger — an alarm, boot, a clock or
+timezone change, the launcher resuming, a PIN pause ending, and each of the three
+commands. Alarms only *wake* the device to re-evaluate; they never set state. A
+missed, stale or duplicated alarm is therefore harmless, and no stored flag can
+survive a reboot or a clock change to strand the device in the wrong state.
+
+`LockSchedule` (in `protocol/`, pure Kotlin, `java.time` only) holds the window
+arithmetic and is unit-tested without Android:
+
+- a window **wraps midnight** when start > end (21:00 → 07:00); start < end is a
+  legal same-day window;
+- a night **belongs to the day it starts**, so windows starting Friday or Saturday
+  use the weekend times and Sunday–Thursday use the weekday times;
+- `start == end` disables that day type rather than locking for 24 hours.
+
+`LockController` is the **single authority**: it is the only component that knows
+a complete lock outranks ordinary child mode. Every path that restores or applies
+lock-task policy goes through it — boot, the service's pause watchdog, the
+launcher's pause tracking, and `KIOSK_ON`/`KIOSK_OFF`. Two production defects came
+from paths that bypassed it and silently downgraded a complete lock to the
+child-mode allowlist while the bedtime screen still claimed the device was locked;
+both are covered by `LockControllerTest`.
+
+A correct parent PIN pauses a complete lock exactly as it pauses child mode (10
+minutes, then it re-locks if the window is still open). `lockComplete()` sets
+`LOCK_TASK_FEATURE_GLOBAL_ACTIONS` alongside `SYSTEM_INFO`, unlike `kioskOn`,
+so the power menu — and through it the system emergency dialer — stays reachable
+on a locked device. That path is **unverified on real hardware**; see the README's
+limitations.
 
 ## Security
 
@@ -160,10 +250,13 @@ treat the QR screen as sensitive while it's on screen.
 ./gradlew :app:testDebugUnitTest # JVM unit tests (protocol, controller, persistence, managed)
 ```
 
-BLE and device-owner behavior can be exercised between two API 33+ emulators
+BLE and device-owner behaviour can be exercised between two API 34+ emulators
 (emulated Bluetooth) — see the "Emulator test rig" section of
-[`testing.md`](testing.md); the QR/Setup-Wizard provisioning path and the hotspot need
-real devices.
+[`testing.md`](testing.md). What the rig cannot cover, and must be checked on real
+hardware: the QR/Setup-Wizard provisioning path, the hotspot, the Android 16+
+local-network permission, and the power-menu emergency path under lock task (on
+the API 35 image, long-press power opens Assistant rather than the classic power
+menu, so the check is inconclusive there).
 
 ## Known limitations
 
@@ -181,4 +274,16 @@ real devices.
   LAN) or Custom URL (self-hosted https) mode if the QR fails to provision.
 - Hotspot mode has no internet — only useful for the APK download step; any
   step requiring internet (e.g. Play Store operations) needs the managed
-  device back on real Wi-Fi/mobile data afterward.
+  device back on real Wi-Fi/mobile data afterward. Some OEMs (Samsung among
+  them) prompt "this network has no internet" when joining, and the parent has
+  to accept it during enrolment.
+- Emergency calling under a complete lock is **unverified**. `lockComplete()`
+  keeps `LOCK_TASK_FEATURE_GLOBAL_ACTIONS` enabled so the power menu — and the
+  system emergency dialer through it — stays reachable, but this could not be
+  confirmed on the emulator images used so far and still needs a real handset.
+- A night lock cannot currently be ended remotely: only the parent PIN on the
+  child's device, or waiting for the window to close. The parent's Unlock button
+  is shown only for a manual lock, so it never silently does nothing.
+- Some shell tooling is unavailable on OEM builds when testing: Samsung blocks
+  `cmd wifi connect-network` for the shell user, so joining a test hotspot has to
+  be driven through the Wi-Fi UI.
