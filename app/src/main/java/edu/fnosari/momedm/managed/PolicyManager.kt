@@ -131,8 +131,12 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
 
     /**
      * Starts a parent-PIN pause: persists the deadline; the launcher Activity releases lock task itself.
-     * Returns pauseUntil, or 0L (no-op) when neither child mode nor a complete lock is active — there
-     * is nothing to pause.
+     * Also runs [LockController.reevaluate], which — because the pause deadline is now in the future —
+     * only arms an alarm for it and pushes status; it does not touch lock/kiosk state (see
+     * [LockController]). That alarm is what re-locks the device if this process dies mid-pause:
+     * [ManagedLinkService.startPauseWatchdog] cannot cover that case on its own because it only runs
+     * while child mode is on, and a night lock can be active with child mode off. Returns pauseUntil,
+     * or 0L (no-op) when neither child mode nor a complete lock is active — there is nothing to pause.
      */
     suspend fun pause(nowMs: Long = System.currentTimeMillis()): Long {
         val kioskOn = prefs.kioskConfig.first().on
@@ -140,7 +144,7 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         if (!kioskOn && !lockOn) return 0L
         val until = nowMs + KioskConfig.PAUSE_MS
         prefs.setPauseUntil(until); Log.d(LOG_TAG, "Paused until $until")
-        ManagedLinkState.statusPushRequests.tryEmit(Unit)
+        LockController(context, prefs, this).reevaluate()
         return until
     }
 
@@ -197,18 +201,17 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         Result.success(Unit)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
-    // Task 6 adds the LockController.reevaluate() call to both, once that class exists. Until then a
-    // schedule/manual-lock change takes effect at the next trigger rather than instantly, which is
-    // correct but slower.
     override suspend fun setSchedule(schedule: LockSchedule): Result<Unit> = try {
         prefs.setLockSchedule(schedule)
         Log.d(LOG_TAG, "Lock schedule set (enabled=${schedule.enabled})")
+        LockController(context, prefs, this).reevaluate()
         Result.success(Unit)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
     override suspend fun setManualLock(on: Boolean): Result<Unit> = try {
         prefs.setManualLock(on)
         Log.d(LOG_TAG, "Manual lock = $on")
+        LockController(context, prefs, this).reevaluate()
         Result.success(Unit)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 

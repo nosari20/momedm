@@ -8,15 +8,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-/** On boot of a managed device: restart the BLE link service (which also restores kiosk), and re-evaluate the lock. */
-class BootReceiver : BroadcastReceiver() {
-    companion object { private const val LOG_TAG = "BootReceiver" }
+/**
+ * Re-evaluates the lock when the clock or the timezone moves. Without this, a child who changes the
+ * device clock would shift the bedtime window, and every armed alarm would be pointing at the wrong
+ * instant.
+ */
+class TimeChangeReceiver : BroadcastReceiver() {
+    companion object { private const val LOG_TAG = "TimeChangeReceiver" }
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        if (!PolicyManager(context, ManagedSetup.prefs(context)).isDeviceOwner) { Log.d(LOG_TAG, "Not device owner; ignoring boot"); return }
-        Log.d(LOG_TAG, "Boot completed; starting link service")
-        ManagedLinkService.start(context, fromBoot = true)
-
+        if (intent.action != Intent.ACTION_TIME_CHANGED && intent.action != Intent.ACTION_TIMEZONE_CHANGED) return
+        Log.d(LOG_TAG, "Clock changed (${intent.action}); re-evaluating lock")
         val pending = goAsync()
         val app = context.applicationContext
         CoroutineScope(Dispatchers.Default).launch {
