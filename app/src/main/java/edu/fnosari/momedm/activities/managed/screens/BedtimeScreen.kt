@@ -66,16 +66,22 @@ fun BedtimeScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface)))
-            .then(
+            .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface))),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Long-press is scoped to the clock/title column (spec §1.7: "long-press the header"), not the
+        // whole screen — matching ChildLauncherScreen's header-only affordance. A child with no app
+        // tiles to touch on this screen would otherwise find the hidden gesture on literally any tap.
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.then(
                 if (pinSet) Modifier
                     .semantics { contentDescription = a11y }
                     .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
                 else Modifier,
             ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ) {
             Text(clock, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.bedtime_title), style = MaterialTheme.typography.headlineSmall)
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
