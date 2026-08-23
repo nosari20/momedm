@@ -242,4 +242,5 @@
     <string name="conn_event_advertising">Visibilité modifiée</string>
     <string name="conn_event_error">Erreur de connexion</string>
     <string name="conn_rejected_hint">« Connecté mais non reconnu » signifie que ce téléphone a été configuré avec un autre code d\'association. Associez-le à nouveau pour corriger cela.</string>
+    <string name="bedtime_emergency">Appel d\'urgence</string>
 </resources>

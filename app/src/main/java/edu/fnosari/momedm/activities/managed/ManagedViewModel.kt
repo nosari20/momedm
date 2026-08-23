@@ -204,6 +204,18 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Opens the device's emergency dialer from the bedtime screen.
+     *
+     * A completely locked phone must still be able to call for help. The power-menu route the design
+     * relied on does not exist on every device — on a Samsung running Android 14, long-pressing power
+     * under lock task shows no menu at all even with LOCK_TASK_FEATURE_GLOBAL_ACTIONS set — so the
+     * lock allowlists the dialer and the child gets a visible button instead.
+     */
+    fun openEmergencyDialer() {
+        if (!policy.launchEmergencyDialer()) Log.w(LOG_TAG, "Emergency dialer unavailable")
+    }
+
     fun clearPinError() { _pinError.value = null }
 
     /** Ends a pause now (re-locks). */

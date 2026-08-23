@@ -215,10 +215,12 @@ tests and to code review, and only surfaced on devices. See
 Stated plainly, because a parental-control tool that oversells itself is worse
 than useless:
 
-- **Emergency calling under a night lock is unverified.** The app keeps Android's
-  power menu (and its Emergency entry) enabled while locked, but this could not be
-  confirmed on the emulator images used so far and still needs checking on a real
-  handset.
+- **Emergency calling works, but not the way Android suggests.** A locked phone
+  shows an explicit **Emergency call** button, because the power-menu route the
+  platform documents is not reliable: on a Samsung running Android 14, holding
+  power under a lock produces no menu at all, even with the correct flag set.
+  Instead the lock allows the device's emergency dialer specifically, and nothing
+  else — verified on hardware.
 - **A night lock cannot currently be ended remotely** — only by the parent PIN on
   the child's phone, or by waiting for the window to close.
 - **One shared secret per parent**, not per child. Compromising one child's phone

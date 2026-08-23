@@ -242,4 +242,5 @@
     <string name="conn_event_advertising">Visibility changed</string>
     <string name="conn_event_error">Connection error</string>
     <string name="conn_rejected_hint">"Connected but not recognised" means that phone was set up with a different pairing code. Pair it again to fix it.</string>
+    <string name="bedtime_emergency">Emergency call</string>
 </resources>

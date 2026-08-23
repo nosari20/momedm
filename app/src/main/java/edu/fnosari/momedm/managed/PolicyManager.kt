@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import android.util.Log
@@ -29,6 +30,8 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         private const val LOG_TAG = "PolicyManager"
         const val PLAY_PKG = "com.android.vending"
         const val GMS_PKG = "com.google.android.gms"
+        /** The long-standing implicit action for the platform emergency dialer; OEMs answer it with their own component. */
+        const val EMERGENCY_DIAL_ACTION = "com.android.phone.EmergencyDialer.DIAL"
     }
     private val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
     /** The [AdminReceiver] component this app is (or would be) registered as device owner with. */
@@ -124,7 +127,7 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * [kioskOn] directly (see its comment).
      */
     private fun applyKiosk(allowed: List<String>, pinned: String?) {
-        dpm.setLockTaskPackages(admin, (allowed + context.packageName + PLAY_PKG + GMS_PKG).toTypedArray())
+        dpm.setLockTaskPackages(admin, (allowed + context.packageName + PLAY_PKG + GMS_PKG + listOfNotNull(emergencyDialerPackage())).toTypedArray())
         // NOTIFICATIONS requires HOME to also be enabled or AOSP throws IllegalArgumentException; SYSTEM_INFO alone is safe.
         dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
         launchHomeLocked()
@@ -147,8 +150,40 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * the power menu, and the power menu is the route to the system emergency dialer. A phone a child
      * carries must still be able to call for help at night.
      */
+    /**
+     * Package that handles emergency dialling on this device, or null if nothing does.
+     *
+     * Resolved at runtime rather than hardcoded: the component is OEM-specific — AOSP answers with
+     * `com.android.phone`, this Samsung with `com.samsung.android.emergency` — and a wrong constant
+     * would silently mean no emergency route at all.
+     */
+    fun emergencyDialerPackage(): String? = runCatching {
+        context.packageManager
+            .resolveActivity(Intent(EMERGENCY_DIAL_ACTION), PackageManager.ResolveInfoFlags.of(0))
+            ?.activityInfo?.packageName
+    }.getOrNull()
+
+    /**
+     * Opens the device's emergency dialer from the bedtime screen, keeping lock task on so the child
+     * cannot wander off into the rest of the phone. Returns false when nothing could be launched.
+     *
+     * This only opens the dialer UI; placing a call is the caller's own deliberate act.
+     */
+    fun launchEmergencyDialer(): Boolean {
+        val i = Intent(EMERGENCY_DIAL_ACTION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (i.resolveActivity(context.packageManager) == null) { Log.w(LOG_TAG, "No emergency dialer on this device"); return false }
+        return runCatching {
+            context.startActivity(i, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
+        }.onFailure { Log.w(LOG_TAG, "Could not open the emergency dialer", it) }.isSuccess
+    }
+
     override suspend fun lockComplete(): Result<Unit> = try {
-        dpm.setLockTaskPackages(admin, arrayOf(context.packageName))
+        // Us, plus whatever handles emergency dialling on this device. LOCK_TASK_FEATURE_GLOBAL_ACTIONS
+        // is requested too, but it is not enough on its own: on a Samsung running Android 14 with the
+        // flag set, long-pressing power under lock task produces no menu at all, so the power-menu
+        // route to the emergency dialer simply does not exist. Allowlisting the dialer is what makes
+        // the bedtime screen's Emergency button able to launch it.
+        dpm.setLockTaskPackages(admin, (listOf(context.packageName) + listOfNotNull(emergencyDialerPackage())).toTypedArray())
         dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
         launchHomeLocked()
         Log.d(LOG_TAG, "Complete lock applied")

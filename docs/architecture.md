@@ -197,10 +197,21 @@ both are covered by `LockControllerTest`.
 
 A correct parent PIN pauses a complete lock exactly as it pauses child mode (10
 minutes, then it re-locks if the window is still open). `lockComplete()` sets
-`LOCK_TASK_FEATURE_GLOBAL_ACTIONS` alongside `SYSTEM_INFO`, unlike `kioskOn`,
-so the power menu — and through it the system emergency dialer — stays reachable
-on a locked device. That path is **unverified on real hardware**; see the README's
-limitations.
+`LOCK_TASK_FEATURE_GLOBAL_ACTIONS` alongside `SYSTEM_INFO`, but that flag is not
+sufficient on its own: on a Samsung running Android 14 with it set, long-pressing
+power under lock task produces no menu at all, so the documented power-menu route
+to the emergency dialer simply does not exist there.
+
+What actually works — and is verified on hardware — is allowing the emergency
+dialer explicitly. `lockComplete()` puts it in the lock-task allowlist alongside
+this app, and the bedtime screen carries a visible **Emergency call** button. The
+component is resolved at runtime via `com.android.phone.EmergencyDialer.DIAL`,
+never hardcoded: AOSP answers with `com.android.phone`, Samsung with
+`com.samsung.android.emergency`, and a wrong constant would mean no emergency
+route at all. The dialer opens *inside* lock task, so the child cannot use it to
+reach the rest of the phone: launching a non-allowlisted app is still refused, and
+Back returns to the bedtime screen. Child mode's allowlist includes it for the
+same reason.
 
 ## Security
 
@@ -277,10 +288,10 @@ menu, so the check is inconclusive there).
   device back on real Wi-Fi/mobile data afterward. Some OEMs (Samsung among
   them) prompt "this network has no internet" when joining, and the parent has
   to accept it during enrolment.
-- Emergency calling under a complete lock is **unverified**. `lockComplete()`
-  keeps `LOCK_TASK_FEATURE_GLOBAL_ACTIONS` enabled so the power menu — and the
-  system emergency dialer through it — stays reachable, but this could not be
-  confirmed on the emulator images used so far and still needs a real handset.
+- Emergency calling relies on the device exposing an emergency dialer for the
+  implicit `com.android.phone.EmergencyDialer.DIAL` action. Every device tested
+  does, but one that does not would leave the button unable to launch anything —
+  it is hidden in that case rather than failing silently.
 - A night lock cannot currently be ended remotely: only the parent PIN on the
   child's device, or waiting for the window to close. The parent's Unlock button
   is shown only for a manual lock, so it never silently does nothing.

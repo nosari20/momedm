@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -93,6 +94,17 @@ fun BedtimeScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 32.dp))
         }
+
+        // A completely locked phone must still be able to call for help, and the power-menu route the
+        // design assumed does not exist on every device: on a Samsung running Android 14, long-pressing
+        // power under lock task shows no menu at all even with LOCK_TASK_FEATURE_GLOBAL_ACTIONS set. So
+        // the way out is explicit and visible rather than hidden behind a gesture a child would not
+        // know. Deliberately outside the long-press Column above, so reaching for it can never open the
+        // parent PIN pad by accident.
+        OutlinedButton(
+            onClick = { vm.openEmergencyDialer() },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp),
+        ) { Text(stringResource(R.string.bedtime_emergency)) }
     }
 
     if (showPin) PinDialog(
