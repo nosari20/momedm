@@ -107,6 +107,7 @@ class ControllerService : Service() {
         }, object : SessionManager.Events {
             override fun onAuthenticated(key: String, hello: Message.Hello) {
                 Log.d(LOG_TAG, "Authenticated ${hello.deviceId} (${hello.model})")
+                ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.AUTHENTICATED, "${hello.model} (${hello.deviceId.take(8)})")
                 // `sessions` (not the local `sm`, which isn't in scope while its own initializer — this
                 // anonymous object — is still being constructed) is guaranteed set by the time this callback
                 // actually fires, since it only fires after `sm` finishes construction and `sessions = sm` runs.
@@ -121,7 +122,14 @@ class ControllerService : Service() {
                     else -> Log.w(LOG_TAG, "Unexpected ${m::class.simpleName} from $deviceId")
                 }
             }
-            override fun onDropped(key: String, deviceId: String?) { refreshOnline() }
+            override fun onDropped(key: String, deviceId: String?) {
+                // deviceId == null means the central connected but never completed the handshake before
+                // the auth timeout — the signature of a child holding a different shared secret. Worth
+                // surfacing, because in the device list that is indistinguishable from a child that
+                // never showed up at all.
+                if (deviceId == null) ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.REJECTED, key)
+                refreshOnline()
+            }
         })
         sessions = sm
         ControllerLink.commander = { deviceId, cmd -> sm.send(deviceId, cmd) }
@@ -129,20 +137,30 @@ class ControllerService : Service() {
         prefsJob = scope.launch { ControllerLink.prefsChanged.collect { sm.onlineDeviceIds().forEach { pushPrefs(sm, it) } } }
         try {
             val s = BLEServer(this, clientLimit = 7, callBack = object : BLEServer.BLEServerCallBack {
-                override fun onDeviceConnected(device: BluetoothDevice) { devicesByKey[device.address] = device; sm.onConnected(device.address) }
-                override fun onDeviceDisconnected(device: BluetoothDevice) { devicesByKey.remove(device.address); sm.onDisconnected(device.address) }
+                override fun onDeviceConnected(device: BluetoothDevice) {
+                    devicesByKey[device.address] = device; sm.onConnected(device.address)
+                    ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.CONNECTED, device.address)
+                }
+                override fun onDeviceDisconnected(device: BluetoothDevice) {
+                    devicesByKey.remove(device.address); sm.onDisconnected(device.address)
+                    ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.DISCONNECTED, device.address)
+                }
                 override fun onCharacteristicWriteRequest(characteristic: BLECharacteristic, service: BLEService, device: BluetoothDevice, value: String): Boolean {
                     // A frame from a link we hold no session for (our server restarted / the session was
                     // dropped while the BLE link stayed up) is rejected at GATT level: notifications to such
                     // a stale client do not reach it, but a failed write does, and makes it reconnect.
-                    return if (characteristic.uuid == MdmGatt.RSP_UUID) sm.onFrame(device.address, value) else true
+                    if (characteristic.uuid != MdmGatt.RSP_UUID) return true
+                    val accepted = sm.onFrame(device.address, value)
+                    if (!accepted) ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.REJECTED, device.address)
+                    return accepted
                 }
             }, includeDeviceName = false)
             s.addService(gatt); s.startServer(); server = s
             ControllerLink.advertising.value = true
+            ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.ADVERTISING, "started")
             Log.d(LOG_TAG, "GATT server started")
         } catch (e: Throwable) {
-            Log.e(LOG_TAG, "Server start failed: ${e.message}"); ControllerLink.errors.tryEmit(e.message ?: "BLE error"); stopSelf(); return
+            Log.e(LOG_TAG, "Server start failed: ${e.message}"); ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.ERROR, e.message ?: "BLE error"); ControllerLink.errors.tryEmit(e.message ?: "BLE error"); stopSelf(); return
         }
         tickJob = scope.launch { while (isActive) { delay(1_000); sm.tick(System.currentTimeMillis()) } }
     }
@@ -167,6 +185,7 @@ class ControllerService : Service() {
         tickJob?.cancel(); prefsJob?.cancel()
         ControllerLink.commander = null
         ControllerLink.advertising.value = false; ControllerLink.online.value = emptySet()
+        ControllerLink.logEvent(ControllerLink.LinkEvent.Kind.ADVERTISING, "stopped")
         try { server?.stopServer() } catch (e: BLEException) { Log.w(LOG_TAG, "stop failed: ${e.message}") }
         scope.cancel()
         super.onDestroy()

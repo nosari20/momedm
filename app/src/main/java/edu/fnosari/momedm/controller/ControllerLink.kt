@@ -19,6 +19,29 @@ object ControllerLink {
     /** Emitted when language/theme/accent/PIN change; the service re-pushes SET_PREFS to every online child. */
     val prefsChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
+    /**
+     * One thing that happened on the BLE link, for the parent's connection screen.
+     *
+     * The distinction that matters when a child will not pair is *connected but never authenticated*
+     * — the two sides disagree about the shared secret, typically because the child still holds an
+     * older one — versus *nothing ever connected*: out of range, not advertising, or the child is not
+     * scanning. Neither is visible from the device list, which only shows the end state.
+     */
+    data class LinkEvent(val atMs: Long, val kind: Kind, val detail: String) {
+        enum class Kind { CONNECTED, AUTHENTICATED, REJECTED, DISCONNECTED, ADVERTISING, ERROR }
+    }
+
+    /** The most recent link events, newest first. In memory only — a diagnostic, not a record. */
+    val events = MutableStateFlow<List<LinkEvent>>(emptyList())
+
+    private const val MAX_EVENTS = 40
+
+    /** Records a link event, dropping the oldest once [MAX_EVENTS] is reached. */
+    fun logEvent(kind: LinkEvent.Kind, detail: String) {
+        val e = LinkEvent(System.currentTimeMillis(), kind, detail)
+        events.value = (listOf(e) + events.value).take(MAX_EVENTS)
+    }
+
     /** Sends the command produced by [build] (given a fresh id). Returns the id, or null when [deviceId] is offline. */
     fun sendCmd(deviceId: String, build: (id: String) -> Message.Cmd): String? {
         val cmd = build(UUID.randomUUID().toString().substring(0, 8))

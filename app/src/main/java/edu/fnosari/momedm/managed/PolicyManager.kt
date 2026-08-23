@@ -36,6 +36,35 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
     /** True once this app has been set as device owner (via `dpm set-device-owner` during provisioning). */
     val isDeviceOwner: Boolean get() = dpm.isDeviceOwnerApp(context.packageName)
 
+    /**
+     * Grants this app the runtime permissions it needs to reach the parent, using the device owner's
+     * power to grant its own.
+     *
+     * Nobody can grant these by hand on a child device: the phone is handed to a child, the link
+     * service starts at boot with no one looking at it, and a launcher that cannot scan just sits
+     * there. Without [android.Manifest.permission.BLUETOOTH_SCAN] the client never starts scanning at
+     * all — `ERROR_BLUETOOTH_SCAN_PERMISSION_NOT_GRANTED` — so the child never finds the parent and
+     * every status push is dropped as unauthenticated, which looks exactly like a failed pairing.
+     *
+     * Idempotent and safe on every service start: re-granting an already-granted permission is a
+     * no-op. Does nothing when this app is not the device owner.
+     */
+    fun grantOwnRuntimePermissions() {
+        if (!isDeviceOwner) return
+        val permissions = listOf(
+            android.Manifest.permission.BLUETOOTH_SCAN,
+            android.Manifest.permission.BLUETOOTH_CONNECT,
+            android.Manifest.permission.POST_NOTIFICATIONS,
+        )
+        for (p in permissions) {
+            val ok = runCatching {
+                dpm.setPermissionGrantState(admin, context.packageName, p, DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED)
+            }.getOrElse { Log.w(LOG_TAG, "Could not grant ${p.substringAfterLast('.')}: ${it::class.simpleName}"); false }
+            if (!ok) Log.w(LOG_TAG, "Grant refused for ${p.substringAfterLast('.')}")
+        }
+        Log.d(LOG_TAG, "Self-granted the runtime permissions needed for the parent link")
+    }
+
     /** Makes [ManagedHomeActivity] the persistent HOME so the device boots into us. */
     fun setAsDefaultHome() {
         val filter = IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME); addCategory(Intent.CATEGORY_DEFAULT) }

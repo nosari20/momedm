@@ -81,6 +81,10 @@ class PolicyComplianceActivity : ComponentActivity() {
 
     private fun finishSetup(policy: PolicyManager) {
         Log.d(LOG_TAG, "Setup finished; setting HOME and starting link")
+        // Grant our own BLE permissions while we still have a screen and device-owner rights: nobody
+        // will ever tap a permission dialog on a child device, and without BLUETOOTH_SCAN the link
+        // service can never find the parent.
+        runCatching { policy.grantOwnRuntimePermissions() }.onFailure { Log.w(LOG_TAG, "self-grant failed", it) }
         runCatching { policy.setAsDefaultHome() }.onFailure { Log.w(LOG_TAG, "setAsDefaultHome failed", it) }
         ManagedLinkService.start(this)
         setResult(RESULT_OK); finish()
