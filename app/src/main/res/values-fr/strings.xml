@@ -49,17 +49,17 @@
     <string name="managed_activity_title">Môme DM</string>
     <string name="managed_usage_unavailable">Réglages d\'accès à l\'usage indisponibles</string>
 
-    <!-- Child launcher (ManagedHomeActivity: ChildLauncherScreen, PinDialog); the mode label and PIN
-         strings live in the parent-vocabulary set below as launcher_child_mode/launcher_all_apps and
-         managed_pin_* -->
+    <!-- Child launcher (ManagedHomeActivity: ChildLauncherScreen, PinDialog); PIN strings are managed_pin_* below -->
     <string name="launcher_paused">Mode enfant en pause · %1$s</string>
+    <string name="launcher_greeting_morning">Bonjour&#160;!</string>
+    <string name="launcher_greeting_afternoon">Bon après-midi&#160;!</string>
+    <string name="launcher_greeting_evening">Bonsoir&#160;!</string>
     <string name="launcher_relock">Reverrouiller</string>
     <string name="launcher_lock_cd">Déverrouillage parent</string>
     <string name="launcher_no_apps">Aucune app autorisée. Demandez à un parent.</string>
     <string name="launcher_no_apps_installed">Aucune app trouvée</string>
     <string name="launcher_online">Connecté au parent</string>
     <string name="launcher_offline">Parent hors de portée</string>
-    <string name="launcher_battery">%1$d %%</string>
 
     <!-- Controller UI (MainActivity) -->
     <string name="main_drawer_name">Contrôleur</string>
@@ -195,8 +195,6 @@
     <string name="pair_password_value">%1$s : %2$s</string>
 
     <!-- Child launcher (managed) -->
-    <string name="launcher_child_mode">Mode enfant</string>
-    <string name="launcher_all_apps">Toutes les apps</string>
     <string name="managed_pin_title">Code PIN parental</string>
     <string name="managed_pin_hint">4 à 6 chiffres</string>
     <string name="managed_pin_wrong">Code incorrect</string>
