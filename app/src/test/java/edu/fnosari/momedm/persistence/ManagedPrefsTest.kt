@@ -1,5 +1,6 @@
 package edu.fnosari.momedm.persistence
 
+import edu.fnosari.momedm.protocol.LockSchedule
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -36,5 +37,23 @@ class ManagedPrefsTest {
         assertEquals(3, p.pinFailures.first()); assertEquals(1_700_000_000_000L, p.pinLockUntil.first())
         p.setPinLock(0, 0L)
         assertEquals(0, p.pinFailures.first()); assertEquals(0L, p.pinLockUntil.first())
+    }
+
+    @Test fun lockScheduleDefaultsThenRoundTrips() = runTest {
+        val prefs = ManagedPrefs(InMemoryPreferencesProvider())
+        assertEquals(LockSchedule(), prefs.lockSchedule.first())
+        val s = LockSchedule(enabled = true, weekdayStart = 20 * 60 + 30, weekdayEnd = 6 * 60 + 45,
+            weekendStart = 23 * 60, weekendEnd = 9 * 60)
+        prefs.setLockSchedule(s)
+        assertEquals(s, prefs.lockSchedule.first())
+    }
+
+    @Test fun manualLockDefaultsFalseAndRoundTrips() = runTest {
+        val prefs = ManagedPrefs(InMemoryPreferencesProvider())
+        assertFalse(prefs.manualLock.first())
+        prefs.setManualLock(true)
+        assertTrue(prefs.manualLock.first())
+        prefs.setManualLock(false)
+        assertFalse(prefs.manualLock.first())
     }
 }

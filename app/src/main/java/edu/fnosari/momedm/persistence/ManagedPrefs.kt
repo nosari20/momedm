@@ -3,6 +3,7 @@ package edu.fnosari.momedm.persistence
 import edu.fnosari.momedm.persistence.preferences.PreferencesProvider
 import edu.fnosari.momedm.protocol.Base64Std
 import edu.fnosari.momedm.protocol.ChildPrefs
+import edu.fnosari.momedm.protocol.LockSchedule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -26,6 +27,12 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         const val KEY_PIN_HASH = "managed_pin_hash"
         const val KEY_PIN_FAILURES = "managed_pin_failures"
         const val KEY_PIN_LOCK_UNTIL = "managed_pin_lock_until"
+        const val KEY_LOCK_ENABLED = "managed_lock_enabled"
+        const val KEY_LOCK_WD_START = "managed_lock_wd_start"
+        const val KEY_LOCK_WD_END = "managed_lock_wd_end"
+        const val KEY_LOCK_WE_START = "managed_lock_we_start"
+        const val KEY_LOCK_WE_END = "managed_lock_we_end"
+        const val KEY_LOCK_MANUAL = "managed_lock_manual"
     }
     val controllerId: Flow<String> = p.readString(KEY_CONTROLLER_ID, "")
     val secretBase64: Flow<String> = p.readString(KEY_SECRET, "")
@@ -46,6 +53,19 @@ class ManagedPrefs(private val p: PreferencesProvider) {
     val pinFailures: Flow<Int> = p.readInt(KEY_PIN_FAILURES, 0)
     /** Epoch ms until which the PIN dialog refuses input; 0 = not locked out. */
     val pinLockUntil: Flow<Long> = p.readString(KEY_PIN_LOCK_UNTIL, "0").map { it.toLongOrNull() ?: 0L }  // Long stored as string (provider has no Long)
+
+    /** The parent's nightly lock window. Defaults match [LockSchedule]'s own defaults. */
+    val lockSchedule: Flow<LockSchedule> = combine(
+        p.readBoolean(KEY_LOCK_ENABLED, false),
+        p.readInt(KEY_LOCK_WD_START, 21 * 60), p.readInt(KEY_LOCK_WD_END, 7 * 60),
+        p.readInt(KEY_LOCK_WE_START, 22 * 60), p.readInt(KEY_LOCK_WE_END, 8 * 60),
+    ) { on, ws, we, es, ee -> LockSchedule(on, ws, we, es, ee) }
+
+    /**
+     * True while the parent's "Lock now" is in force. Unlike a PIN pause this **survives reboot** —
+     * a manual lock is a deliberate parent act and must not be undone by the child restarting.
+     */
+    val manualLock: Flow<Boolean> = p.readBoolean(KEY_LOCK_MANUAL, false)
 
     /** Persists the controller identity (id + secret) received from the QR admin extras. */
     suspend fun saveProvisioning(controllerId: String, secretBase64: String) { p.write(KEY_CONTROLLER_ID, controllerId); p.write(KEY_SECRET, secretBase64) }
@@ -78,4 +98,11 @@ class ManagedPrefs(private val p: PreferencesProvider) {
      * the launcher no longer wipes the backoff.
      */
     suspend fun setPinLock(failures: Int, untilMs: Long) { p.write(KEY_PIN_FAILURES, failures); p.write(KEY_PIN_LOCK_UNTIL, untilMs.toString()) }
+
+    suspend fun setLockSchedule(s: LockSchedule) {
+        p.write(KEY_LOCK_ENABLED, s.enabled); p.write(KEY_LOCK_WD_START, s.weekdayStart); p.write(KEY_LOCK_WD_END, s.weekdayEnd)
+        p.write(KEY_LOCK_WE_START, s.weekendStart); p.write(KEY_LOCK_WE_END, s.weekendEnd)
+    }
+
+    suspend fun setManualLock(on: Boolean) = p.write(KEY_LOCK_MANUAL, on)
 }
