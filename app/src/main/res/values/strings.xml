@@ -265,4 +265,10 @@
     <string name="appcfg_none">This app offers no settings that can be managed. Most apps do not - it is something each app has to support. Blocking the app, or the phone-wide filtering, are the levers that always work.</string>
     <string name="appcfg_warning">Expert settings, straight from the app itself. A wrong value can stop the app working properly.</string>
     <string name="appcfg_unsupported">%1$s - cannot be set here</string>
+
+    <!-- Re-pairing a child device by scanning the parent code -->
+    <string name="repair_open">Re-pair with a parent</string>
+    <string name="repair_hint">Point the camera at the pairing code on the parent phone.</string>
+    <string name="repair_not_ours">That is not a Môme DM pairing code.</string>
+    <string name="repair_done">Paired. Reconnecting...</string>
 </resources>

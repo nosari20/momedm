@@ -1,5 +1,6 @@
 package edu.fnosari.momedm.activities.managed.screens
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.managed.ManagedViewModel
+import edu.fnosari.momedm.activities.managed.RepairScanActivity
 import edu.fnosari.momedm.activities.managed.components.AppTile
 import edu.fnosari.momedm.activities.managed.components.PinDialog
 import edu.fnosari.momedm.managed.ManagedLinkState.LinkState
@@ -69,6 +72,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
     val pinLockedRemaining by vm.pinLockedRemainingMs.collectAsState()
     val showPin by vm.pinDialogOpen.collectAsState()
     val paused = pauseLeft > 0L
+    val context = LocalContext.current
     val connected = link == LinkState.AUTHENTICATED
 
     // Config still loading (null): draw a bare surface rather than guessing. Rendering every installed
@@ -110,9 +114,19 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
                 Modifier
                     .fillMaxWidth()
                     .then(
+                        // With a PIN set, the long-press asks for it and a correct PIN pauses child
+                        // mode. With no PIN there is nothing to verify, so it goes straight to
+                        // re-pairing — otherwise the gesture is simply dead, and a family that never
+                        // set a PIN would have no way to re-pair a child device at all, which is
+                        // exactly the situation a lost or replaced parent phone creates.
                         if (canUnlock) Modifier
                             .semantics { contentDescription = headerA11y }
                             .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
+                        else if (config.on) Modifier
+                            .semantics { contentDescription = headerA11y }
+                            .pointerInput(Unit) {
+                                detectTapGestures(onLongPress = { context.startActivity(Intent(context, RepairScanActivity::class.java)) })
+                            }
                         else Modifier,
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp),
@@ -146,6 +160,11 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
                         val s = (pauseLeft / 1_000L) % 60L
                         Text(stringResource(R.string.launcher_paused, String.format(Locale.US, "%02d:%02d", m, s)), style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.weight(1f))
+                        // Only reachable while paused, which took the parent PIN: a child cannot
+                        // re-point their own phone at a different parent.
+                        TextButton(onClick = {
+                            context.startActivity(Intent(context, RepairScanActivity::class.java))
+                        }) { Text(stringResource(R.string.repair_open)) }
                         TextButton(onClick = { vm.relock() }) { Text(stringResource(R.string.launcher_relock)) }
                     }
                 }

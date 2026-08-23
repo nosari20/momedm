@@ -265,4 +265,10 @@
     <string name="appcfg_none">Cette app ne propose aucun réglage gérable à distance. C\'est le cas de la plupart des apps : chacune doit le prévoir. Bloquer l\'app, ou le filtrage de tout le téléphone, restent les leviers qui marchent toujours.</string>
     <string name="appcfg_warning">Réglages experts, fournis par l\'app elle-même. Une mauvaise valeur peut empêcher l\'app de fonctionner.</string>
     <string name="appcfg_unsupported">%1$s - non modifiable ici</string>
+
+    <!-- Re-pairing a child device by scanning the parent code -->
+    <string name="repair_open">Ré-associer à un parent</string>
+    <string name="repair_hint">Dirigez la caméra vers le code d\'association affiché sur le téléphone du parent.</string>
+    <string name="repair_not_ours">Ce n\'est pas un code d\'association Môme DM.</string>
+    <string name="repair_done">Associé. Reconnexion...</string>
 </resources>

@@ -60,6 +60,11 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.zxing.core)
+    // Camera, for re-pairing an already-provisioned child by scanning the parent's code.
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
     implementation(libs.nanohttpd)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

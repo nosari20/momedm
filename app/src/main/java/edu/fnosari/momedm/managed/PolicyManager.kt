@@ -60,6 +60,8 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
             android.Manifest.permission.BLUETOOTH_SCAN,
             android.Manifest.permission.BLUETOOTH_CONNECT,
             android.Manifest.permission.POST_NOTIFICATIONS,
+            // Only used by the re-pairing scanner, which a parent reaches behind the PIN.
+            android.Manifest.permission.CAMERA,
         )
         for (p in permissions) {
             val ok = runCatching {

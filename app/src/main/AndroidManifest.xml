@@ -25,6 +25,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+        Camera: only for re-pairing a child device by scanning the parent's code. The child is the
+        device owner, so it grants this to itself — nobody is going to tap a permission dialog on a
+        child's phone.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <!-- Managed role -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -96,6 +103,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".activities.managed.RepairScanActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MomeDM" />
 
         <receiver
             android:name=".managed.AdminReceiver"
