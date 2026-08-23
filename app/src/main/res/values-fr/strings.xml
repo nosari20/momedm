@@ -50,12 +50,11 @@
 
     <!-- Managed home UI -->
     <string name="managed_activity_title">Môme DM</string>
-    <string name="managed_allow">Autoriser</string>
     <string name="managed_usage_unavailable">Réglages d\'accès à l\'usage indisponibles</string>
 
-    <!-- Child launcher (ManagedHomeActivity: ChildLauncherScreen, PinDialog) -->
-    <string name="launcher_child_mode_on">Mode enfant</string>
-    <string name="launcher_child_mode_off">Toutes les apps</string>
+    <!-- Child launcher (ManagedHomeActivity: ChildLauncherScreen, PinDialog); the mode label and PIN
+         strings live in the parent-vocabulary set below as launcher_child_mode/launcher_all_apps and
+         managed_pin_* -->
     <string name="launcher_paused">Mode enfant en pause · %1$s</string>
     <string name="launcher_relock">Reverrouiller</string>
     <string name="launcher_lock_cd">Déverrouillage parent</string>
@@ -64,12 +63,6 @@
     <string name="launcher_online">Connecté au parent</string>
     <string name="launcher_offline">Parent hors de portée</string>
     <string name="launcher_battery">%1$d %%</string>
-    <string name="pin_title">Code PIN parental</string>
-    <string name="pin_hint">4 à 6 chiffres</string>
-    <string name="pin_wrong">Code incorrect</string>
-    <string name="pin_locked">Réessayez dans %1$d s</string>
-    <string name="pin_ok">Déverrouiller</string>
-    <string name="pin_cancel">Annuler</string>
 
     <!-- Controller UI (MainActivity) -->
     <string name="main_activity_title">Môme DM</string>

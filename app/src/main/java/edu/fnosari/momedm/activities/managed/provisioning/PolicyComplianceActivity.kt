@@ -71,7 +71,7 @@ class PolicyComplianceActivity : ComponentActivity() {
                         else -> StepCard(getString(R.string.setup_usage_title), getString(R.string.setup_usage_text), getString(R.string.setup_usage_button), usageOk,
                             onAction = {
                                 runCatching { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
-                                    .onFailure { Log.w(LOG_TAG, "Usage access settings unavailable", it); ManagedLinkState.lastError.value = "Usage access settings unavailable" }
+                                    .onFailure { Log.w(LOG_TAG, "Usage access settings unavailable", it); ManagedLinkState.lastError.value = getString(R.string.managed_usage_unavailable) }
                             }, onNext = { finishSetup(policy) }, last = true)
                     }
                 }

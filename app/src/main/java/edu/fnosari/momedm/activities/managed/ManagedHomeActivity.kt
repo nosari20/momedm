@@ -61,7 +61,7 @@ class ManagedHomeActivity : ComponentActivity() {
                 Log.d(LOG_TAG, "Missing permissions: $missing")
                 if (missing.isNotEmpty()) {
                     BasicLayoutWithTopBar(title = context.getString(R.string.managed_activity_title)) {
-                        Column { for (p in missing) ButtonRequestPermission(context, p, p, granted = { required.remove(p) }, denied = { Log.d(LOG_TAG, "$p denied") }) }
+                        Column { for (p in missing) ButtonRequestPermission(context, p, granted = { required.remove(p) }, denied = { Log.d(LOG_TAG, "$p denied") }) }
                     }
                 } else {
                     LaunchedEffect(Unit) { vm.ensureLink() }

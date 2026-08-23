@@ -72,7 +72,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
         // header
         Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(if (config.on) R.string.launcher_child_mode_on else R.string.launcher_child_mode_off), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(if (config.on) R.string.launcher_child_mode else R.string.launcher_all_apps), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
                 Text(stringResource(if (link == LinkState.AUTHENTICATED) R.string.launcher_online else R.string.launcher_offline), style = MaterialTheme.typography.labelMedium)
                 status?.let { Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.launcher_battery, it.battery), style = MaterialTheme.typography.labelMedium) }

@@ -151,7 +151,7 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
             val lock = (PIN_LOCK_BASE_MS shl (pinFailures - 1).coerceAtMost(5)).coerceAtMost(PIN_LOCK_MAX_MS)
             pinLockDeadline = System.currentTimeMillis() + lock
             prefs.setPinLock(pinFailures, pinLockDeadline)
-            _pinError.value = getApplication<Application>().getString(R.string.pin_wrong)
+            _pinError.value = getApplication<Application>().getString(R.string.managed_pin_wrong)
             startPinLockTicker()
         }
     } }

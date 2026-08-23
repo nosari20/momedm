@@ -23,16 +23,16 @@ fun PinDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit, error: String?,
     var pin by remember { mutableStateOf("") }
     val locked = lockedForMs > 0L
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.pin_title)) },
+        title = { Text(stringResource(R.string.managed_pin_title)) },
         text = {
             Column {
                 OutlinedTextField(value = pin, onValueChange = { v -> if (v.length <= 6 && v.all { it.isDigit() }) pin = v },
-                    label = { Text(stringResource(R.string.pin_hint)) }, singleLine = true, enabled = !locked,
+                    label = { Text(stringResource(R.string.managed_pin_hint)) }, singleLine = true, enabled = !locked,
                     visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), isError = error != null)
-                if (locked) Text(stringResource(R.string.pin_locked, (lockedForMs / 1000L) + 1), color = MaterialTheme.colorScheme.error)
+                if (locked) Text(stringResource(R.string.managed_pin_locked, (lockedForMs / 1000L) + 1), color = MaterialTheme.colorScheme.error)
                 else error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { TextButton(onClick = { onSubmit(pin); pin = "" }, enabled = !locked && pin.length >= 4) { Text(stringResource(R.string.pin_ok)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.pin_cancel)) } })
+        confirmButton = { TextButton(onClick = { onSubmit(pin); pin = "" }, enabled = !locked && pin.length >= 4) { Text(stringResource(R.string.managed_pin_ok)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.managed_pin_cancel)) } })
 }
