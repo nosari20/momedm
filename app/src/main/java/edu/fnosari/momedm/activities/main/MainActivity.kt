@@ -59,7 +59,19 @@ import edu.fnosari.momedm.ui.layouts.Layout
  * there is nothing to do in `attachBaseContext` here.
  */
 class MainActivity : ComponentActivity() {
-    companion object { private const val LOG_TAG = "MainActivity" }
+    companion object {
+        private const val LOG_TAG = "MainActivity"
+        /**
+         * `Manifest.permission.ACCESS_LOCAL_NETWORK`, written as a literal so this still compiles
+         * against an SDK older than 37. Android 17 gates local-network traffic behind it: without the
+         * grant the platform completes the TCP handshake to our provisioning APK server and then
+         * silently drops the connection, so a child device's Setup Wizard download hangs until it
+         * times out, with nothing logged on either side.
+         */
+        private const val ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
+        /** First SDK level that enforces [ACCESS_LOCAL_NETWORK]. */
+        private const val SDK_LOCAL_NETWORK = 37
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,7 +87,13 @@ class MainActivity : ComponentActivity() {
             val vm: ControllerViewModel = viewModel()
             val snackbar = remember { SnackbarHostState() }
             ControllerThemed(this) {
-                val required = remember { mutableStateListOf(BLUETOOTH_CONNECT, BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE, POST_NOTIFICATIONS, NEARBY_WIFI_DEVICES) }
+                val required = remember {
+                    mutableStateListOf(BLUETOOTH_CONNECT, BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE, POST_NOTIFICATIONS, NEARBY_WIFI_DEVICES).apply {
+                        // Only ask where the platform enforces it: on older releases the permission is
+                        // unknown, so it could never be granted and the gate would never clear.
+                        if (android.os.Build.VERSION.SDK_INT >= SDK_LOCAL_NETWORK) add(ACCESS_LOCAL_NETWORK)
+                    }
+                }
                 // A permission granted from system Settings (rather than through our own dialog) never
                 // fires the launcher callback, so re-check on every resume and drop what is now granted
                 // — otherwise the gate stays up until the activity is recreated. Mirrors

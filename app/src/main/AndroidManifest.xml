@@ -14,6 +14,13 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+        Android 17 (API 37) gates local-network traffic behind this runtime permission. Without it the
+        platform still completes the TCP handshake to our APK server and then silently drops the
+        connection, so the child device's Setup Wizard download hangs until it times out, with no error
+        logged anywhere. Older releases ignore an unknown permission, so this is safe at minSdk 34.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <!-- Foreground services (both roles) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
