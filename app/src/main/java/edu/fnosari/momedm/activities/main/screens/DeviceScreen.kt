@@ -37,6 +37,7 @@ import edu.fnosari.momedm.activities.main.ControllerViewModel
 import edu.fnosari.momedm.activities.main.components.AppPickerDialog
 import edu.fnosari.momedm.activities.main.components.TimeRangeRow
 import edu.fnosari.momedm.protocol.LockSchedule
+import edu.fnosari.momedm.protocol.LockState
 import edu.fnosari.momedm.ui.common.AccentPill
 import edu.fnosari.momedm.ui.common.SectionLabel
 import java.text.DateFormat
@@ -93,17 +94,28 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 }
                 Text(
                     when {
-                        s?.lockReason == "manual" -> stringResource(R.string.child_locked_manual)
+                        s?.lockReason == LockState.REASON_MANUAL -> stringResource(R.string.child_locked_manual)
                         s?.locked == true -> stringResource(R.string.child_locked_until,
                             s.lockUntil?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) } ?: "—")
                         else -> stringResource(R.string.child_unlocked)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                OutlinedButton(
-                    onClick = { if (s?.locked == true) viewModel.unlock(deviceId) else viewModel.lockNow(deviceId) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(if (s?.locked == true) R.string.child_unlock else R.string.child_lock_now)) }
+                // The button only ever performs an action UNLOCK can actually undo: clearing a manual
+                // lock. Offering it during a night lock would send UNLOCK, which clears an
+                // already-false manualLock and changes nothing (still inside the window) while the
+                // parent gets a success toast — see the brief. There is deliberately no "cancel
+                // tonight's window" action here; that needs new persisted state this fix does not add.
+                when {
+                    s?.lockReason == LockState.REASON_MANUAL -> OutlinedButton(
+                        onClick = { viewModel.unlock(deviceId) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.child_unlock)) }
+                    s?.locked != true -> OutlinedButton(
+                        onClick = { viewModel.lockNow(deviceId) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.child_lock_now)) }
+                }
             }
         }
         Button(onClick = { if (s?.kiosk == true) viewModel.kioskOff(deviceId) else viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
