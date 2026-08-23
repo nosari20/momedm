@@ -14,7 +14,7 @@
     <string name="settings_screen_category_licenses">Licences</string>
     <string name="settings_screen_category_easteregg">Œuf de Pâques</string>
     <string name="settings_screen_category_easteregg_title">🎉</string>
-    <string name="settings_screen_category_easteregg_text">Vous avez trouvé le tableau caché. Retour en classe !</string>
+    <string name="settings_screen_category_easteregg_text">Vous avez trouvé le tiroir secret. Rien ici, juste un rappel : allez dire bonne nuit.</string>
     <string name="settings_dialog_title_edit">Modifier la valeur</string>
     <string name="settings_dialog_confirm">Enregistrer</string>
     <string name="settings_dialog_dismiss">Annuler</string>

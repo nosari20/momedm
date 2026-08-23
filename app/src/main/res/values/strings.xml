@@ -14,7 +14,7 @@
     <string name="settings_screen_category_licenses">Licenses</string>
     <string name="settings_screen_category_easteregg">Easter Egg</string>
     <string name="settings_screen_category_easteregg_title">🎉</string>
-    <string name="settings_screen_category_easteregg_text">You found the hidden chalkboard. Back to class!</string>
+    <string name="settings_screen_category_easteregg_text">You found the secret drawer. Nothing in here but a reminder to go say goodnight.</string>
     <string name="settings_dialog_title_edit">Edit Value</string>
     <string name="settings_dialog_confirm">Save</string>
     <string name="settings_dialog_dismiss">Cancel</string>
