@@ -1,180 +1,243 @@
+<div align="center">
+
 # Môme DM
+
+**A parental-control app for families that runs entirely between two phones.**
+
+No cloud. No account. No subscription. A parent's phone talks to a child's phone
+over Bluetooth Low Energy, and nothing else is involved.
+
+[![CI](https://github.com/nosari20/momedm/actions/workflows/ci.yml/badge.svg)](https://github.com/nosari20/momedm/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Android-14%2B%20(API%2034)-3ddc84.svg)](https://developer.android.com)
+[![Languages](https://img.shields.io/badge/i18n-English%20%7C%20Fran%C3%A7ais-informational.svg)](app/src/main/res)
+
+<img src="docs/images/child-launcher-childmode.png" width="220" alt="The child's home screen showing only the allowed apps">
+<img src="docs/images/child-bedtime.png" width="220" alt="The bedtime screen during a night lock">
+<img src="docs/images/parent-device.png" width="220" alt="The parent's view of one child device">
+
+</div>
+
+---
 
 ## What it is
 
-Môme DM is a single Android app, package `edu.fnosari.momedm`, with two runtime
-roles selected automatically at launch (`DevicePolicyManager.isDeviceOwnerApp`):
+Most parental-control tools route a child's activity through someone else's
+servers. Môme DM doesn't. It is one Android app installed on two phones:
 
-- **Managed** — the app is **device owner** on a fully managed device (work
-  profile is refused). It connects over BLE to a controller and executes
-  management commands.
-- **Controller** — the same app on another phone. It provisions managed
-  devices via QR code, advertises a BLE GATT server, and sends commands to
-  connected managed devices.
+- On the **child's phone** it is the device owner — it becomes the home screen,
+  decides which apps exist, and can lock the device completely.
+- On the **parent's phone** it is a small control panel that talks to the child's
+  phone directly over BLE when they are near each other.
 
-There is no role picker and no cloud/Play EMM involved — the transport is BLE
-only.
+Everything the child's phone enforces keeps working when the parent is out of
+range, asleep, or has a flat battery. The parent's phone is a remote control, not
+a dependency.
 
-The app is fully localized in **French and English**; the parent picks
-language, light/dark theme, and an accent colour under **Settings →
-Appearance & language**, and every choice pushes to connected children live
-(`SET_PREFS`) — a child device always shows its parent's chosen look, not its
-own setting.
+> **What this is not.** A parenting aid, not a security product. A factory reset
+> removes it, and a determined teenager will eventually find the edges. It is
+> built for the ordinary case: agreeing on rules and letting the phone hold them.
 
-## Architecture
+## Features
 
-```
-Controller phone                              Managed phone
-┌─────────────────────────┐                   ┌─────────────────────────┐
-│ ControllerService        │   BLE GATT        │ ManagedLinkService       │
-│  BLEServer (advertiser,  │◄─────────────────►│  BLEClient (scan by      │
-│  clientLimit 7)          │   MdmService       │  service UUID, connect) │
-│  SessionManager          │   Cmd (NOTIFY)     │  ManagedEndpoint        │
-│  ControllerEndpoint       │   Rsp (WRITE)      │  handshake, session key │
-└─────────────────────────┘                   └─────────────────────────┘
-```
+### Choose which apps exist
 
-Protocol layers, bottom to top:
+The parent picks the apps their child may use. Everything else is not on the home
+screen and cannot be launched — this is Android's lock task mode, so Back and
+Home cannot escape it. Optionally pin the child to **one single app**, useful
+when handing a phone over for a specific purpose.
 
-1. **Frames** (`protocol/Framer.kt`) — each logical message is chunked to fit
-   the negotiated ATT MTU: `"<msgId>:<idx>/<count>:<chunk>"`. `Reassembler`
-   reassembles chunks per `msgId`, discards a partial after a 10 s idle
-   timeout, and tracks at most 16 concurrent partial messages so a flood of
-   junk frames cannot exhaust memory before auth.
-2. **Envelope** (`protocol/SecureChannel.kt`) — once authenticated, every
-   message is wrapped as `{seq, body, mac}` and sealed/opened by
-   `SecureChannel`.
-3. **Messages** (`protocol/Messages.kt`) — the typed sealed hierarchy (`Hello`,
-   `Challenge`, `Auth`, `AuthOk`, `Status`, `Apps`, `Result`, `Cmd`, …) encoded
-   as JSON by `MessageCodec`.
+<div align="center">
+<img src="docs/images/parent-apps-picker.png" width="245" alt="Choosing which apps the child may use">
+<img src="docs/images/child-launcher-allapps.png" width="245" alt="The child's home screen with child mode off">
+</div>
 
-`connectivity/ble` (the GATT client/server framework) and `protocol` (framing,
-handshake, secure channel, endpoints) are pure/app-agnostic layers; `managed/`
-and `controller/` wire them to Android (DevicePolicyManager, foreground
-services, DataStore).
+### A home screen built for a child
 
-## Provisioning walkthrough
+Not a cut-down admin console: a big clock, a greeting that follows the time of
+day, large rounded app tiles that respond to a press, and a small dot showing
+whether the parent's phone is nearby. Meant to feel normal for a child up to
+about 14 — friendly without being babyish.
 
-1. On the **controller**, open the **Provision** screen and pick a Wi-Fi
-   source: *Hotspot* (local-only hotspot, no internet needed), *Manual*
-   (shared LAN), or *Custom URL* (self-hosted https APK, no local server).
-2. Tap **Generate QR** — the controller starts an HTTP server (hotspot/manual
-   modes) serving its own APK and encodes a JSON provisioning payload (device
-   admin component, download URL, signing-certificate checksum, Wi-Fi
-   credentials, controller id + shared secret) into a QR code.
-3. On the **managed** device (factory reset), the Setup Wizard welcome screen
-   is tapped 6× to enter QR provisioning, then the QR is scanned.
-4. The device joins the Wi-Fi, downloads the APK, and Android sets Môme DM as
-   device owner.
-5. The app's provisioning wizard runs: **Add Google account** step, then
-   **Grant usage access** step (both skippable), then the managed home screen
-   is shown as device HOME.
+There is no visible lock button, deliberately. A parent unlocks by
+**long-pressing the header**, which opens the PIN pad. A child looking at the
+screen finds nothing to poke at.
 
-See `docs/testing.md` for the full manual walkthrough on two physical
-devices.
+### Night lock — a bedtime the phone keeps on its own
 
-## Commands
+Set a bedtime window and the phone locks itself: no apps, just a quiet screen
+with the time and when it opens again. Separate windows for school nights and for
+Friday and Saturday, because those differ in most houses. The parent can also
+lock the phone **right now** from their own device.
 
-| Command | Effect on managed device |
-|---|---|
-| `KIOSK_ON {apps, pinned?}` | Child mode on: lock task with `apps` allowed; if `pinned` (must be in `apps`) is set, the launcher keeps bouncing back into that one app |
-| `KIOSK_OFF` | Child mode off: exit lock task, launcher shows every installed app |
-| `SET_PREFS {prefs}` | Push language/theme/accent and the parent-PIN hash+salt (or clear it); applied immediately and re-sent after every reconnect |
-| `INSTALL {pkg}` | Open Google Play listing (`market://details?id=pkg`); user taps Install |
-| `ADD_ACCOUNT` | Open system "Add Google account" flow |
-| `LIST_APPS` | Reply with installed launchable apps |
-| `GET_STATUS` | Reply with status |
+<div align="center">
+<img src="docs/images/parent-time-picker.png" width="245" alt="Setting the bedtime window">
+<img src="docs/images/child-pin-dialog.png" width="245" alt="The parent PIN dialog on the child's phone">
+</div>
 
-Out of scope v1: lock/reboot/wipe, user restrictions, APK streaming over BLE,
-sideload URL, silent Play install (requires registered EMM — not available to
-a custom DPC).
+The lock is decided on the child's phone from the schedule it was given, so it
+works with the parent nowhere nearby, survives a reboot, and follows the clock if
+the timezone changes. Under the hood it is deliberately stateless: the phone
+recomputes *am I locked?* from the schedule every time rather than remembering an
+answer — so a missed alarm or a changed clock cannot strand it in the wrong state.
 
-### Child mode
+### A PIN that buys ten minutes
 
-`ManagedHomeActivity` is the managed device's launcher in both states: with
-child mode off it lists every installed app; with child mode on ("Child
-mode" header) it shows only the parent-chosen `apps`, running under Android
-lock task so Back/Home can't escape it. If the parent picked a **pinned**
-app, the launcher relaunches into it after a short (1.5 s) grace period — so the parent-PIN lock icon stays reachable — and keeps bouncing back
-whenever the child returns to the launcher (e.g. via Home).
+Type the parent PIN on the child's phone and the lock pauses for ten minutes —
+enough to check something or deal with an exception — then it re-locks itself.
+The parent can end the pause early.
 
-If the parent has set a PIN (Settings → Controller → *Set PIN*), a lock icon
-in the header opens a PIN prompt; a correct PIN pauses child mode for 10
-minutes (lock task is released, all apps become reachable, a countdown
-banner shows) without turning it off — the parent can end the pause early
-with *Lock again*, or a wrong PIN triggers a growing lockout. The pause does
-**not** survive a reboot: the device re-locks with the same `apps`/`pinned`
-on boot. The PIN itself is hashed (PBKDF2) on the controller before it's
-sent — the managed device only ever stores/compares the hash, never the
-plaintext PIN.
+<div align="center">
+<img src="docs/images/child-paused.png" width="245" alt="The child's phone during a ten-minute pause">
+<img src="docs/images/parent-pin.png" width="245" alt="Setting the parent PIN">
+</div>
 
-## Security
+The PIN is hashed (PBKDF2-HMAC-SHA256, 20 000 iterations, per-device salt) on the
+parent's phone before it is ever sent; the child's phone stores and compares only
+the hash. Wrong guesses trigger a lockout that grows and survives killing the app.
 
-Shared `secret` (32 B) from QR. HMAC-SHA256 throughout.
+### The parent's view
 
-```
-C→S  HELLO     {deviceId, model, nonceC, mtu}
-S→C  CHALLENGE {nonceS, proof = HMAC(secret, "momedm/challenge|" + nonceC)}
-C→S  AUTH      {proof = HMAC(secret, "momedm/auth|" + nonceS)}
-sessionKey = HMAC(secret, "momedm/session|" + nonceC + "|" + nonceS)
-```
+Which apps are allowed, what the child is using right now, battery, when the
+phone was last seen, whether it is locked — with the controls to change any of it.
 
-Every HMAC is **domain-separated** by a distinct constant prefix. Without it the
-three computations share one key and one input space, and the CHALLENGE proof is
-an oracle: whoever sends the HELLO picks `nonceC` freely, so a forged HELLO with
-`nonceC = realNonceC + nonceS` would come back with exactly the value the old
-`HMAC(secret, nonceC || nonceS)` session key had — disclosing the session key
-without ever knowing the secret. The tags make the three input spaces disjoint.
+<div align="center">
+<img src="docs/images/parent-children.png" width="245" alt="The list of children">
+<img src="docs/images/parent-settings.png" width="245" alt="Settings">
+</div>
 
-Both endpoints also **validate the peer's nonce before any HMAC is computed**: a
-`nonceC` (controller side, on HELLO) or `nonceS` (managed side, on CHALLENGE)
-that is not exactly 32 lower-case hex chars — the shape `Crypto.randomHex(16)`
-produces — is a protocol error and resets the session.
+### The parent chooses how it looks
 
-After auth, every message is `{seq, body, mac}` with
-`mac = HMAC(sessionKey, dir|seq|body)` with `dir = 'C'` for controller→managed
-and `'M'` for managed→controller; `seq` monotonic per direction starting at 1.
-Binding the mac to a direction tag stops a captured sealed message from being
-replayed back at its own sender and accepted as if it came from the peer.
-Bad MAC / non-increasing seq / unknown msg before auth → disconnect and reset
-the whole session (handshake + channel), so no captured handshake or sealed
-frame from before the error can be replayed to re-derive or reuse it.
-Managed device on auth failure keeps scanning (another controller may be
-nearby). Controller drops unauthenticated connections after 5 s.
+Theme, accent colour and language are picked on the parent's phone and pushed to
+the child's, so a child's phone shows the family's choices rather than its own —
+including the language. Fully bilingual, **English and French**, with the two
+string files kept key-for-key in sync by a test that fails the build otherwise.
 
-What is **not** encrypted: BLE link-layer traffic itself (no LE Secure
-Connections pairing is used — the app-layer HMAC handshake and per-message
-MAC are the actual trust boundary), and the provisioning QR code — anyone who
-photographs it during the provisioning window learns the shared secret, so
-treat the QR screen as sensitive while it's on screen.
+<div align="center">
+<img src="docs/images/parent-appearance.png" width="245" alt="Theme, accent colour and language">
+</div>
 
-## Building
+### Setting up a child's phone
+
+From a factory-reset phone: tap the welcome screen six times, scan the code the
+parent's app shows, and the child's phone downloads the app and installs it as
+device owner. The parent's phone can even provide the Wi-Fi itself through a
+local hotspot, so no existing network is needed.
+
+<div align="center">
+<img src="docs/images/parent-provision.png" width="245" alt="The enrolment screen with the pairing code">
+</div>
+
+*The pairing code and Wi-Fi password are blurred in this screenshot on purpose —
+that code carries the shared secret, so treat the real one as sensitive while it
+is on screen.*
+
+## Requirements
+
+- Two Android phones on **Android 14 (API 34)** or newer.
+- The child's phone must be **factory reset** to be enrolled — Android grants
+  device-owner rights only during initial setup, before any account is added.
+- Bluetooth on both. No internet, Google account or Play services are needed for
+  day-to-day use.
+
+## Installing
 
 ```bash
-./gradlew assembleDebug          # build debug APK
-./gradlew installDebug           # build + install on a connected device
-./gradlew :app:testDebugUnitTest # JVM unit tests (protocol, controller, persistence, managed)
+git clone https://github.com/nosari20/momedm.git
+cd momedm
+./gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-BLE and device-owner behavior can be exercised between two API 33+ emulators
-(emulated Bluetooth) — see the "Emulator test rig" section of
-`docs/testing.md`; the QR/Setup-Wizard provisioning path and the hotspot need
-real devices.
+Install that APK on the parent's phone and open it, then follow the **enrolment**
+screen for the child's phone. [`docs/testing.md`](docs/testing.md) has the full
+walkthrough, including the emulator route if you want to try it without two
+handsets.
+
+## How it works
+
+```
+Parent phone                                  Child phone
+┌──────────────────────────┐                  ┌──────────────────────────┐
+│ ControllerService         │   BLE GATT       │ ManagedLinkService        │
+│  advertises, holds        │◄────────────────►│  scans, connects,         │
+│  sessions, sends commands │   MdmService     │  applies policy           │
+└──────────────────────────┘                  └──────────────────────────┘
+                                                          │
+                                                DevicePolicyManager
+                                          (lock task, home, restrictions)
+```
+
+The parent's phone runs a BLE GATT server; the child's phone scans for it and
+connects. On top sits a small protocol: messages are chunked to the negotiated
+MTU, a mutual HMAC-SHA256 handshake derives a session key, and every message
+afterwards carries a per-direction MAC and a monotonic sequence number, so a
+captured frame cannot be replayed — in either direction.
+
+The `protocol/` package is pure Kotlin with no Android imports, which is why the
+framing, handshake, secure channel and lock schedule are all covered by ordinary
+JVM tests.
+
+For the deeper version — the exact handshake, the framing format, the commands,
+and the threat model with its limits — see
+[`docs/architecture.md`](docs/architecture.md).
+
+## Testing
+
+```bash
+./gradlew :app:testDebugUnitTest   # JVM unit tests
+./gradlew :app:assembleDebug       # build the APK
+```
+
+Two layers, covering different things:
+
+- **JVM tests** cover everything that can be pure — protocol framing, the
+  handshake, the secure channel, the lock schedule's date maths (including DST),
+  persistence, command dispatch, and the lock controller's decisions.
+- **A two-emulator rig** covers what has no JVM fake: `DevicePolicyManager` lock
+  task, `AlarmManager`, the broadcast receivers, and the BLE link itself. Two
+  emulators share an emulated Bluetooth stack, so the whole parent↔child flow
+  runs between them.
+
+That second layer is not ceremony. Two real defects here — a busy loop, and a
+reboot race that silently downgraded a complete lock so apps could launch while
+the bedtime screen still claimed the phone was locked — were invisible to unit
+tests and to code review, and only surfaced on devices. See
+[`docs/testing.md`](docs/testing.md).
 
 ## Known limitations
 
-- v1 uses one shared secret for all devices provisioned by a controller;
-  compromise of one device's secret exposes the fleet until `Regenerate secret`
-  + re-provisioning. Per-device secrets are planned.
-- No silent Play install: `INSTALL` opens the Play listing for the user to
-  tap Install — a custom (non-registered-EMM) DPC cannot install silently.
-- Usage access (for `currentApp` in `STATUS`) is optional and skippable
-  during provisioning; without it the managed device reports the kiosk
-  package while kiosk is on, or nothing (shown as "—" in both UIs) otherwise.
-- The provisioning download URL defaults to plain `http://` (the controller's
-  self-hosted APK server); SUW's acceptance of `http://` and of a no-internet
-  hotspot network varies by OEM/Android version — fall back to Manual (shared
-  LAN) or Custom URL (self-hosted https) mode if the QR fails to provision.
-- Hotspot mode has no internet — only useful for the APK download step; any
-  step requiring internet (e.g. Play Store operations) needs the managed
-  device back on real Wi-Fi/mobile data afterward.
+Stated plainly, because a parental-control tool that oversells itself is worse
+than useless:
+
+- **Emergency calling under a night lock is unverified.** The app keeps Android's
+  power menu (and its Emergency entry) enabled while locked, but this could not be
+  confirmed on the emulator images used so far and still needs checking on a real
+  handset.
+- **A night lock cannot currently be ended remotely** — only by the parent PIN on
+  the child's phone, or by waiting for the window to close.
+- **One shared secret per parent**, not per child. Compromising one child's phone
+  exposes the others until the parent regenerates the secret and re-enrols.
+- **No silent app installation.** The parent can open a Play listing on the
+  child's phone; someone still has to tap Install. Silent installation requires
+  being a registered enterprise EMM.
+- **The BLE link is authenticated, not encrypted.** Messages cannot be forged or
+  replayed, but they are not confidential to someone sniffing the radio.
+- **Physical access wins.** A factory reset removes the app entirely.
+
+## Contributing
+
+Contributions are welcome — especially real-device reports for the gaps above.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it covers the architectural rules
+(lock state is never persisted, `protocol/` stays Android-free, strings live in
+both languages) and what "I tested it" has to mean here.
+
+Security issues go through [SECURITY.md](SECURITY.md), not the public tracker.
+
+This repository also ships [Claude Code](https://claude.com/claude-code)
+configuration in [`.claude/`](.claude/) — skills describing the emulator rig, how
+to add a management command end-to-end, and the string-parity rules. Useful
+reading even if you never run Claude.
+
+## Licence
+
+[Apache License 2.0](LICENSE) — see [NOTICE](NOTICE).

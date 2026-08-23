@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest something the app should be able to do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: >
+        Describe the situation as a parent or a child would experience it, not
+        as a feature. "My daughter needs her alarm clock during bedtime lock" is
+        more useful than "add an app allowlist to night lock".
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What did you try or consider instead?
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Please confirm you have considered
+      options:
+        - label: This works with the parent phone out of BLE range (the child device is often alone)
+        - label: This does not require a cloud service or a Google account
+        - label: This does not weaken an existing lock guarantee

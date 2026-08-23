@@ -16,3 +16,7 @@ local.properties
 
 # SDD scratch workspace
 .superpowers/
+
+# Screenshot capture scratch (working shots, not the published set)
+docs/images/_*.png
+docs/images/CAPTURE-NOTES.md

@@ -1,0 +1,81 @@
+name: Bug report
+description: Something behaves differently from what the app promises
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If this is a **security** issue — an escape from a
+        lock, a PIN bypass, a forged command — please do not file it here. See
+        [SECURITY.md](../blob/main/SECURITY.md) for private reporting.
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Which side is affected?
+      options:
+        - Parent phone (controller)
+        - Child phone (managed device)
+        - Both / the link between them
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you see, and what did you expect instead?
+      placeholder: |
+        The child's phone showed the bedtime screen, but tapping Home escaped it.
+        I expected the bedtime screen to stay in front.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. On the parent, enable Night lock with a window starting in 1 minute
+        2. Wait for the window to open
+        3. On the child, press Home
+    validations:
+      required: true
+
+  - type: input
+    id: android
+    attributes:
+      label: Android version(s)
+      placeholder: "Parent: Android 15 (Pixel 7). Child: Android 14 (Galaxy A15)."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Real devices or emulators?
+      options:
+        - Real devices
+        - Two emulators
+        - One of each
+    validations:
+      required: true
+
+  - type: textarea
+    id: state
+    attributes:
+      label: Lock state at the time, if relevant
+      description: >
+        Child mode on or off? A night lock or manual lock active? A PIN pause
+        running? If you can, include the output of
+        `adb shell dumpsys activity activities | grep mLockTaskModeState`.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        `adb logcat -d -s ManagedLinkService:V PolicyManager:V LockController:V ControllerService:V`
+        is usually the useful slice. **Redact any PIN before pasting.**
+      render: text
