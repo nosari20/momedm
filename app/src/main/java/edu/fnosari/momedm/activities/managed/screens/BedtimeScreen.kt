@@ -82,8 +82,14 @@ fun BedtimeScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
                 else Modifier,
             ),
         ) {
-            Text(clock, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.bedtime_title), style = MaterialTheme.typography.headlineSmall)
+            // Both colours are explicit on purpose: this Column sits in a bare Box, not a Surface, so
+            // LocalContentColor falls back to black and the clock renders nearly invisible against the
+            // dark gradient. The subtitle below already sets its own colour, which is why it was the
+            // only legible line before this was fixed.
+            Text(clock, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.bedtime_title), style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface)
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 32.dp))
         }
