@@ -99,8 +99,21 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { kioskConfig.filterNotNull().collect { refreshApps(); trackPause(it) } }
     }
 
-    /** Bumps [resumeTick] — called from the Activity's ON_RESUME observer. */
-    fun onResumed() { resumeTick.value++ }
+    /**
+     * Bumps [resumeTick] and re-evaluates the lock — called from the Activity's ON_RESUME observer.
+     *
+     * This is spec §1.4's "launcher resumes" trigger, and §1.10's compensating control for a missed
+     * alarm (doze, an OEM task killer): as long as the launcher is ever brought back to the
+     * foreground, its lock state converges within one resume, even if the alarm never fired. It is
+     * safe to call unconditionally on every resume — including the resume that
+     * [LockController.reevaluate] itself causes via `lockComplete()`/`applyKiosk()`'s
+     * `CLEAR_TASK` relaunch — because [LockController] skips re-applying a [LockState] identical to
+     * the one it last applied; see its KDoc for why that cannot get the device stuck in a wrong state.
+     */
+    fun onResumed() {
+        resumeTick.value++
+        viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() }
+    }
 
     /**
      * Recomputes the tile list (allowed apps while locked, every launchable app otherwise); cancels
@@ -148,9 +161,11 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
 
     /** Opens [pkg] — via [PolicyManager.launchAllowed], which requests lock task only while locked. */
     fun open(pkg: String) {
-        // Config not loaded yet: no tiles are rendered, so this can only be a stale bounce request —
-        // never ask for lock task on a guess.
-        val locked = kioskConfig.value?.isLocked(System.currentTimeMillis()) == true
+        // lockState not loaded yet: no tiles are rendered, so this can only be a stale bounce request —
+        // never ask for lock task on a guess. Reads lockState (not kioskConfig.isLocked) so this is the
+        // last call site to converge on the same "locked" notion LockController itself uses — a plain
+        // kiosk-mode flag has no idea a complete lock could apply with child mode off.
+        val locked = lockState.value?.locked == true
         val ok = policy.launchAllowed(pkg, locked)
         if (!ok) Log.w(LOG_TAG, "Could not open $pkg")
     }
