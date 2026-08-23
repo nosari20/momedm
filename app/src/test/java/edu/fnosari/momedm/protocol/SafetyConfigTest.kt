@@ -76,6 +76,42 @@ class SafetyConfigTest {
         assertEquals(c, back.safety)
     }
 
+    @Test fun aNestedSchemaSurvivesTheWire() {
+        // The real shape of a list-of-groups setting, captured from an app that declares one: a bundle
+        // array whose single template bundle carries the item's fields.
+        val schema = listOf(
+            SchemaEntry(
+                key = "test_list", type = EntryType.BUNDLE_ARRAY, title = "Tests",
+                nested = listOf(
+                    SchemaEntry(
+                        key = "test", type = EntryType.BUNDLE, title = "Test",
+                        nested = listOf(
+                            SchemaEntry("test_hostname", EntryType.STRING, "Hostname"),
+                            SchemaEntry("test_port", EntryType.INTEGER, "Port"),
+                            SchemaEntry("test_ssl", EntryType.BOOLEAN, "Use SSL"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val back = MessageCodec.decodeMessage(
+            MessageCodec.encodeMessage(Message.Schema("com.example.app", schema)),
+        ) as Message.Schema
+        assertEquals(schema, back.entries)
+    }
+
+    @Test fun aBundleArrayOffersTheItemsFieldsNotTheWrapper() {
+        // The form has to show hostname/port/ssl when adding an entry, not one nameless "Test" group.
+        val template = SchemaEntry(
+            key = "test", type = EntryType.BUNDLE,
+            nested = listOf(SchemaEntry("test_hostname", EntryType.STRING), SchemaEntry("test_port", EntryType.INTEGER)),
+        )
+        val list = SchemaEntry("test_list", EntryType.BUNDLE_ARRAY, nested = listOf(template))
+        assertEquals(listOf("test_hostname", "test_port"), list.itemFields.map { it.key })
+        // A plain bundle offers its own children.
+        assertEquals(listOf("test_hostname", "test_port"), template.itemFields.map { it.key })
+    }
+
     @Test fun statusDefaultsToOffWhenAPeerSendsNoLevel() {
         val json = """{"t":"STATUS","kiosk":false,"kioskPkg":null,"account":false,"battery":10,"currentApp":null}"""
         assertEquals(SafetyLevel.OFF, (MessageCodec.decodeMessage(json) as Message.Status).safetyLevel)

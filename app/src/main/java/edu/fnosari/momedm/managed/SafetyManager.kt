@@ -41,6 +41,12 @@ class SafetyManager(private val context: Context, private val dpm: DevicePolicyM
                     value is JsonPrimitive && value.isString -> b.putString(key, value.content)
                     value is JsonArray && value.all { it is JsonPrimitive && it.isString } ->
                         b.putStringArray(key, value.map { (it as JsonPrimitive).content }.toTypedArray())
+                    // Nested groups and lists of groups: the shape apps use for a list of servers,
+                    // bookmarks and the like. Without these, such a setting could be shown but never
+                    // written, which is worse than not offering it.
+                    value is JsonObject -> b.putBundle(key, toBundle(value))
+                    value is JsonArray && value.all { it is JsonObject } ->
+                        b.putParcelableArray(key, value.map { toBundle(it as JsonObject) }.toTypedArray())
                     else -> Log.w(LOG_TAG, "Skipping unsupported value for $key")
                 }
             }

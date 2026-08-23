@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -39,8 +40,10 @@ import kotlinx.serialization.json.intOrNull
  * A form built from an app's *own* declared settings, so any app that supports managed configuration
  * can be configured without this app knowing anything about it in advance.
  *
- * Only entries the child could describe are shown; bundle-shaped ones are listed as not editable
- * rather than hidden, so a parent looking for a setting learns it exists but cannot be set here.
+ * Groups of fields are rendered inline, and lists of groups — a list of servers, of bookmarks — can
+ * have entries added and removed, since that is the shape apps reach for whenever a setting is more
+ * than one value. Anything left that a form cannot represent is listed as not editable rather than
+ * hidden, so a parent looking for a setting learns it exists but cannot be set here.
  *
  * [current] is what the child already holds for this package, so opening the form shows the values in
  * force rather than blanks, and saving does not silently reset the ones left untouched.
@@ -142,6 +145,43 @@ private fun Field(entry: SchemaEntry, value: JsonElement?, onChange: (JsonElemen
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // A group of fields: rendered inline and indented, writing into a nested object.
+            EntryType.BUNDLE -> {
+                Text(entry.title, style = MaterialTheme.typography.bodyMedium)
+                val obj = value as? JsonObject ?: JsonObject(emptyMap())
+                Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (child in entry.itemFields) {
+                        Field(child, obj[child.key]) { v -> onChange(JsonObject(obj + (child.key to v))) }
+                    }
+                }
+            }
+
+            // A repeatable list of groups — a list of servers, bookmarks and the like. The schema
+            // declares one item's shape; the parent adds and removes as many as they need.
+            EntryType.BUNDLE_ARRAY -> {
+                val items = (value as? JsonArray)?.filterIsInstance<JsonObject>().orEmpty()
+                Text(
+                    stringResource(R.string.appcfg_items, entry.title, items.size),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                items.forEachIndexed { index, item ->
+                    Column(Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (child in entry.itemFields) {
+                            Field(child, item[child.key]) { v ->
+                                val updated = JsonObject(item + (child.key to v))
+                                onChange(JsonArray(items.toMutableList().also { it[index] = updated }))
+                            }
+                        }
+                        TextButton(onClick = {
+                            onChange(JsonArray(items.toMutableList().also { it.removeAt(index) }))
+                        }) { Text(stringResource(R.string.appcfg_remove)) }
+                    }
+                }
+                TextButton(onClick = { onChange(JsonArray(items + JsonObject(emptyMap()))) }) {
+                    Text(stringResource(R.string.appcfg_add, entry.title))
+                }
+            }
 
             // Shown, not hidden: a parent hunting for a setting should learn it exists and that this
             // form cannot set it, rather than conclude the app does not have it.

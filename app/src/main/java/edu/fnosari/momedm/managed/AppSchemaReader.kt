@@ -45,15 +45,23 @@ object AppSchemaReader {
             RestrictionEntry.TYPE_MULTI_SELECT -> EntryType.MULTI_SELECT
             RestrictionEntry.TYPE_INTEGER -> EntryType.INTEGER
             RestrictionEntry.TYPE_STRING -> EntryType.STRING
-            // Bundles describe tree-shaped configuration a flat form cannot edit honestly.
+            RestrictionEntry.TYPE_BUNDLE -> EntryType.BUNDLE
+            RestrictionEntry.TYPE_BUNDLE_ARRAY -> EntryType.BUNDLE_ARRAY
             else -> EntryType.UNSUPPORTED
         }
+        // Bundles carry their fields as child entries; a bundle array declares the shape of one item
+        // once and repeats it. Recursing is what makes list-shaped settings — a list of servers, of
+        // bookmarks — editable instead of merely visible.
+        val children = if (kind == EntryType.BUNDLE || kind == EntryType.BUNDLE_ARRAY) {
+            restrictions?.mapNotNull { it.toSchemaEntry() }.orEmpty()
+        } else emptyList()
         return SchemaEntry(
             key = key,
             type = kind,
             title = title?.takeIf { it.isNotBlank() } ?: key,
             choiceLabels = choiceEntries?.toList().orEmpty(),
             choiceValues = choiceValues?.toList().orEmpty(),
+            nested = children,
         )
     }
 }
