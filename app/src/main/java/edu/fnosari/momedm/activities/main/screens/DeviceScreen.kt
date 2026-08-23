@@ -163,7 +163,10 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         OutlinedButton(onClick = { viewModel.refresh(deviceId) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_refresh)) }
     }
     appsFor?.let { (id, apps) ->
-        if (id == deviceId) AppPickerDialog(apps, initiallySelected = s?.kioskApps?.toSet() ?: emptySet(), initiallyPinned = s?.kioskPkg,
+        // Both pickers are driven by the same app list the child reports, so this one stands aside
+        // when the list was requested in order to choose an app to configure — otherwise asking for
+        // advanced settings opens the allowed-apps picker instead.
+        if (id == deviceId && !pickingConfigApp) AppPickerDialog(apps, initiallySelected = s?.kioskApps?.toSet() ?: emptySet(), initiallyPinned = s?.kioskPkg,
             onConfirm = { selectedApps, pinned -> viewModel.kioskOn(deviceId, selectedApps, pinned) }, onDismiss = { viewModel.clearApps() })
     }
     val schema by viewModel.schemaFor.collectAsState()
