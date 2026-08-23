@@ -205,6 +205,8 @@
     <string name="pair_qr_error">Code trop grand à afficher</string>
     <string name="pair_help">L\'appareil enfant doit d\'abord être réinitialisé.</string>
     <string name="pair_ssid_value">%1$s : %2$s</string>
+    <string name="pair_password_show">Afficher</string>
+    <string name="pair_password_hide">Masquer</string>
     <string name="pair_password_value">%1$s : %2$s</string>
 
     <!-- Child launcher (managed) -->

@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.runtime.Composable
@@ -32,7 +33,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -108,7 +113,24 @@ fun ProvisionScreen(navController: NavHostController, viewModel: ControllerViewM
                     }
                 } else {
                     OutlinedTextField(s.ssid, { pc.setManual(it, s.password) }, label = { Text(stringResource(R.string.pair_ssid)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(s.password, { pc.setManual(s.ssid, it) }, label = { Text(stringResource(R.string.pair_password)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    // Masked by default: this is typed with a child, and often a neighbour, in the room.
+                    // The toggle is a text button because the eye glyph lives in material-icons-extended,
+                    // which this project does not ship.
+                    var showPassword by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        s.password,
+                        { pc.setManual(s.ssid, it) },
+                        label = { Text(stringResource(R.string.pair_password)) },
+                        singleLine = true,
+                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            TextButton(onClick = { showPassword = !showPassword }) {
+                                Text(stringResource(if (showPassword) R.string.pair_password_hide else R.string.pair_password_show))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 if (s.mode == ControllerPrefs.MODE_CUSTOM_URL) OutlinedTextField(s.customUrl, { pc.setCustomUrl(it) }, label = { Text(stringResource(R.string.pair_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }

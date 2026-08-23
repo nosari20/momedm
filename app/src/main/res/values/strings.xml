@@ -205,6 +205,8 @@
     <string name="pair_qr_error">Code too large to display</string>
     <string name="pair_help">The child device must be factory-reset first.</string>
     <string name="pair_ssid_value">%1$s: %2$s</string>
+    <string name="pair_password_show">Show</string>
+    <string name="pair_password_hide">Hide</string>
     <string name="pair_password_value">%1$s: %2$s</string>
 
     <!-- Child launcher (managed) -->
