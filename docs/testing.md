@@ -181,6 +181,32 @@ prioritize them.**
   itself under an active complete lock) was found during this step on the
   pre-fix build; it was fixed in `8bfe160` and re-verified — see "Defects
   found and fixed" below.
+
+  **This PASS was stale and has been re-verified.** It was recorded before
+  `467d165` added `LockController`'s in-memory apply-dedup cache (the
+  ON_RESUME relaunch-loop guard). That cache's key was `LockState` alone,
+  and a still-active pause returned from `reevaluate()` without touching the
+  cache — so once the hosting Activity's `stopLockTask()` took the device
+  out of the applied policy, the cache kept recording the old lock as
+  "already applied." On this exact rig (PIN `1234`, manual lock, `auto_time`
+  toggled off and the clock advanced past the 10-minute pause deadline via
+  Settings → Date & time, since this AVD image has no root shell for `adb
+  shell date`), that meant the lapse step above silently stopped re-locking:
+  `mLockTaskModeState` stayed `NONE` and the bedtime screen never came back,
+  even though it still claimed "Un parent a verrouillé ce téléphone" (a
+  regression, not a re-confirmation, of Defect 1's fix — same symptom
+  family, different cause). Re-verified 2026-08-23 against this branch's fix
+  (cache now keyed on `(LockState, KioskConfig)`, and cleared outright on
+  entering the still-active-pause branch): after the same pause-then-lapse
+  sequence, logcat showed `LockController: Re-evaluated: locked=true
+  reason=manual` → `PolicyManager: Complete lock applied` at the lapse
+  instant, `dumpsys activity activities` showed `mLockTaskModeState=LOCKED`
+  again, and the bedtime screen reappeared unprompted. `top -m 10 -n 1`
+  immediately after showed the app process absent from the top 10 (idle) and
+  logcat showed no repeated activity starts — the ON_RESUME dedup guard
+  `467d165` added still holds. Full transcript in
+  `.superpowers/sdd/2026-08-23-complete-lock/regression-fix-report.md`. —
+  **PASS (re-verified)**.
 - [x] **Step 4: Reboot inside a window.** `adb reboot` while
   `mLockTaskModeState=LOCKED` (reason=night). After boot, our
   `BootReceiver: Boot completed; starting link service` fired, then

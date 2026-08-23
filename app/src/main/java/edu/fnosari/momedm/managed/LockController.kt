@@ -2,6 +2,7 @@ package edu.fnosari.momedm.managed
 
 import android.content.Context
 import android.util.Log
+import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.LockState
 import kotlinx.coroutines.flow.first
@@ -28,6 +29,20 @@ private class SystemAlarms(private val context: Context) : Alarms {
 }
 
 /**
+ * The full applied policy, used as the apply-dedup cache key (see [LockController.lastApplied]).
+ * [LockState] alone is not enough: [LockActions.restoreNormal] does not take the state as an
+ * argument — it reads [ManagedPrefs.kioskConfig] itself and branches into either the child-mode
+ * kiosk allowlist or a fully free device. Two different [KioskConfig]s (child mode on vs. off) can
+ * both evaluate to the same unlocked [LockState], so a cache keyed on [LockState] alone would treat
+ * "just turned child mode on" and "just turned child mode off" as the same already-applied entry
+ * and silently skip one of them — which is exactly regression 1 (KIOSK_ON/KIOSK_OFF becoming DPM
+ * no-ops). [kiosk] is always recorded with `pauseUntil = 0` (see the call site in [reevaluate]),
+ * since by the time an apply happens the pause is either not live or was just cleared, and normalizing
+ * it keeps the key stable across calls instead of drifting with whatever stale deadline was last read.
+ */
+private data class Applied(val state: LockState, val kiosk: KioskConfig)
+
+/**
  * The single place that decides whether the device is completely locked and makes reality match.
  *
  * [reevaluate] is idempotent and cheap, and is called from every trigger that could change the
@@ -39,16 +54,21 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         private const val LOG_TAG = "LockController"
 
         /**
-         * The last [LockState] this class actually applied ([LockActions.lockComplete] /
+         * The last [Applied] policy this class actually applied ([LockActions.lockComplete] /
          * [LockActions.restoreNormal]), in-memory only — a plain, non-persisted process-wide field,
          * never written to disk. It exists solely to stop the relaunch loop described on
          * [reevaluate]: it is never treated as the verdict itself, only as "did we already do this
-         * exact thing", and [reevaluate] always recomputes [LockState] fresh from the persisted
+         * exact thing", and [reevaluate] always recomputes [Applied] fresh from the persisted
          * inputs before consulting it. Cleared for free by process death (a reboot or an OOM kill),
          * which is exactly when the cache *should* be empty, since the DPM state itself was never
-         * asserted by this process instance.
+         * asserted by this process instance. Also cleared explicitly whenever a pause is (still)
+         * active — see the `pauseUntil > now` branch in [reevaluate] — because starting a pause
+         * always releases lock task out-of-band (the hosting Activity calls stopLockTask() itself),
+         * so the device leaves whatever policy this field records; without clearing it, a pause that
+         * lapses back into an unchanged [Applied] pair would be skipped as "already applied" even
+         * though the device is no longer actually in that state (regression 2).
          */
-        @Volatile private var lastApplied: LockState? = null
+        @Volatile private var lastApplied: Applied? = null
 
         /**
          * Test-only: clears the in-memory apply cache between test cases so they don't leak state
@@ -69,7 +89,8 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         val zone = ZoneId.systemDefault()
         val schedule = prefs.lockSchedule.first()
         val manual = prefs.manualLock.first()
-        val pauseUntil = prefs.kioskConfig.first().pauseUntil
+        val kioskConfig = prefs.kioskConfig.first()
+        val pauseUntil = kioskConfig.pauseUntil
 
         // A parent-PIN pause always evaluates to unlocked (LockState.evaluate short-circuits on
         // pauseUntil > now), so if we fell through to the apply step below, an unlocked state would
@@ -83,6 +104,11 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         // exists to avoid.
         if (pauseUntil > now) {
             Log.d(LOG_TAG, "Pause active until $pauseUntil; leaving lock state untouched")
+            // The pause releases lock task out-of-band (the hosting Activity calls stopLockTask()
+            // itself), so the device is no longer in whatever policy lastApplied records. Clear it
+            // so that when the pause lapses and reevaluate() recomputes an unchanged Applied pair,
+            // the stale cache entry does not cause the re-lock apply to be skipped (regression 2).
+            lastApplied = null
             alarms.armNext(pauseUntil)
             ManagedLinkState.statusPushRequests.tryEmit(Unit)
             return
@@ -114,19 +140,28 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         val state = LockState.evaluate(schedule, manual, pauseUntil, now, zone)
         Log.d(LOG_TAG, "Re-evaluated: locked=${state.locked} reason=${state.reason}")
 
-        // Skip re-applying when the computed state is exactly what we last applied. This exists so
+        // Skip re-applying when the computed policy is exactly what we last applied. This exists so
         // that ON_RESUME can safely call reevaluate() on every resume (including the resume caused by
         // this very call's own launchHomeLocked()/CLEAR_TASK) without relaunching forever: the second
-        // and subsequent resumes recompute the *same* LockState from the same persisted inputs, find
-        // it equal to lastApplied, and skip the apply (and therefore skip the relaunch that would
-        // trigger yet another ON_RESUME).
+        // and subsequent resumes recompute the *same* Applied pair from the same persisted inputs,
+        // find it equal to lastApplied, and skip the apply (and therefore skip the relaunch that
+        // would trigger yet another ON_RESUME).
+        //
+        // The cache key is the whole applied policy (state + KioskConfig), not just LockState:
+        // restoreNormal() takes no arguments and instead reads prefs.kioskConfig itself to decide
+        // between the child-mode allowlist and a fully free device, so two different KioskConfigs
+        // that both evaluate to the same unlocked LockState (child mode just turned on vs. just
+        // turned off) must not collide in the cache — that collision was regression 1
+        // (KIOSK_ON/KIOSK_OFF becoming DPM no-ops). pauseUntil is normalized to 0 in the key: at this
+        // point it is either already 0, or was just zeroed in prefs above, so the key stays stable
+        // regardless of which lapsed value was read at the top of this call.
         //
         // This cannot cause the device to get stuck in a wrong policy:
         //  - It is a cache of "what we last *applied*", not of "what is locked" — LockState itself is
         //    still recomputed from scratch on every call, from the persisted schedule/manual/pause
-        //    inputs, exactly as before. Any input change (a new schedule, LOCK_NOW/UNLOCK, a pause
-        //    starting or the lapse-clear above) changes the computed LockState and therefore misses
-        //    the cache, so the apply still runs.
+        //    inputs, exactly as before. Any input change (a new schedule, LOCK_NOW/UNLOCK, a KioskConfig
+        //    change, a pause starting or the lapse-clear above) changes the computed Applied pair and
+        //    therefore misses the cache, so the apply still runs.
         //  - It is process-memory only (a plain field, not DataStore), so a reboot or an OOM kill —
         //    the two failure modes §1.10 lists as the ones re-evaluation exists to catch — always
         //    starts with lastApplied == null, guaranteeing the first reevaluate() after either one
@@ -134,18 +169,21 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         //  - A failed apply never updates the cache (see below), so a device that failed to reach its
         //    correct policy keeps retrying on every subsequent trigger instead of being cached as
         //    "done".
+        //  - A still-active pause clears the cache outright (see the `pauseUntil > now` branch above),
+        //    so a lapse that recomputes an unchanged Applied pair still re-applies it (regression 2).
         //  - Every other trigger (alarm, boot, clock change, the pause-lapse path above, the three
         //    commands) still calls reevaluate() exactly as before; this only removes a redundant
         //    *apply* when nothing about the decision changed, never a chance to reconsider it.
-        if (state == lastApplied) {
+        val applied = Applied(state, kioskConfig.copy(pauseUntil = 0L))
+        if (applied == lastApplied) {
             Log.d(LOG_TAG, "Lock state unchanged since last apply; skipping re-apply")
         } else {
-            val applied = if (state.locked) actions.lockComplete() else actions.restoreNormal()
+            val result = if (state.locked) actions.lockComplete() else actions.restoreNormal()
             // A failure is left for the next trigger to retry: nothing was persisted from the
             // attempt, the cache is not updated, so a retry starts from the same inputs, reaches the
             // same decision, and tries the apply again.
-            applied.onSuccess { lastApplied = state }
-            applied.onFailure { Log.w(LOG_TAG, "Could not apply lock state; will retry on the next trigger", it) }
+            result.onSuccess { lastApplied = applied }
+            result.onFailure { Log.w(LOG_TAG, "Could not apply lock state; will retry on the next trigger", it) }
         }
 
         // Wake up at the next window boundary. pauseUntil is never in the future at this point (the
