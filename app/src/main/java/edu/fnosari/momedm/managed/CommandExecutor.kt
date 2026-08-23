@@ -4,6 +4,7 @@ import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.LockSchedule
+import edu.fnosari.momedm.protocol.SafetyConfig
 import edu.fnosari.momedm.protocol.Message
 
 /** Managed-role actions the [CommandExecutor] drives; implemented by [PolicyManager]. */
@@ -15,6 +16,8 @@ interface PolicyActions {
     /** Opens Play's search results for a plain-language app name (no package id needed). */
     suspend fun openPlaySearch(term: String): Result<Unit>
     suspend fun openAddAccount(): Result<Unit>
+    /** Stores and applies the parent's content restrictions (app managed configuration + private DNS). */
+    suspend fun setSafety(config: SafetyConfig): Result<String>
     /** Stores and applies parent-pushed preferences (language, theme, accent, PIN). */
     suspend fun applyPrefs(prefs: ChildPrefs): Result<Unit>
     /** Persists the parent's nightly lock window and re-evaluates the lock immediately. */
@@ -55,6 +58,12 @@ class CommandExecutor(private val policy: PolicyActions, private val status: Sta
             CmdType.SET_PREFS -> {
                 val prefs = cmd.prefs ?: return listOf(Message.Result(cmd.id, false, "missing prefs"))
                 listOf(res(policy.applyPrefs(prefs.sanitized()), "prefs applied"))
+            }
+            CmdType.SET_SAFETY -> {
+                val cfg = cmd.safety ?: return listOf(Message.Result(cmd.id, false, "missing safety"))
+                val r = policy.setSafety(cfg.sanitized())
+                if (r.isSuccess) listOf(Message.Result(cmd.id, true, r.getOrThrow()), status.collect())
+                else listOf(Message.Result(cmd.id, false, r.exceptionOrNull()?.message ?: "failed"))
             }
             CmdType.SET_SCHEDULE -> {
                 val s = cmd.schedule ?: return listOf(Message.Result(cmd.id, false, "missing schedule"))

@@ -1,0 +1,84 @@
+package edu.fnosari.momedm.protocol
+
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+
+/** How strict the content settings pushed to a child device are. */
+enum class SafetyLevel { OFF, MODERATE, STRICT }
+
+/**
+ * Content restrictions a parent pushes to a child device. Pure Kotlin.
+ *
+ * [appConfigs] is deliberately generic — package name to managed-configuration key/values, applied
+ * verbatim — rather than a fixed set of Chrome fields. A preset is only a *generator* of that map, so
+ * adding a key later, or configuring a different app entirely, needs no protocol change.
+ */
+@Serializable
+data class SafetyConfig(
+    val level: SafetyLevel = SafetyLevel.OFF,
+    /** DNS-over-TLS hostname; null leaves private DNS alone. */
+    val dnsHost: String? = null,
+    val appConfigs: Map<String, JsonObject> = emptyMap(),
+) {
+    /** Drops a malformed [dnsHost] rather than handing it to the platform. */
+    fun sanitized(): SafetyConfig = copy(dnsHost = dnsHost?.takeIf { isValidHostname(it) })
+
+    companion object {
+        const val CHROME_PKG = "com.android.chrome"
+
+        /**
+         * The preset for [level], as managed configuration for the apps that support it.
+         *
+         * Only Chrome is covered, because it is the only common app that declares managed
+         * configurations: the YouTube app declares none at all, so nothing an MDM sends can restrict
+         * it — that is what [dnsHost] is for, since a family-filter resolver forces YouTube's own
+         * Restricted Mode network-wide, inside the app included.
+         *
+         * Keys are Chrome enterprise policies, all present in the Chrome build shipping on Android:
+         *  - `BrowserSignin = 0` — signing in is disabled, so the browser is not tied to an account;
+         *  - `SafeBrowsingProtectionLevel = 2` — enhanced protection (1 = standard, 0 = off);
+         *  - `IncognitoModeAvailability = 1` — incognito disabled, so history cannot be sidestepped;
+         *  - `ForceGoogleSafeSearch = true`;
+         *  - `SafeSitesFilterBehavior = 1` — filter adult content;
+         *  - `ForceYouTubeRestrict` — 1 moderate, 2 strict (applies to YouTube *in Chrome*).
+         */
+        fun presetFor(level: SafetyLevel): Map<String, JsonObject> = when (level) {
+            SafetyLevel.OFF -> emptyMap()
+            SafetyLevel.MODERATE -> mapOf(CHROME_PKG to chrome(youTubeRestrict = 1))
+            SafetyLevel.STRICT -> mapOf(CHROME_PKG to chrome(youTubeRestrict = 2))
+        }
+
+        private fun chrome(youTubeRestrict: Int): JsonObject = buildJsonObject {
+            put("BrowserSignin", JsonPrimitive(0))
+            put("SafeBrowsingProtectionLevel", JsonPrimitive(2))
+            put("IncognitoModeAvailability", JsonPrimitive(1))
+            put("ForceGoogleSafeSearch", JsonPrimitive(true))
+            put("SafeSitesFilterBehavior", JsonPrimitive(1))
+            put("ForceYouTubeRestrict", JsonPrimitive(youTubeRestrict))
+        }
+
+        /** A preset built from [level], keeping the parent's [dnsHost] choice. */
+        fun of(level: SafetyLevel, dnsHost: String?): SafetyConfig =
+            SafetyConfig(level, dnsHost, presetFor(level)).sanitized()
+
+        /**
+         * Resolvers offered to the parent. Both force YouTube Restricted Mode and Google SafeSearch —
+         * not every family resolver does, and one that does not would silently leave the YouTube app
+         * unfiltered, which is most of the point.
+         */
+        const val DNS_CLEANBROWSING = "family-filter-dns.cleanbrowsing.org"
+        const val DNS_ADGUARD = "family.adguard-dns.com"
+
+        /** Conservative hostname check: labels of letters/digits/hyphens, at least one dot, ≤253 chars. */
+        fun isValidHostname(h: String): Boolean {
+            if (h.isBlank() || h.length > 253 || '.' !in h) return false
+            return h.split('.').all { label ->
+                label.isNotEmpty() && label.length <= 63 &&
+                    label.all { it.isLetterOrDigit() || it == '-' } &&
+                    !label.startsWith('-') && !label.endsWith('-')
+            }
+        }
+    }
+}

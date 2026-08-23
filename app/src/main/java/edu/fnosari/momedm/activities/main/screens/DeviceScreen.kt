@@ -35,6 +35,9 @@ import androidx.navigation.NavHostController
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.main.ControllerViewModel
 import edu.fnosari.momedm.activities.main.components.AppPickerDialog
+import edu.fnosari.momedm.activities.main.components.SafetyDialog
+import edu.fnosari.momedm.protocol.SafetyConfig
+import edu.fnosari.momedm.protocol.SafetyLevel
 import edu.fnosari.momedm.activities.main.components.TimeRangeRow
 import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.LockState
@@ -54,6 +57,7 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
     val yes = stringResource(R.string.yes); val no = stringResource(R.string.no)
     var pkg by remember { mutableStateOf("") }
     var renaming by remember { mutableStateOf(false) }
+    var editingSafety by remember { mutableStateOf(false) }
     val s = d?.lastStatus
     Column(Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -118,6 +122,27 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 }
             }
         }
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(R.string.safety_section))
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                    Text(stringResource(R.string.safety_level))
+                    Text(
+                        stringResource(
+                            when (s?.safetyLevel) {
+                                SafetyLevel.STRICT -> R.string.safety_strict
+                                SafetyLevel.MODERATE -> R.string.safety_moderate
+                                else -> R.string.safety_off
+                            },
+                        ),
+                    )
+                }
+                OutlinedButton(onClick = { editingSafety = true }, Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.safety_change))
+                }
+            }
+        }
+
         Button(onClick = { if (s?.kiosk == true) viewModel.kioskOff(deviceId) else viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
             Text(stringResource(if (s?.kiosk == true) R.string.child_stop else R.string.child_start))
         }
@@ -132,6 +157,11 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         if (id == deviceId) AppPickerDialog(apps, initiallySelected = s?.kioskApps?.toSet() ?: emptySet(), initiallyPinned = s?.kioskPkg,
             onConfirm = { selectedApps, pinned -> viewModel.kioskOn(deviceId, selectedApps, pinned) }, onDismiss = { viewModel.clearApps() })
     }
+    if (editingSafety) SafetyDialog(
+        current = SafetyConfig.of(s?.safetyLevel ?: SafetyLevel.OFF, null),
+        onConfirm = { level, dns -> viewModel.setSafety(deviceId, level, dns); editingSafety = false },
+        onDismiss = { editingSafety = false },
+    )
     if (renaming) {
         var name by remember { mutableStateOf(d?.nickname ?: "") }
         AlertDialog(onDismissRequest = { renaming = false },

@@ -15,6 +15,8 @@ import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.LockSchedule
+import edu.fnosari.momedm.protocol.SafetyConfig
+import edu.fnosari.momedm.protocol.SafetyLevel
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,6 +116,14 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         Log.d(LOG_TAG, "setSchedule -> $deviceId: enabled=${schedule.enabled}: ${if (id == null) "offline" else "sent (id=$id)"}")
         announce(id)
     }
+    /** Pushes a content-restriction preset (and the filtering resolver) to [deviceId]. */
+    fun setSafety(deviceId: String, level: SafetyLevel, dnsHost: String?) {
+        val cfg = SafetyConfig.of(level, dnsHost)
+        val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SAFETY, safety = cfg) }
+        Log.d(LOG_TAG, "setSafety -> $deviceId: level=$level dns=${dnsHost != null}: ${if (id == null) "offline" else "sent (id=$id)"}")
+        announce(id)
+    }
+
     fun lockNow(deviceId: String) { send(deviceId, CmdType.LOCK_NOW) }
     fun unlock(deviceId: String) { send(deviceId, CmdType.UNLOCK) }
 

@@ -1,0 +1,83 @@
+package edu.fnosari.momedm.protocol
+
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Pure JVM tests for the content-restriction presets and their sanitizing. */
+class SafetyConfigTest {
+    private fun chrome(level: SafetyLevel) = SafetyConfig.presetFor(level)[SafetyConfig.CHROME_PKG]
+
+    @Test fun offCarriesNoAppConfiguration() {
+        assertTrue(SafetyConfig.presetFor(SafetyLevel.OFF).isEmpty())
+    }
+
+    @Test fun moderateAndStrictSetTheChromeKeysWeIntend() {
+        for (level in listOf(SafetyLevel.MODERATE, SafetyLevel.STRICT)) {
+            val c = chrome(level) ?: error("no Chrome config for $level")
+            // Signing in disabled, so the browser is not tied to an account.
+            assertEquals(0, (c["BrowserSignin"] as JsonPrimitive).intOrNull)
+            // Enhanced Safe Browsing.
+            assertEquals(2, (c["SafeBrowsingProtectionLevel"] as JsonPrimitive).intOrNull)
+            // Incognito disabled, so history cannot be sidestepped.
+            assertEquals(1, (c["IncognitoModeAvailability"] as JsonPrimitive).intOrNull)
+            assertEquals(true, (c["ForceGoogleSafeSearch"] as JsonPrimitive).booleanOrNull)
+            assertEquals(1, (c["SafeSitesFilterBehavior"] as JsonPrimitive).intOrNull)
+        }
+    }
+
+    @Test fun strictRestrictsYouTubeHarderThanModerate() {
+        assertEquals(1, (chrome(SafetyLevel.MODERATE)!!["ForceYouTubeRestrict"] as JsonPrimitive).intOrNull)
+        assertEquals(2, (chrome(SafetyLevel.STRICT)!!["ForceYouTubeRestrict"] as JsonPrimitive).intOrNull)
+    }
+
+    @Test fun onlyChromeIsConfigured() {
+        // The YouTube app declares no managed configuration at all, so sending it any would be a
+        // silent no-op that made the parent think their child was covered. DNS is what reaches it.
+        assertEquals(setOf(SafetyConfig.CHROME_PKG), SafetyConfig.presetFor(SafetyLevel.STRICT).keys)
+    }
+
+    @Test fun aMalformedDnsHostIsDroppedRatherThanSentToThePlatform() {
+        // These arrive over the wire from an authenticated but untrusted peer.
+        for (bad in listOf("not a hostname", "", "nodot", "-lead.example.com", "trail-.example.com", "a".repeat(300))) {
+            assertNull("expected $bad to be rejected", SafetyConfig(dnsHost = bad).sanitized().dnsHost)
+        }
+    }
+
+    @Test fun realResolverHostnamesSurviveSanitizing() {
+        for (good in listOf(SafetyConfig.DNS_CLEANBROWSING, SafetyConfig.DNS_ADGUARD, "dns.example.co.uk")) {
+            assertEquals(good, SafetyConfig(dnsHost = good).sanitized().dnsHost)
+        }
+    }
+
+    @Test fun hostnameCheckAcceptsAndRejectsTheObviousCases() {
+        assertTrue(SafetyConfig.isValidHostname("family.adguard-dns.com"))
+        assertFalse(SafetyConfig.isValidHostname("has space.com"))
+        assertFalse(SafetyConfig.isValidHostname("double..dot.com"))
+    }
+
+    @Test fun ofBuildsAPresetAndKeepsTheParentsResolver() {
+        val c = SafetyConfig.of(SafetyLevel.MODERATE, SafetyConfig.DNS_ADGUARD)
+        assertEquals(SafetyLevel.MODERATE, c.level)
+        assertEquals(SafetyConfig.DNS_ADGUARD, c.dnsHost)
+        assertEquals(SafetyConfig.presetFor(SafetyLevel.MODERATE), c.appConfigs)
+    }
+
+    @Test fun safetyConfigSurvivesTheWire() {
+        val c = SafetyConfig.of(SafetyLevel.STRICT, SafetyConfig.DNS_CLEANBROWSING)
+        val back = MessageCodec.decodeMessage(
+            MessageCodec.encodeMessage(Message.Cmd("c", CmdType.SET_SAFETY, safety = c)),
+        ) as Message.Cmd
+        assertEquals(c, back.safety)
+    }
+
+    @Test fun statusDefaultsToOffWhenAPeerSendsNoLevel() {
+        val json = """{"t":"STATUS","kiosk":false,"kioskPkg":null,"account":false,"battery":10,"currentApp":null}"""
+        assertEquals(SafetyLevel.OFF, (MessageCodec.decodeMessage(json) as Message.Status).safetyLevel)
+    }
+}

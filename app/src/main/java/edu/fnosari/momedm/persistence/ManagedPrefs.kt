@@ -4,6 +4,8 @@ import edu.fnosari.momedm.persistence.preferences.PreferencesProvider
 import edu.fnosari.momedm.protocol.Base64Std
 import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.LockSchedule
+import edu.fnosari.momedm.protocol.MessageCodec
+import edu.fnosari.momedm.protocol.SafetyConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -33,6 +35,7 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         const val KEY_LOCK_WE_START = "managed_lock_we_start"
         const val KEY_LOCK_WE_END = "managed_lock_we_end"
         const val KEY_LOCK_MANUAL = "managed_lock_manual"
+        const val KEY_SAFETY = "managed_safety"
     }
     val controllerId: Flow<String> = p.readString(KEY_CONTROLLER_ID, "")
     val secretBase64: Flow<String> = p.readString(KEY_SECRET, "")
@@ -105,4 +108,15 @@ class ManagedPrefs(private val p: PreferencesProvider) {
     }
 
     suspend fun setManualLock(on: Boolean) = p.write(KEY_LOCK_MANUAL, on)
+
+    /**
+     * The parent's content restrictions, stored as JSON because [SafetyConfig.appConfigs] is an open
+     * map — a fixed column per key would defeat the point of it being generic.
+     */
+    val safety: Flow<SafetyConfig> = p.readString(KEY_SAFETY, "").map { raw ->
+        if (raw.isBlank()) SafetyConfig()
+        else runCatching { MessageCodec.json.decodeFromString(SafetyConfig.serializer(), raw) }.getOrElse { SafetyConfig() }
+    }
+
+    suspend fun setSafety(c: SafetyConfig) = p.write(KEY_SAFETY, MessageCodec.json.encodeToString(SafetyConfig.serializer(), c))
 }

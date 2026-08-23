@@ -116,6 +116,7 @@ class ManagedLinkService : Service() {
         // Also here, not just at provisioning: a device enrolled by an earlier build never got
         // these granted and would otherwise stay unable to scan forever. Idempotent.
         runCatching { policy.grantOwnRuntimePermissions() }.onFailure { Log.w(LOG_TAG, "self-grant failed", it) }
+        scope.launch { policy.restoreSafety() }
         scope.launch { ManagedLinkState.statusPushRequests.collect { pushStatus() } }
         startPauseWatchdog()
         createChannel()

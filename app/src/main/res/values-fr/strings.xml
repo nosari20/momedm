@@ -243,4 +243,18 @@
     <string name="conn_event_error">Erreur de connexion</string>
     <string name="conn_rejected_hint">« Connecté mais non reconnu » signifie que ce téléphone a été configuré avec un autre code d\'association. Associez-le à nouveau pour corriger cela.</string>
     <string name="bedtime_emergency">Appel d\'urgence</string>
+
+    <!-- Content restrictions (parent device page) -->
+    <string name="safety_section">Contenu</string>
+    <string name="safety_title">Restrictions de contenu</string>
+    <string name="safety_level">Niveau</string>
+    <string name="safety_off">Aucune restriction</string>
+    <string name="safety_moderate">Modéré - sites adultes bloqués, SafeSearch activé</string>
+    <string name="safety_strict">Strict - idem, avec YouTube fortement restreint</string>
+    <string name="safety_dns">Filtrage utilisé par tout le téléphone</string>
+    <string name="safety_dns_cleanbrowsing">CleanBrowsing Family</string>
+    <string name="safety_dns_adguard">AdGuard Family</string>
+    <string name="safety_dns_none">Aucun</string>
+    <string name="safety_change">Modifier</string>
+    <string name="safety_explain">Les réglages du navigateur ne concernent que Chrome. L\'application YouTube les ignore : elle n\'est couverte que par le filtrage ci-dessus - sans lui, YouTube n\'est pas filtré. Le mode restreint masque la plupart des contenus pour adultes, pas tous.</string>
 </resources>

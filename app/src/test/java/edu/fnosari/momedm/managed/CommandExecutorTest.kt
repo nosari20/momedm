@@ -4,6 +4,8 @@ import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.LockSchedule
+import edu.fnosari.momedm.protocol.SafetyConfig
+import edu.fnosari.momedm.protocol.SafetyLevel
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -21,6 +23,8 @@ class CommandExecutorTest {
         }
         override suspend fun kioskOff() = run { kiosk = null; pinned = null; Result.success(Unit) }
         override suspend fun openPlay(pkg: String) = run { played = pkg; Result.success(Unit) }
+        var safety: SafetyConfig? = null
+        override suspend fun setSafety(config: SafetyConfig) = run { safety = config; Result.success("safety ${config.level.name.lowercase()}") }
         var searched: String? = null
         override suspend fun openPlaySearch(term: String) = run { searched = term; Result.success(Unit) }
         override suspend fun openAddAccount() = if (kiosk != null) Result.failure(IllegalStateException("kiosk is on; turn it off first")) else run { accountOpened = true; Result.success(Unit) }
@@ -67,6 +71,29 @@ class CommandExecutorTest {
             assertFalse(r.ok); assertEquals("missing search term", r.msg)
         }
         assertEquals(null, p.searched)
+    }
+
+    @Test fun setSafetyAppliesThePresetAndReportsIt() = runTest {
+        val p = FakePolicy()
+        val cfg = SafetyConfig.of(SafetyLevel.STRICT, SafetyConfig.DNS_CLEANBROWSING)
+        val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("40", CmdType.SET_SAFETY, safety = cfg))
+        assertEquals(Message.Result("40", true, "safety strict"), out[0]); assertTrue(out[1] is Message.Status)
+        assertEquals(SafetyLevel.STRICT, p.safety?.level)
+        assertEquals(SafetyConfig.DNS_CLEANBROWSING, p.safety?.dnsHost)
+    }
+
+    @Test fun setSafetyDropsAMalformedDnsHost() = runTest {
+        val p = FakePolicy()
+        // Straight off the wire: a host the platform must never be handed.
+        val cfg = SafetyConfig(SafetyLevel.MODERATE, "not a hostname", SafetyConfig.presetFor(SafetyLevel.MODERATE))
+        CommandExecutor(p, FakeStatus()).execute(Message.Cmd("41", CmdType.SET_SAFETY, safety = cfg))
+        assertEquals(null, p.safety?.dnsHost)
+        assertEquals(SafetyLevel.MODERATE, p.safety?.level)   // the rest of the config still applies
+    }
+
+    @Test fun setSafetyWithoutPayloadFails() = runTest {
+        val r = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("42", CmdType.SET_SAFETY))[0] as Message.Result
+        assertFalse(r.ok); assertEquals("missing safety", r.msg)
     }
 
     @Test fun setPrefs() = runTest {

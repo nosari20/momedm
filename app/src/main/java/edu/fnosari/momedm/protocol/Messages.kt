@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS, SET_SCHEDULE, LOCK_NOW, UNLOCK, SEARCH_APP }
+enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS, SET_SCHEDULE, LOCK_NOW, UNLOCK, SEARCH_APP, SET_SAFETY }
 
 @Serializable
 data class AppInfo(val pkg: String, val label: String)
@@ -79,6 +79,8 @@ sealed class Message {
         val lockUntil: Long? = null,
         /** The child's current lock schedule, so the parent UI can render it after a restart. */
         val schedule: LockSchedule? = null,
+        /** Content-restriction level currently applied on the child. */
+        val safetyLevel: SafetyLevel = SafetyLevel.OFF,
     ) : Message()
     @Serializable @SerialName("APPS")      data class Apps(val apps: List<AppInfo>) : Message()
     @Serializable @SerialName("RESULT")    data class Result(val cmdId: String, val ok: Boolean, val msg: String) : Message()
@@ -88,6 +90,7 @@ sealed class Message {
         /** KIOSK_ON: the single app to pin, must be in [apps]. */ val pinned: String? = null,
         /** SET_PREFS payload. */ val prefs: ChildPrefs? = null,
         /** SET_SCHEDULE payload. */ val schedule: LockSchedule? = null,
+        /** SET_SAFETY payload. */ val safety: SafetyConfig? = null,
     ) : Message()
 }
 

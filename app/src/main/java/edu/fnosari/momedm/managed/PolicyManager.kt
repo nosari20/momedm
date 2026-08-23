@@ -16,6 +16,8 @@ import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.LockState
+import edu.fnosari.momedm.protocol.SafetyConfig
+import edu.fnosari.momedm.protocol.SafetyLevel
 import edu.fnosari.momedm.protocol.PinHash
 import edu.fnosari.momedm.ui.AppLocale
 import kotlinx.coroutines.CancellationException
@@ -290,6 +292,26 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
             context.startActivity(i)
             Log.d(LOG_TAG, "Opened add-account")
         }
+    }
+
+    /**
+     * Persists and applies the parent's content restrictions, returning a sentence describing what
+     * actually happened — which apps were configured, which were not installed, and what became of
+     * private DNS — so the parent sees the real outcome rather than a bare "done".
+     */
+    override suspend fun setSafety(config: SafetyConfig): Result<String> = try {
+        prefs.setSafety(config)
+        val o = SafetyManager(context, dpm, admin).apply(config)
+        val skipped = if (o.appsSkipped.isEmpty()) "" else ", not installed: ${o.appsSkipped.joinToString()}"
+        Result.success("safety ${config.level.name.lowercase()} (${o.appsApplied} app(s)$skipped, DNS ${o.dns})")
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
+
+    /** Re-applies the stored restrictions; called on service start so a reboot cannot quietly drop them. */
+    suspend fun restoreSafety() {
+        val c = prefs.safety.first()
+        if (c.level == SafetyLevel.OFF && c.appConfigs.isEmpty()) return
+        runCatching { SafetyManager(context, dpm, admin).apply(c) }
+            .onFailure { Log.w(LOG_TAG, "Could not re-apply safety settings", it) }
     }
 
     override suspend fun applyPrefs(prefs: ChildPrefs): Result<Unit> = try {
