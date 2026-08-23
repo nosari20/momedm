@@ -37,8 +37,8 @@ import edu.fnosari.momedm.managed.ManagedLinkState
 import edu.fnosari.momedm.managed.ManagedSetup
 import edu.fnosari.momedm.managed.PolicyManager
 import edu.fnosari.momedm.managed.StatusCollector
+import edu.fnosari.momedm.ui.ManagedThemed
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
-import edu.fnosari.momedm.ui.theme.MomeDMTheme
 import kotlinx.coroutines.launch
 
 /** Shown by the Setup Wizard right after we become device owner. Two optional steps, then HOME + link service. */
@@ -55,7 +55,7 @@ class PolicyComplianceActivity : ComponentActivity() {
         val status = StatusCollector(this, prefs)
 
         setContent {
-            MomeDMTheme {
+            ManagedThemed(this) {
                 var step by remember { mutableIntStateOf(0) }
                 var accountOk by remember { mutableStateOf(status.hasGoogleAccount()) }
                 var usageOk by remember { mutableStateOf(status.hasUsageAccess()) }

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
+import edu.fnosari.momedm.ui.common.pronoteTopBarColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,16 +35,20 @@ fun BasicLayoutWithTopBar(
     // It picks up scroll from any nested-scroll-aware content (LazyColumn,
     // Modifier.verticalScroll, …) via the nestedScroll connection below.
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val pronoteColors = pronoteTopBarColors()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onSurface,
         topBar = {
             CenterAlignedTopAppBar(
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = pronoteColors.containerColor,
+                    titleContentColor = pronoteColors.titleContentColor,
+                    navigationIconContentColor = pronoteColors.navigationIconContentColor,
+                    actionIconContentColor = pronoteColors.actionIconContentColor,
                 ),
                 title = { Text(text = title) },
                 navigationIcon = {

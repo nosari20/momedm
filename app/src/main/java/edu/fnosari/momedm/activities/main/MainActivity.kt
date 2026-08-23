@@ -46,12 +46,18 @@ import edu.fnosari.momedm.activities.main.screens.DevicesScreen
 import edu.fnosari.momedm.activities.main.screens.ProvisionScreen
 import edu.fnosari.momedm.activities.managed.ManagedHomeActivity
 import edu.fnosari.momedm.activities.settings.SettingsActivity
+import edu.fnosari.momedm.ui.ControllerThemed
 import edu.fnosari.momedm.ui.components.ButtonRequestPermission
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
 import edu.fnosari.momedm.ui.layouts.Layout
-import edu.fnosari.momedm.ui.theme.MomeDMTheme
 
-/** Launcher entry. Device owner → managed home; otherwise the controller UI. */
+/**
+ * Launcher entry. Device owner → managed home; otherwise the controller UI.
+ *
+ * Language: at this app's `minSdk 34`, [android.app.LocaleManager] always owns the per-app
+ * locale — [edu.fnosari.momedm.ui.AppLocale.apply] (called from Settings) is sufficient and
+ * there is nothing to do in `attachBaseContext` here.
+ */
 class MainActivity : ComponentActivity() {
     companion object { private const val LOG_TAG = "MainActivity" }
 
@@ -68,7 +74,7 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val vm: ControllerViewModel = viewModel()
             val snackbar = remember { SnackbarHostState() }
-            MomeDMTheme {
+            ControllerThemed(this) {
                 val required = remember { mutableStateListOf(BLUETOOTH_CONNECT, BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE, POST_NOTIFICATIONS, NEARBY_WIFI_DEVICES) }
                 // A permission granted from system Settings (rather than through our own dialog) never
                 // fires the launcher callback, so re-check on every resume and drop what is now granted

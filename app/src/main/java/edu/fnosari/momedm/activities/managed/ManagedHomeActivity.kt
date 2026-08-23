@@ -22,14 +22,21 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.managed.screens.ChildLauncherScreen
+import edu.fnosari.momedm.ui.ManagedThemed
 import edu.fnosari.momedm.ui.components.ButtonRequestPermission
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
-import edu.fnosari.momedm.ui.theme.MomeDMTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 
-/** HOME activity of a managed device: permission gate, then the child launcher (tiles grid, pinned relaunch, PIN dialog). */
+/**
+ * HOME activity of a managed device: permission gate, then the child launcher (tiles grid,
+ * pinned relaunch, PIN dialog).
+ *
+ * Language: at this app's `minSdk 34`, [android.app.LocaleManager] always owns the per-app
+ * locale ([edu.fnosari.momedm.ui.AppLocale.apply], driven by [edu.fnosari.momedm.managed.PolicyManager]
+ * applying pushed prefs) — there is nothing to do in `attachBaseContext` here.
+ */
 class ManagedHomeActivity : ComponentActivity() {
     companion object {
         private const val LOG_TAG = "ManagedHomeActivity"
@@ -43,7 +50,7 @@ class ManagedHomeActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             val vm: ManagedViewModel = viewModel()
-            MomeDMTheme {
+            ManagedThemed(this) {
                 val required = remember { mutableStateListOf(BLUETOOTH_SCAN, BLUETOOTH_CONNECT, POST_NOTIFICATIONS) }
                 val owner = LocalLifecycleOwner.current
                 DisposableEffect(owner) {

@@ -17,7 +17,7 @@ import edu.fnosari.momedm.activities.settings.screens.SettingsEasterEgg
 import edu.fnosari.momedm.activities.settings.screens.SettingsMenu
 import edu.fnosari.momedm.activities.settings.screens.SettingsScreen
 import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
-import edu.fnosari.momedm.ui.theme.MomeDMTheme
+import edu.fnosari.momedm.ui.ControllerThemed
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +28,7 @@ class SettingsActivity : ComponentActivity() {
             val context = LocalContext.current
             val preferencesProvider = remember { DataStorePreferencesProvider(context) }
 
-            MomeDMTheme {
+            ControllerThemed(this) {
                 NavHost(
                     navController = navController,
                     enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(200)) },
