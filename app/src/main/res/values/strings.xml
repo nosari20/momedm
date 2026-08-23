@@ -221,4 +221,25 @@
     <string name="perm_notifications">Notifications</string>
     <string name="perm_nearby">Nearby devices</string>
     <string name="perm_local_network">local network access</string>
+
+    <!-- Parent connection screen (Settings > Connection) -->
+    <string name="settings_connection">Connection</string>
+    <string name="conn_this_phone">This phone</string>
+    <string name="conn_discoverable">Visible to children</string>
+    <string name="conn_yes">Yes</string>
+    <string name="conn_no">No</string>
+    <string name="conn_children_connected">Children connected</string>
+    <string name="conn_restart">Restart the connection</string>
+    <string name="conn_children">Children</string>
+    <string name="conn_no_children">No child device paired yet.</string>
+    <string name="conn_child_detail">ID %1$s · last seen %2$s</string>
+    <string name="conn_activity">Recent activity</string>
+    <string name="conn_no_activity">Nothing yet. Activity appears here when a child device tries to connect.</string>
+    <string name="conn_event_connected">A device connected</string>
+    <string name="conn_event_authenticated">A child was recognised</string>
+    <string name="conn_event_rejected">A device connected but was not recognised</string>
+    <string name="conn_event_disconnected">A device disconnected</string>
+    <string name="conn_event_advertising">Visibility changed</string>
+    <string name="conn_event_error">Connection error</string>
+    <string name="conn_rejected_hint">"Connected but not recognised" means that phone was set up with a different pairing code. Pair it again to fix it.</string>
 </resources>

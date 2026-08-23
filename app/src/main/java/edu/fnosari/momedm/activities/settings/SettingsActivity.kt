@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import edu.fnosari.momedm.activities.settings.navigation.Routes
 import edu.fnosari.momedm.activities.settings.screens.SettingsAdvancedScreen
 import edu.fnosari.momedm.activities.settings.screens.SettingsAppearanceScreen
+import edu.fnosari.momedm.activities.settings.screens.SettingsConnectionScreen
 import edu.fnosari.momedm.activities.settings.screens.SettingsEasterEgg
 import edu.fnosari.momedm.activities.settings.screens.SettingsMenu
 import edu.fnosari.momedm.activities.settings.screens.SettingsPinScreen
@@ -43,6 +44,7 @@ class SettingsActivity : ComponentActivity() {
 
                     composable(Routes.APPEARANCE.name) { SettingsAppearanceScreen(navController) }
                     composable(Routes.PIN.name) { SettingsPinScreen(navController) }
+                    composable(Routes.CONNECTION.name) { SettingsConnectionScreen(navController) }
                     composable(Routes.ADVANCED.name) { SettingsAdvancedScreen(navController) }
 
                     composable(Routes.LEGAL.name) {

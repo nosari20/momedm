@@ -221,4 +221,25 @@
     <string name="perm_notifications">Notifications</string>
     <string name="perm_nearby">Appareils à proximité</string>
     <string name="perm_local_network">l\'accès au réseau local</string>
+
+    <!-- Parent connection screen (Settings > Connection) -->
+    <string name="settings_connection">Connexion</string>
+    <string name="conn_this_phone">Ce téléphone</string>
+    <string name="conn_discoverable">Visible par les enfants</string>
+    <string name="conn_yes">Oui</string>
+    <string name="conn_no">Non</string>
+    <string name="conn_children_connected">Enfants connectés</string>
+    <string name="conn_restart">Redémarrer la connexion</string>
+    <string name="conn_children">Enfants</string>
+    <string name="conn_no_children">Aucun appareil enfant associé pour le moment.</string>
+    <string name="conn_child_detail">ID %1$s · vu à %2$s</string>
+    <string name="conn_activity">Activité récente</string>
+    <string name="conn_no_activity">Rien pour l\'instant. L\'activité apparaît ici quand un appareil enfant tente de se connecter.</string>
+    <string name="conn_event_connected">Un appareil s\'est connecté</string>
+    <string name="conn_event_authenticated">Un enfant a été reconnu</string>
+    <string name="conn_event_rejected">Un appareil s\'est connecté mais n\'a pas été reconnu</string>
+    <string name="conn_event_disconnected">Un appareil s\'est déconnecté</string>
+    <string name="conn_event_advertising">Visibilité modifiée</string>
+    <string name="conn_event_error">Erreur de connexion</string>
+    <string name="conn_rejected_hint">« Connecté mais non reconnu » signifie que ce téléphone a été configuré avec un autre code d\'association. Associez-le à nouveau pour corriger cela.</string>
 </resources>

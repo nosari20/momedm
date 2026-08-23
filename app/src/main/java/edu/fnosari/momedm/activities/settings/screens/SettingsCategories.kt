@@ -45,6 +45,12 @@ fun SettingsMenu(navController: NavHostController) {
                 onClick = { navController.navigate(Routes.PIN.name) })
             }
             item { SettingsCategoryItem(
+                title = context.getString(Routes.CONNECTION.label),
+                icon = Routes.CONNECTION.icon,
+                onClick = { navController.navigate(Routes.CONNECTION.name) })
+            }
+
+            item { SettingsCategoryItem(
                 title = context.getString(Routes.ADVANCED.label),
                 icon = Routes.ADVANCED.icon,
                 supportingText = context.getString(R.string.settings_advanced_help),
