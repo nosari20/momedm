@@ -37,3 +37,13 @@ Deferred minors and parked findings from the per-task and final code reviews of 
 - Task 6-7: minor (deferred): setPin two DataStore writes (tiny half-pair window, parent-recoverable); picker seeds remembered without keys; prefsJob starts before BLE try; pushPrefs duplicates id generation; tests don't assert clear-PIN absence / updateStatus nickname.
 - Task 8: minor (deferred): debug provisioning path does not call setAsDefaultHome (Home goes to stock launcher when child mode off on the rig).
 - Final: parked — resume() inside collectLatest cancellable by unrelated DataStore writes (self-heals); DeviceRegistry.reload() outside mutex; lockout restore startup race; malformed PIN pair at rest until next SET_PREFS; tryPin during restored lockout silently swallowed — Ruling: deferred, all self-healing or tiny windows.
+
+## Plan 2 — parent UI + theme + FR/EN (2026-08-23, branch feature/kiosk-v2-ui)
+
+### Parked / deferred
+- Task 1: minor (deferred): SystemBars double enableEdgeToEdge (intentional); Pronote helpers unused until later tasks.
+- Task 2: minor (deferred): pair_ssid_value/password_value FR colon spacing (%1$s: vs %1$s :); fold into Task 4 when the pairing screen uses them.
+- Task 3: minor (deferred): AppLocale comment says API 34 vs actual 33 threshold (cosmetic); LEGAL/LICENSES routes render blank (pre-existing).
+- Task 4: minor (deferred): start-child-mode vs choose-apps both open picker when off (UX redundancy); online-green color duplicated in DevicesScreen vs OnlineIndicator; old device_/provision_/main_route_ strings dead (Task 6 removes).
+- Task 5: minor (deferred): ManagedLinkState.lastError raw strings unlocalized (no UI consumer; localize if wired later).
+- Final: parked — SettingsScreen template cruft on blank LEGAL/LICENSES routes; ControllerService BLE-error snackbar + device RESULT r.msg English-only (Plan-1 scope); APPEARANCE icon = CATEGORIES icon; two snackbars per command — Ruling: deferred, pre-existing/cosmetic.
