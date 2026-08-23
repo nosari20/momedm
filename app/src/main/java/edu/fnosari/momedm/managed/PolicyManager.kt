@@ -19,6 +19,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 /** Thin, logged wrapper around [DevicePolicyManager] for the managed role. */
 class PolicyManager(private val context: Context, private val prefs: ManagedPrefs) : PolicyActions {
@@ -47,6 +48,13 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         context.startActivity(home, ActivityOptions.makeBasic().setLockTaskEnabled(true).toBundle())
     }
 
+    /** Launches our launcher *without* lock task (used when leaving a lock). */
+    private fun launchHomePlain() {
+        val home = Intent(context, ManagedHomeActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        context.startActivity(home)
+    }
+
     // Both kiosk transitions suspend (they write to DataStore), so a plain runCatching would swallow the
     // CancellationException thrown when the caller's scope is cancelled and report it as an ordinary
     // command failure, leaving the coroutine machinery to believe the work completed. Cancellation is
@@ -70,12 +78,42 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         dpm.setLockTaskPackages(admin, emptyArray())   // removing the allowlist forces lock task to end
         prefs.setKiosk(false, null)  // also clears any pause deadline so the pause watchdog cannot fire a stale resume() on the next KIOSK_ON
         // State is already cleared above; a launch failure here must not resurrect kiosk on the next restoreKiosk().
-        runCatching {
-            val home = Intent(context, ManagedHomeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            context.startActivity(home)
-        }.onFailure { Log.w(LOG_TAG, "Failed to launch ManagedHomeActivity after kiosk off", it) }
+        runCatching { launchHomePlain() }.onFailure { Log.w(LOG_TAG, "Failed to launch ManagedHomeActivity after kiosk off", it) }
         Log.d(LOG_TAG, "Kiosk off")
         Result.success(Unit)
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
+
+    /**
+     * Applies a complete lock: nothing but this app is launchable, and the launcher is brought up in
+     * lock task showing its bedtime state.
+     *
+     * `GLOBAL_ACTIONS` is requested explicitly — [kioskOn] passes `SYSTEM_INFO` alone, which disables
+     * the power menu, and the power menu is the route to the system emergency dialer. A phone a child
+     * carries must still be able to call for help at night.
+     */
+    suspend fun lockComplete(): Result<Unit> = try {
+        dpm.setLockTaskPackages(admin, arrayOf(context.packageName))
+        dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO or DevicePolicyManager.LOCK_TASK_FEATURE_GLOBAL_ACTIONS)
+        launchHomeLocked()
+        Log.d(LOG_TAG, "Complete lock applied")
+        Result.success(Unit)
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
+
+    /**
+     * Returns the device to whatever was configured before the lock: child mode with its allowlist
+     * when it is on, otherwise a free device. Idempotent — [LockController] calls it on every
+     * re-evaluation that ends unlocked.
+     */
+    suspend fun restoreNormal(): Result<Unit> = try {
+        val c = prefs.kioskConfig.first()
+        if (c.on && c.apps.isNotEmpty()) {
+            kioskOn(c.apps, c.pinned).map { }
+        } else {
+            dpm.setLockTaskPackages(admin, emptyArray())
+            runCatching { launchHomePlain() }.onFailure { Log.w(LOG_TAG, "Failed to launch home after unlock", it) }
+            Log.d(LOG_TAG, "Complete lock released")
+            Result.success(Unit)
+        }
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 
     /**
@@ -92,12 +130,15 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
 
     /**
      * Starts a parent-PIN pause: persists the deadline; the launcher Activity releases lock task itself.
-     * Returns pauseUntil, or 0L (no-op) when child mode is off — there is nothing to pause.
+     * Returns pauseUntil, or 0L (no-op) when neither child mode nor a complete lock is active — there
+     * is nothing to pause.
      */
     suspend fun pause(nowMs: Long = System.currentTimeMillis()): Long {
-        if (!prefs.kioskConfig.first().on) return 0L
+        val kioskOn = prefs.kioskConfig.first().on
+        val lockOn = prefs.manualLock.first() || prefs.lockSchedule.first().isLockedAt(nowMs, ZoneId.systemDefault())
+        if (!kioskOn && !lockOn) return 0L
         val until = nowMs + KioskConfig.PAUSE_MS
-        prefs.setPauseUntil(until); Log.d(LOG_TAG, "Kiosk paused until $until")
+        prefs.setPauseUntil(until); Log.d(LOG_TAG, "Paused until $until")
         ManagedLinkState.statusPushRequests.tryEmit(Unit)
         return until
     }
