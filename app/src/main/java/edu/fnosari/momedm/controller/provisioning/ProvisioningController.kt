@@ -44,6 +44,20 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     init { scope.launch { _state.value = State(prefs.wifiMode.first(), prefs.manualSsid.first(), prefs.manualPassword.first(), prefs.customUrl.first()) } }
 
     fun setMode(mode: String) { _state.update { it.copy(mode = mode) }; persist() }
+
+    /**
+     * Fills the Shared Wi-Fi name with the network this phone is currently joined to, when the parent
+     * has not typed one. The child device has to join the same network for the download to work, so
+     * the parent's own network is nearly always the right answer — and re-typing it is only a chance
+     * to get it wrong. Never overwrites an existing value.
+     */
+    fun prefillSsidIfBlank() {
+        val s = _state.value
+        if (s.mode != ControllerPrefs.MODE_MANUAL || s.ssid.isNotBlank()) return
+        val ssid = WifiAddresses.currentSsid(context) ?: return
+        Log.d(LOG_TAG, "Pre-filled the Wi-Fi name from the current connection")
+        setManual(ssid, s.password)
+    }
     fun setManual(ssid: String, pass: String) { _state.update { it.copy(ssid = ssid, password = pass) }; persist() }
     fun setCustomUrl(url: String) { _state.update { it.copy(customUrl = url) }; persist() }
     /** Persists only the user's manual Wi-Fi choice — never the transient hotspot credentials. */
@@ -73,12 +87,21 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         if (_state.value.mode == ControllerPrefs.MODE_HOTSPOT) {
             // The AP interface's address can take a moment to settle after the hotspot reports ready; poll for it.
             pollJob = scope.launch {
+                // Exclude the phone's own *client* Wi-Fi address so what remains is the AP interface.
+                // Android's local-only hotspot picks a randomised subnet and does not necessarily take
+                // the ".1" of it, so the gateway heuristic alone is not enough: on a phone both joined
+                // to Wi-Fi (wlan0) and hosting the hotspot (wlan2), the client address wins on
+                // interface-name ordering — and the child device, which is on the hotspot, can never
+                // reach it. That produced a QR advertising an unreachable address and a download that
+                // simply timed out.
+                val clientWifi = WifiAddresses.clientWifiIpv4(context)
                 var ip: String? = null
                 for (attempt in 0 until IP_POLL_ATTEMPTS) {
-                    ip = NetUtils.localIpv4(preferGateway = true)
+                    ip = NetUtils.localIpv4(preferGateway = true, exclude = setOfNotNull(clientWifi))
                     if (ip != null) break
                     delay(IP_POLL_DELAY_MS)
                 }
+                Log.d(LOG_TAG, "Hotspot IP resolved to $ip (client Wi-Fi excluded: ${clientWifi != null})")
                 // stop() may have cancelled this job while it was polling; never apply a stale result.
                 ensureActive()
                 onIpResolved(ip)

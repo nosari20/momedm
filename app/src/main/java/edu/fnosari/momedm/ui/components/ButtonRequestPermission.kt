@@ -19,6 +19,8 @@ private fun friendlyPermissionName(context: Context, permission: String): String
     BLUETOOTH_SCAN, BLUETOOTH_CONNECT, BLUETOOTH_ADVERTISE -> context.getString(R.string.perm_bluetooth)
     POST_NOTIFICATIONS -> context.getString(R.string.perm_notifications)
     NEARBY_WIFI_DEVICES -> context.getString(R.string.perm_nearby)
+    // Literal rather than the constant, so this still compiles against an SDK older than 37.
+    "android.permission.ACCESS_LOCAL_NETWORK" -> context.getString(R.string.perm_local_network)
     else -> permission
 }
 

@@ -191,6 +191,7 @@
     <string name="pair_title">Associer un appareil</string>
     <string name="pair_step1">1. Choisissez comment l\'appareil enfant se connecte</string>
     <string name="pair_step2">2. Créez le code d\'association</string>
+    <string name="pair_local_network_why">Môme DM a besoin de l\'autorisation d\'accéder aux appareils de votre Wi-Fi, pour que le téléphone de votre enfant puisse y télécharger l\'application. Sans elle, le téléchargement reste bloqué.</string>
     <string name="pair_step3">3. Sur l\'appareil enfant réinitialisé, appuyez 6 fois sur l\'écran d\'accueil et scannez ce code</string>
     <string name="pair_wifi_hotspot">Point d\'accès (automatique)</string>
     <string name="pair_wifi_manual">Wi-Fi partagé</string>
@@ -219,4 +220,5 @@
     <string name="perm_bluetooth">Bluetooth</string>
     <string name="perm_notifications">Notifications</string>
     <string name="perm_nearby">Appareils à proximité</string>
+    <string name="perm_local_network">l\'accès au réseau local</string>
 </resources>

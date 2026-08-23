@@ -139,6 +139,12 @@ is on screen.*
   device-owner rights only during initial setup, before any account is added.
 - Bluetooth on both. No internet, Google account or Play services are needed for
   day-to-day use.
+- **On Android 16 and newer, the parent's phone will ask for local network
+  access** the first time you pair a device. Enrolment cannot work without it:
+  the child's phone downloads the app directly from the parent's phone, and
+  Android blocks that traffic unless the permission is granted. If it is denied,
+  the platform still accepts the connection and then silently discards it, so the
+  download hangs with no error on either screen.
 
 ## Installing
 
