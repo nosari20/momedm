@@ -144,7 +144,17 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         if (!kioskOn && !lockOn) return 0L
         val until = nowMs + KioskConfig.PAUSE_MS
         prefs.setPauseUntil(until); Log.d(LOG_TAG, "Paused until $until")
-        LockController(context, prefs, this).reevaluate()
+        // The deadline is already persisted above, so a failure here must not propagate out of pause():
+        // the pause is in effect either way, and throwing would hand the caller an exception where it
+        // expects the pauseUntil it just set. Left for the next trigger (launcher countdown, the
+        // service's pause watchdog, or another reevaluate()) to arm the alarm this one failed to.
+        try {
+            LockController(context, prefs, this).reevaluate()
+        } catch (c: CancellationException) {
+            throw c
+        } catch (t: Throwable) {
+            Log.w(LOG_TAG, "Post-pause re-evaluation failed; re-lock alarm may be unset until the next trigger", t)
+        }
         return until
     }
 
