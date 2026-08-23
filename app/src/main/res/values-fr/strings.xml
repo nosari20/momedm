@@ -252,6 +252,8 @@
     <string name="child_offline_msg">Cet appareil est hors ligne</string>
     <string name="child_sent">C\'est fait</string>
     <string name="child_result">%1$s</string>
+    <string name="result_ok">OK</string>
+    <string name="result_err">Erreur</string>
 
     <!-- App picker (apps_title/apps_confirm/apps_pin_one/apps_loading already
          exist above with Plan 1 wording; values updated in place to the
