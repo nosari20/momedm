@@ -269,7 +269,7 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /** Ends a pause now (re-locks). */
-    fun relock() { viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() } }
+    fun relock() { viewModelScope.launch { LockController(getApplication(), prefs, policy).endPause() } }
 
     fun ensureLink() { if (ManagedLinkState.state.value == ManagedLinkState.LinkState.IDLE) ManagedLinkService.start(getApplication()) }
 }

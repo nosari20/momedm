@@ -84,6 +84,19 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         }
     }
 
+    /**
+     * Ends an active pause now and re-applies whatever the schedule and child mode call for.
+     *
+     * [reevaluate] cannot do this on its own: while the deadline is in the future it deliberately
+     * returns after arming the alarm, so calling it to re-lock early did nothing at all — which is
+     * why the launcher's "Lock again" button appeared to be dead. Clearing the deadline first is the
+     * whole difference between "the pause has been cut short" and "the pause is still running".
+     */
+    suspend fun endPause() {
+        prefs.setPauseUntil(0L)
+        reevaluate()
+    }
+
     suspend fun reevaluate() {
         val now = System.currentTimeMillis()
         val zone = ZoneId.systemDefault()

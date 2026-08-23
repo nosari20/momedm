@@ -73,6 +73,34 @@ class LockControllerTest {
         assertEquals(deadline, alarms.lastArmed)
     }
 
+    @Test fun endPause_cutsAnActivePauseShort_andAppliesImmediately() = runTest {
+        // "Lock again" on the launcher. reevaluate() alone returns early while the deadline is in the
+        // future, so the button did nothing; endPause() clears the deadline first.
+        val prefs = freshPrefs()
+        prefs.setKioskConfig(KioskConfig(on = true, apps = listOf("a"), pauseUntil = System.currentTimeMillis() + 60_000L))
+        val actions = FakeActions(prefs); val alarms = FakeAlarms()
+
+        LockController(prefs, actions, alarms).endPause()
+
+        assertEquals(0L, prefs.kioskConfig.first().pauseUntil)
+        assertEquals(1, actions.restoreCalls)
+        assertEquals(0, actions.lockCalls)
+    }
+
+    @Test fun endPause_duringANightWindow_locksRatherThanRestoringChildMode() = runTest {
+        // Ending a pause re-applies the *current* answer, which at night is a complete lock.
+        val prefs = freshPrefs()
+        prefs.setKioskConfig(KioskConfig(on = true, apps = listOf("a"), pauseUntil = System.currentTimeMillis() + 60_000L))
+        prefs.setManualLock(true)
+        val actions = FakeActions(prefs); val alarms = FakeAlarms()
+
+        LockController(prefs, actions, alarms).endPause()
+
+        assertEquals(0L, prefs.kioskConfig.first().pauseUntil)
+        assertEquals(1, actions.lockCalls)
+        assertEquals(0, actions.restoreCalls)
+    }
+
     @Test fun pauseLapsed_deadlineZeroedExactlyOnce_thenNormalApplyHappens() = runTest {
         val prefs = freshPrefs()
         val lapsed = System.currentTimeMillis() - 5_000L
