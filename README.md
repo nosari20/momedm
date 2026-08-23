@@ -38,6 +38,16 @@ a dependency.
 > removes it, and a determined teenager will eventually find the edges. It is
 > built for the ordinary case: agreeing on rules and letting the phone hold them.
 
+### How the two phones talk
+
+Wi-Fi appears exactly once, to get the app onto the child's phone — after that the
+two phones only ever speak over Bluetooth, and the child's phone enforces the rules
+whether or not yours is anywhere near.
+
+<div align="center">
+<img src="docs/images/connectivity.svg" width="760" alt="Wi-Fi is used once to install the app from the parent's phone; afterwards the two phones talk only over Bluetooth, and the child's phone keeps enforcing the rules when out of range">
+</div>
+
 ## Features
 
 ### Choose which apps exist
