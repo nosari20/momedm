@@ -60,6 +60,9 @@
     <string name="launcher_no_apps_installed">Aucune app trouvée</string>
     <string name="launcher_online">Connecté au parent</string>
     <string name="launcher_offline">Parent hors de portée</string>
+    <string name="bedtime_title">Bonne nuit&#160;!</string>
+    <string name="bedtime_until">Déverrouillage à %1$s</string>
+    <string name="bedtime_manual">Un parent a verrouillé ce téléphone</string>
 
     <!-- Controller UI (MainActivity) -->
     <string name="main_drawer_name">Contrôleur</string>

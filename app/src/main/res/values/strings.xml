@@ -60,6 +60,9 @@
     <string name="launcher_no_apps_installed">No app found</string>
     <string name="launcher_online">Connected to parent</string>
     <string name="launcher_offline">Parent not in range</string>
+    <string name="bedtime_title">Good night!</string>
+    <string name="bedtime_until">Unlocks at %1$s</string>
+    <string name="bedtime_manual">A parent locked this phone</string>
 
     <!-- Controller UI (MainActivity) -->
     <string name="main_drawer_name">Controller</string>

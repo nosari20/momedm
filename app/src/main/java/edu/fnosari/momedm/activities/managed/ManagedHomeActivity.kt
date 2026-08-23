@@ -12,6 +12,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -21,6 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import edu.fnosari.momedm.R
+import edu.fnosari.momedm.activities.managed.screens.BedtimeScreen
 import edu.fnosari.momedm.activities.managed.screens.ChildLauncherScreen
 import edu.fnosari.momedm.ui.ManagedThemed
 import edu.fnosari.momedm.ui.components.ButtonRequestPermission
@@ -71,12 +74,12 @@ class ManagedHomeActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         combine(vm.kioskConfig, vm.resumeTick) { c, _ -> c }.filterNotNull().collect { c ->
                             val now = System.currentTimeMillis()
-                            if (c.isLocked(now) && c.pinned != null && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            if (vm.lockState.value?.locked != true && c.isLocked(now) && c.pinned != null && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
                                 delay(PINNED_BOUNCE_DELAY_MS)
                                 // RESUMED is re-checked after the grace period too: the child may have opened
                                 // another allowed app while we waited, and bouncing from a launcher that is no
                                 // longer in front would yank them straight back out of it.
-                                if (!vm.pinDialogOpen.value && vm.kioskConfig.value?.isLocked(System.currentTimeMillis()) == true &&
+                                if (vm.lockState.value?.locked != true && !vm.pinDialogOpen.value && vm.kioskConfig.value?.isLocked(System.currentTimeMillis()) == true &&
                                     lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) vm.open(c.pinned)
                             }
                         }
@@ -85,10 +88,12 @@ class ManagedHomeActivity : ComponentActivity() {
                         val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) vm.onResumed() }
                         owner.lifecycle.addObserver(obs); onDispose { owner.lifecycle.removeObserver(obs) }
                     }
-                    ChildLauncherScreen(vm, onUnlocked = {
-                        // PolicyManager.pause() already persisted the deadline; release lock task from the Activity.
+                    val lock by vm.lockState.collectAsState()
+                    val onUnlocked: () -> Unit = {
+                        // PolicyManager.pause() already persisted the deadline; release lock task here.
                         runCatching { stopLockTask() }.onFailure { Log.w(LOG_TAG, "stopLockTask failed", it) }
-                    })
+                    }
+                    if (lock?.locked == true) BedtimeScreen(vm, onUnlocked) else ChildLauncherScreen(vm, onUnlocked)
                 }
             }
         }

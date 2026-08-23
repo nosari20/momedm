@@ -8,25 +8,30 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import edu.fnosari.momedm.R
+import edu.fnosari.momedm.managed.LockController
 import edu.fnosari.momedm.managed.ManagedLinkService
 import edu.fnosari.momedm.managed.ManagedLinkState
 import edu.fnosari.momedm.managed.ManagedSetup
 import edu.fnosari.momedm.managed.PolicyManager
 import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.persistence.ManagedPrefs
+import edu.fnosari.momedm.protocol.LockState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 /** Child-launcher state: apps to show, child-mode config, PIN/pause handling, link state. */
 class ManagedViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,6 +58,20 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     val resumeTick = MutableStateFlow(0)
     /** True while [edu.fnosari.momedm.activities.managed.components.PinDialog] is showing — suppresses the pinned-app bounce. */
     val pinDialogOpen = MutableStateFlow(false)
+
+    /**
+     * The current complete-lock state, or null while the persisted inputs are still loading (the
+     * launcher must not flash its tiles at a device that turns out to be locked).
+     *
+     * Recomputed on every input change, on each ON_RESUME (via [resumeTick]) and once a minute, so a
+     * window that opens while the screen is on takes effect without waiting for the alarm.
+     */
+    val lockState: StateFlow<LockState?> = combine(
+        prefs.lockSchedule, prefs.manualLock, prefs.kioskConfig, resumeTick,
+        flow { while (true) { emit(Unit); delay(30_000L) } },
+    ) { schedule, manual, config, _, _ ->
+        LockState.evaluate(schedule, manual, config.pauseUntil, System.currentTimeMillis(), ZoneId.systemDefault())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _apps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val launcherApps: StateFlow<List<LauncherApp>> = _apps
@@ -112,12 +131,16 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     private fun trackPause(c: KioskConfig) {
         pauseJob?.cancel()
         val now = System.currentTimeMillis()
-        if (c.on && c.pauseUntil > 0L && !c.isPaused(now)) { _pauseRemaining.value = 0L; viewModelScope.launch { policy.resume() }; return }
+        if (c.on && c.pauseUntil > 0L && !c.isPaused(now)) {
+            _pauseRemaining.value = 0L
+            viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() }
+            return
+        }
         if (!c.isPaused(now)) { _pauseRemaining.value = 0L; return }
         pauseJob = viewModelScope.launch {
             while (isActive) {
                 val left = c.pauseUntil - System.currentTimeMillis()
-                if (left <= 0L) { _pauseRemaining.value = 0L; policy.resume(); break }
+                if (left <= 0L) { _pauseRemaining.value = 0L; LockController(getApplication(), prefs, policy).reevaluate(); break }
                 _pauseRemaining.value = left; delay(1_000L)
             }
         }
@@ -169,7 +192,7 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     fun clearPinError() { _pinError.value = null }
 
     /** Ends a pause now (re-locks). */
-    fun relock() { viewModelScope.launch { policy.resume() } }
+    fun relock() { viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() } }
 
     fun ensureLink() { if (ManagedLinkState.state.value == ManagedLinkState.LinkState.IDLE) ManagedLinkService.start(getApplication()) }
 }
