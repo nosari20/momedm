@@ -32,17 +32,36 @@ fun SettingsMenu(navController: NavHostController) {
 
         LazyColumn(state = listState) {
 
-            item { SettingsCategoryItem(title = context.getString(Routes.SETTINGS_CONTROLLER.label), icon = Routes.SETTINGS_CONTROLLER.icon, onClick = { navController.navigate(Routes.SETTINGS_CONTROLLER.name) }) }
-
             item { SettingsCategoryItem(
-                title = context.getString(Routes.SETTINGS_LEGAL.label),
-                icon = Routes.SETTINGS_LEGAL.icon,
-                onClick = { navController.navigate(Routes.SETTINGS_LEGAL.name) })
+                title = context.getString(Routes.APPEARANCE.label),
+                icon = Routes.APPEARANCE.icon,
+                supportingText = context.getString(R.string.settings_appearance_help),
+                onClick = { navController.navigate(Routes.APPEARANCE.name) })
             }
             item { SettingsCategoryItem(
-                title = context.getString(Routes.SETTINGS_LICENSES.label),
-                icon = Routes.SETTINGS_LICENSES.icon,
-                onClick = { navController.navigate(Routes.SETTINGS_LICENSES.name) })
+                title = context.getString(Routes.PIN.label),
+                icon = Routes.PIN.icon,
+                supportingText = context.getString(R.string.settings_pin_help),
+                onClick = { navController.navigate(Routes.PIN.name) })
+            }
+            item { SettingsCategoryItem(
+                title = context.getString(Routes.ADVANCED.label),
+                icon = Routes.ADVANCED.icon,
+                supportingText = context.getString(R.string.settings_advanced_help),
+                onClick = { navController.navigate(Routes.ADVANCED.name) })
+            }
+
+            item { SettingsCategoryDivider() }
+
+            item { SettingsCategoryItem(
+                title = context.getString(Routes.LEGAL.label),
+                icon = Routes.LEGAL.icon,
+                onClick = { navController.navigate(Routes.LEGAL.name) })
+            }
+            item { SettingsCategoryItem(
+                title = context.getString(Routes.LICENSES.label),
+                icon = Routes.LICENSES.icon,
+                onClick = { navController.navigate(Routes.LICENSES.name) })
             }
 
             item { SettingsCategoryDivider() }
@@ -50,13 +69,13 @@ fun SettingsMenu(navController: NavHostController) {
             item {
                 var clickCount = 0
                 SettingsAppVersion(
-                versionText = context.getString(R.string.settings_screen_version, appVersion?.versionName, appVersion?.versionNumber),
-                copyrights = context.getString(R.string.settings_screen_copyrights),
+                versionText = context.getString(R.string.settings_version, appVersion?.versionName, appVersion?.versionNumber),
+                copyrights = context.getString(R.string.settings_copyright),
                 onClick = {
                     clickCount++
                     if(clickCount == 8){
                         clickCount = 0
-                        navController.navigate(Routes.SETTINGS_EASTEREGG.name)
+                        navController.navigate(Routes.EASTEREGG.name)
                     }
                 }) }
         }

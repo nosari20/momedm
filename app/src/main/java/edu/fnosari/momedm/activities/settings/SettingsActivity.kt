@@ -12,9 +12,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import edu.fnosari.momedm.activities.settings.navigation.Routes
-import edu.fnosari.momedm.activities.settings.screens.SettingsControllerScreen
+import edu.fnosari.momedm.activities.settings.screens.SettingsAdvancedScreen
+import edu.fnosari.momedm.activities.settings.screens.SettingsAppearanceScreen
 import edu.fnosari.momedm.activities.settings.screens.SettingsEasterEgg
 import edu.fnosari.momedm.activities.settings.screens.SettingsMenu
+import edu.fnosari.momedm.activities.settings.screens.SettingsPinScreen
 import edu.fnosari.momedm.activities.settings.screens.SettingsScreen
 import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
 import edu.fnosari.momedm.ui.ControllerThemed
@@ -39,23 +41,25 @@ class SettingsActivity : ComponentActivity() {
                 ) {
                     composable(Routes.CATEGORIES.name) { SettingsMenu(navController) }
 
-                    composable(Routes.SETTINGS_CONTROLLER.name) { SettingsControllerScreen(navController) }
+                    composable(Routes.APPEARANCE.name) { SettingsAppearanceScreen(navController) }
+                    composable(Routes.PIN.name) { SettingsPinScreen(navController) }
+                    composable(Routes.ADVANCED.name) { SettingsAdvancedScreen(navController) }
 
-                    composable(Routes.SETTINGS_LEGAL.name) {
+                    composable(Routes.LEGAL.name) {
                         SettingsScreen(
                             navController,
                             preferencesProvider,
                             listOf()
                         )
                     }
-                    composable(Routes.SETTINGS_LICENSES.name) {
+                    composable(Routes.LICENSES.name) {
                         SettingsScreen(
                             navController,
                             preferencesProvider,
                             listOf()
                         )
                     }
-                    composable(Routes.SETTINGS_EASTEREGG.name) {
+                    composable(Routes.EASTEREGG.name) {
                         SettingsEasterEgg(navController)
                     }
                 }
