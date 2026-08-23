@@ -119,6 +119,7 @@ class ControllerService : Service() {
                     is Message.Result -> ControllerLink.results.tryEmit(deviceId to m)
                     is Message.Ping -> scope.launch { registry.upsertSeen(deviceId, registry.get(deviceId)?.model ?: "?", System.currentTimeMillis()) }
                     is Message.Apps -> ControllerLink.apps.tryEmit(deviceId to m)
+                    is Message.Schema -> ControllerLink.schemas.tryEmit(deviceId to m)
                     else -> Log.w(LOG_TAG, "Unexpected ${m::class.simpleName} from $deviceId")
                 }
             }

@@ -12,6 +12,8 @@ object ControllerLink {
     val online = MutableStateFlow<Set<String>>(emptySet())
     val results = MutableSharedFlow<Pair<String, Message.Result>>(extraBufferCapacity = 16)
     val apps = MutableSharedFlow<Pair<String, Message.Apps>>(extraBufferCapacity = 4)
+    /** Managed-configuration schemas a child reported, for the advanced app-settings form. */
+    val schemas = MutableSharedFlow<Pair<String, Message.Schema>>(extraBufferCapacity = 4)
     /** replay = 1 so a start failure emitted before the UI subscribes is not lost. */
     val errors = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 8)
     /** Installed by the running service. */

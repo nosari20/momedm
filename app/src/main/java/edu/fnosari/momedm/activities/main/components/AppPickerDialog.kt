@@ -33,10 +33,17 @@ import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.ui.common.AccentPill
 import edu.fnosari.momedm.ui.theme.pastelOf
 
-/** Multi-select of the child's apps (null = still loading) with an optional "pin a single app" choice. */
+/**
+ * Multi-select of the child's apps (null = still loading) with an optional "pin a single app" choice.
+ *
+ * [singleChoice] reuses the same list to pick exactly one app — the advanced settings form needs to
+ * ask "which app?" and this list, with its search box, is already the right answer. In that mode the
+ * pin switch and the allowed-count pill are hidden, since neither means anything for a single pick.
+ */
 @Composable
 fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initiallyPinned: String?,
-                    onConfirm: (apps: List<String>, pinned: String?) -> Unit, onDismiss: () -> Unit) {
+                    onConfirm: (apps: List<String>, pinned: String?) -> Unit, onDismiss: () -> Unit,
+                    singleChoice: Boolean = false, title: String? = null) {
     var selected by remember { mutableStateOf(initiallySelected) }
     var pinOne by remember { mutableStateOf(initiallyPinned != null) }
     var pinned by remember { mutableStateOf(initiallyPinned) }
@@ -45,8 +52,8 @@ fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initia
         shape = RoundedCornerShape(20.dp),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.apps_title))
-                if (apps != null) AccentPill(text = stringResource(R.string.child_allowed_count, selected.size), accent = MaterialTheme.colorScheme.primary)
+                Text(title ?: stringResource(R.string.apps_title))
+                if (apps != null && !singleChoice) AccentPill(text = stringResource(R.string.child_allowed_count, selected.size), accent = MaterialTheme.colorScheme.primary)
             }
         },
         confirmButton = { TextButton(enabled = selected.isNotEmpty() && (!pinOne || pinned in selected),
@@ -57,7 +64,7 @@ fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initia
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { CircularProgressIndicator(); Text(stringResource(R.string.apps_loading)) }
             } else Column {
                 OutlinedTextField(query, { query = it }, label = { Text(stringResource(R.string.search)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Row(
+                if (!singleChoice) Row(
                     Modifier.fillMaxWidth().padding(vertical = 8.dp).background(pastelOf(MaterialTheme.colorScheme.primary), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -70,6 +77,7 @@ fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initia
                         Row(
                             Modifier.fillMaxWidth()
                                 .clickable {
+                                    if (singleChoice) { selected = setOf(a.pkg); return@clickable }
                                     if (checked && pinned == a.pkg) pinned = null
                                     selected = if (checked) selected - a.pkg else selected + a.pkg
                                 }

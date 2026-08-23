@@ -257,4 +257,12 @@
     <string name="safety_dns_none">Aucun</string>
     <string name="safety_change">Modifier</string>
     <string name="safety_explain">Les réglages du navigateur ne concernent que Chrome. L\'application YouTube les ignore : elle n\'est couverte que par le filtrage ci-dessus - sans lui, YouTube n\'est pas filtré. Le mode restreint masque la plupart des contenus pour adultes, pas tous.</string>
+
+    <!-- Advanced per-app managed configuration -->
+    <string name="appcfg_open">Réglages avancés des apps</string>
+    <string name="appcfg_pick">Quelle app ?</string>
+    <string name="appcfg_loading">Lecture des réglages de l\'app...</string>
+    <string name="appcfg_none">Cette app ne propose aucun réglage gérable à distance. C\'est le cas de la plupart des apps : chacune doit le prévoir. Bloquer l\'app, ou le filtrage de tout le téléphone, restent les leviers qui marchent toujours.</string>
+    <string name="appcfg_warning">Réglages experts, fournis par l\'app elle-même. Une mauvaise valeur peut empêcher l\'app de fonctionner.</string>
+    <string name="appcfg_unsupported">%1$s - non modifiable ici</string>
 </resources>

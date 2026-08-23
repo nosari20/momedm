@@ -5,6 +5,7 @@ import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.SafetyConfig
+import edu.fnosari.momedm.protocol.SchemaEntry
 import edu.fnosari.momedm.protocol.Message
 
 /** Managed-role actions the [CommandExecutor] drives; implemented by [PolicyManager]. */
@@ -30,6 +31,8 @@ interface PolicyActions {
 interface StatusSource {
     suspend fun collect(): Message.Status
     suspend fun launchableApps(): List<AppInfo>
+    /** Managed-configuration settings [pkg] declares; empty when it declares none. */
+    suspend fun appSchema(pkg: String): List<SchemaEntry>
 }
 
 /** Maps a [Message.Cmd] to policy actions; returns the messages to send back (RESULT first). Pure Kotlin. */
@@ -53,6 +56,13 @@ class CommandExecutor(private val policy: PolicyActions, private val status: Sta
                 listOf(res(policy.openPlaySearch(term), "play search opened"))
             }
             CmdType.ADD_ACCOUNT -> listOf(res(policy.openAddAccount(), "account flow opened"))
+            CmdType.GET_APP_SCHEMA -> {
+                val pkg = cmd.pkg ?: return listOf(Message.Result(cmd.id, false, "missing pkg"))
+                val entries = status.appSchema(pkg)
+                // An app with no schema is reported as an empty list, not an error: "declares nothing"
+                // and "could not be read" are different answers and the parent is shown which.
+                listOf(Message.Result(cmd.id, true, "${entries.size} setting(s)"), Message.Schema(pkg, entries))
+            }
             CmdType.LIST_APPS -> listOf(Message.Result(cmd.id, true, "apps"), Message.Apps(status.launchableApps()))
             CmdType.GET_STATUS -> listOf(Message.Result(cmd.id, true, "status"), status.collect())
             CmdType.SET_PREFS -> {

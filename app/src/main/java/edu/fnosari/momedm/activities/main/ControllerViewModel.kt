@@ -17,6 +17,8 @@ import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.SafetyConfig
 import edu.fnosari.momedm.protocol.SafetyLevel
+import edu.fnosari.momedm.protocol.SchemaEntry
+import kotlinx.serialization.json.JsonObject
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +48,9 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     // the permission gate, before the post-gate LaunchedEffect subscribes) is not lost.
     private val _events = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 8)
     val events: SharedFlow<String> = _events
+    private val _schemaFor = MutableStateFlow<Triple<String, String, List<SchemaEntry>?>?>(null)
+    /** (deviceId, package, entries) while the advanced form is open; entries == null while loading. */
+    val schemaFor: StateFlow<Triple<String, String, List<SchemaEntry>?>?> = _schemaFor
     private val _appsFor = MutableStateFlow<Pair<String, List<AppInfo>?>?>(null)
     /** (deviceId, apps) while the picker is open; apps == null while loading. */
     val appsFor: StateFlow<Pair<String, List<AppInfo>?>?> = _appsFor
@@ -69,6 +74,12 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
         viewModelScope.launch { ControllerLink.apps.collect { (id, a) -> if (_appsFor.value?.first == id) _appsFor.value = id to a.apps } }
+        viewModelScope.launch {
+            ControllerLink.schemas.collect { (id, m) ->
+                val open = _schemaFor.value
+                if (open != null && open.first == id && open.second == m.pkg) _schemaFor.value = Triple(id, m.pkg, m.entries)
+            }
+        }
         viewModelScope.launch { ControllerLink.errors.collect { _events.emit(it) } }
         // Service-side registry writes land in DataStore; re-read the blob so the UI list refreshes.
         viewModelScope.launch { prefs.registryJson.collect { registry.reload() } }
@@ -121,6 +132,28 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         val cfg = SafetyConfig.of(level, dnsHost)
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SAFETY, safety = cfg) }
         Log.d(LOG_TAG, "setSafety -> $deviceId: level=$level dns=${dnsHost != null}: ${if (id == null) "offline" else "sent (id=$id)"}")
+        announce(id)
+    }
+
+    /** Asks [deviceId] which managed-configuration settings [pkg] declares. */
+    fun requestSchema(deviceId: String, pkg: String) {
+        _schemaFor.value = Triple(deviceId, pkg, null)
+        if (send(deviceId, CmdType.GET_APP_SCHEMA, pkg) == null) _schemaFor.value = null
+    }
+    fun clearSchema() { _schemaFor.value = null }
+
+    /**
+     * Writes [values] as [pkg]'s managed configuration, keeping every other app's untouched.
+     *
+     * [current] is the config the child reported in its status: the parent stores nothing of its own,
+     * so merging against what the child actually holds is the only way to edit one app without
+     * silently wiping the preset applied to another.
+     */
+    fun setAppConfig(deviceId: String, current: SafetyConfig?, pkg: String, values: JsonObject) {
+        val base = current ?: SafetyConfig()
+        val merged = base.copy(appConfigs = base.appConfigs + (pkg to values))
+        val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SAFETY, safety = merged) }
+        Log.d(LOG_TAG, "setAppConfig -> $deviceId: $pkg (${values.size} value(s)): ${if (id == null) "offline" else "sent (id=$id)"}")
         announce(id)
     }
 

@@ -35,7 +35,9 @@ import androidx.navigation.NavHostController
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.main.ControllerViewModel
 import edu.fnosari.momedm.activities.main.components.AppPickerDialog
+import edu.fnosari.momedm.activities.main.components.AppConfigDialog
 import edu.fnosari.momedm.activities.main.components.SafetyDialog
+import kotlinx.serialization.json.JsonObject
 import edu.fnosari.momedm.protocol.SafetyConfig
 import edu.fnosari.momedm.protocol.SafetyLevel
 import edu.fnosari.momedm.activities.main.components.TimeRangeRow
@@ -58,6 +60,10 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
     var pkg by remember { mutableStateOf("") }
     var renaming by remember { mutableStateOf(false) }
     var editingSafety by remember { mutableStateOf(false) }
+    var pickingConfigApp by remember { mutableStateOf(false) }
+    // Captured when the app is chosen: the picker's list is cleared before the form opens, so the
+    // label has to be remembered here or the form can only show a package name.
+    var configAppLabel by remember { mutableStateOf("") }
     val s = d?.lastStatus
     Column(Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -140,6 +146,9 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 OutlinedButton(onClick = { editingSafety = true }, Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.safety_change))
                 }
+                OutlinedButton(onClick = { pickingConfigApp = true; viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.appcfg_open))
+                }
             }
         }
 
@@ -156,6 +165,37 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
     appsFor?.let { (id, apps) ->
         if (id == deviceId) AppPickerDialog(apps, initiallySelected = s?.kioskApps?.toSet() ?: emptySet(), initiallyPinned = s?.kioskPkg,
             onConfirm = { selectedApps, pinned -> viewModel.kioskOn(deviceId, selectedApps, pinned) }, onDismiss = { viewModel.clearApps() })
+    }
+    val schema by viewModel.schemaFor.collectAsState()
+    // Picking which app to configure reuses the installed-apps list the child already reports.
+    appsFor?.let { (id, apps) ->
+        if (id == deviceId && pickingConfigApp && apps != null && schema == null) AppPickerDialog(
+            apps,
+            initiallySelected = emptySet(),
+            initiallyPinned = null,
+            singleChoice = true,
+            title = stringResource(R.string.appcfg_pick),
+            onConfirm = { selected, _ ->
+                selected.firstOrNull()?.let { pkg ->
+                    configAppLabel = apps.firstOrNull { it.pkg == pkg }?.label ?: pkg
+                    viewModel.requestSchema(deviceId, pkg)
+                }
+                pickingConfigApp = false; viewModel.clearApps()
+            },
+            onDismiss = { pickingConfigApp = false; viewModel.clearApps() },
+        )
+    }
+    schema?.let { (id, pkg, entries) ->
+        if (id == deviceId) {
+            if (entries == null) Text(stringResource(R.string.appcfg_loading))
+            else AppConfigDialog(
+                label = configAppLabel.ifBlank { pkg },
+                entries = entries,
+                current = s?.safety?.appConfigs?.get(pkg) ?: JsonObject(emptyMap()),
+                onConfirm = { values -> viewModel.setAppConfig(deviceId, s?.safety, pkg, values); viewModel.clearSchema() },
+                onDismiss = { viewModel.clearSchema() },
+            )
+        }
     }
     if (editingSafety) SafetyDialog(
         current = SafetyConfig.of(s?.safetyLevel ?: SafetyLevel.OFF, null),

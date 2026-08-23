@@ -6,6 +6,8 @@ import edu.fnosari.momedm.protocol.CmdType
 import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.SafetyConfig
 import edu.fnosari.momedm.protocol.SafetyLevel
+import edu.fnosari.momedm.protocol.EntryType
+import edu.fnosari.momedm.protocol.SchemaEntry
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -36,6 +38,9 @@ class CommandExecutorTest {
     private class FakeStatus : StatusSource {
         override suspend fun collect() = Message.Status(false, null, true, 42, "x")
         override suspend fun launchableApps() = listOf(AppInfo("a", "A"))
+        var schemaFor: String? = null
+        var schemaToReturn: List<SchemaEntry> = emptyList()
+        override suspend fun appSchema(pkg: String): List<SchemaEntry> { schemaFor = pkg; return schemaToReturn }
     }
 
     @Test fun kioskOnReturnsResultThenStatus() = runTest {
@@ -94,6 +99,31 @@ class CommandExecutorTest {
     @Test fun setSafetyWithoutPayloadFails() = runTest {
         val r = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("42", CmdType.SET_SAFETY))[0] as Message.Result
         assertFalse(r.ok); assertEquals("missing safety", r.msg)
+    }
+
+    @Test fun appSchemaIsReturnedForTheRequestedPackage() = runTest {
+        val st = FakeStatus()
+        st.schemaToReturn = listOf(
+            SchemaEntry("BrowserSignin", EntryType.INTEGER, "Sign-in"),
+            SchemaEntry("URLBlocklist", EntryType.MULTI_SELECT, "Blocked sites", listOf("A"), listOf("a")),
+        )
+        val out = CommandExecutor(FakePolicy(), st).execute(Message.Cmd("50", CmdType.GET_APP_SCHEMA, pkg = "com.android.chrome"))
+        assertEquals(Message.Result("50", true, "2 setting(s)"), out[0])
+        assertEquals(Message.Schema("com.android.chrome", st.schemaToReturn), out[1])
+        assertEquals("com.android.chrome", st.schemaFor)
+    }
+
+    @Test fun anAppWithNoSchemaIsAnEmptyListNotAnError() = runTest {
+        // "declares nothing" and "could not be read" must not look the same to the parent.
+        val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("51", CmdType.GET_APP_SCHEMA, pkg = "com.duolingo"))
+        val r = out[0] as Message.Result
+        assertTrue(r.ok); assertEquals("0 setting(s)", r.msg)
+        assertEquals(Message.Schema("com.duolingo", emptyList()), out[1])
+    }
+
+    @Test fun appSchemaWithoutAPackageFails() = runTest {
+        val r = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("52", CmdType.GET_APP_SCHEMA))[0] as Message.Result
+        assertFalse(r.ok); assertEquals("missing pkg", r.msg)
     }
 
     @Test fun setPrefs() = runTest {

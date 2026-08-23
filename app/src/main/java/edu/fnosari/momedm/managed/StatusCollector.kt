@@ -14,6 +14,7 @@ import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.LockState
 import edu.fnosari.momedm.protocol.Message
+import edu.fnosari.momedm.protocol.SchemaEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -42,6 +43,7 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
         val c = prefs.kioskConfig.first(); val now = System.currentTimeMillis()
         val paused = c.isPaused(now)
         val schedule = prefs.lockSchedule.first()
+        val safetyConfig = prefs.safety.first()
         val lock = LockState.evaluate(schedule, prefs.manualLock.first(), c.pauseUntil, now, ZoneId.systemDefault())
         val s = Message.Status(kiosk = c.on, kioskPkg = c.pinned, account = hasGoogleAccount(), battery = batteryPercent(),
             currentApp = foregroundApp() ?: if (c.isLocked(now)) c.pinned else null,
@@ -79,6 +81,11 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
      * Runs on [Dispatchers.IO]: `queryIntentActivities` plus one `loadLabel` per resolved activity is a
      * long series of blocking [PackageManager] binder calls and must not run on the main thread.
      */
+    /** Reads the app's declared managed-configuration schema; see [AppSchemaReader]. */
+    override suspend fun appSchema(pkg: String): List<SchemaEntry> = withContext(Dispatchers.IO) {
+        AppSchemaReader.read(context, pkg)
+    }
+
     override suspend fun launchableApps(): List<AppInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)

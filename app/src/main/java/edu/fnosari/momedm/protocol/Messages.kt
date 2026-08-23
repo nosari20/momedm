@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS, SET_SCHEDULE, LOCK_NOW, UNLOCK, SEARCH_APP, SET_SAFETY }
+enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS, SET_SCHEDULE, LOCK_NOW, UNLOCK, SEARCH_APP, SET_SAFETY, GET_APP_SCHEMA }
 
 @Serializable
 data class AppInfo(val pkg: String, val label: String)
@@ -81,8 +81,15 @@ sealed class Message {
         val schedule: LockSchedule? = null,
         /** Content-restriction level currently applied on the child. */
         val safetyLevel: SafetyLevel = SafetyLevel.OFF,
+        /**
+         * The whole restriction config in force. The parent keeps nothing of its own, so without this
+         * it could not merge: editing one app's settings would overwrite every other app's.
+         */
+        val safety: SafetyConfig? = null,
     ) : Message()
     @Serializable @SerialName("APPS")      data class Apps(val apps: List<AppInfo>) : Message()
+    /** Reply to [CmdType.GET_APP_SCHEMA]: the managed-configuration settings [pkg] declares, empty when it declares none. */
+    @Serializable @SerialName("SCHEMA")    data class Schema(val pkg: String, val entries: List<SchemaEntry>) : Message()
     @Serializable @SerialName("RESULT")    data class Result(val cmdId: String, val ok: Boolean, val msg: String) : Message()
     @Serializable @SerialName("CMD")       data class Cmd(
         val id: String, val type: CmdType, val pkg: String? = null,

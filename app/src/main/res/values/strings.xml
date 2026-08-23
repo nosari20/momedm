@@ -257,4 +257,12 @@
     <string name="safety_dns_none">None</string>
     <string name="safety_change">Change</string>
     <string name="safety_explain">Browser settings only apply to Chrome. The YouTube app ignores them, so it is covered only by the phone-wide filtering above - without it, YouTube is unfiltered. Restricted Mode hides most mature content, not all of it.</string>
+
+    <!-- Advanced per-app managed configuration -->
+    <string name="appcfg_open">Advanced app settings</string>
+    <string name="appcfg_pick">Which app?</string>
+    <string name="appcfg_loading">Reading the app settings...</string>
+    <string name="appcfg_none">This app offers no settings that can be managed. Most apps do not - it is something each app has to support. Blocking the app, or the phone-wide filtering, are the levers that always work.</string>
+    <string name="appcfg_warning">Expert settings, straight from the app itself. A wrong value can stop the app working properly.</string>
+    <string name="appcfg_unsupported">%1$s - cannot be set here</string>
 </resources>
