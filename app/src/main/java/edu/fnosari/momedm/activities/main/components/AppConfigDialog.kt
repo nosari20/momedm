@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -85,6 +86,29 @@ fun AppConfigDialog(
                 onClick = { onConfirm(JsonObject(current + edits)) },
             ) { Text(stringResource(R.string.settings_dialog_confirm)) }
         },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_dialog_dismiss)) } },
+    )
+}
+
+/**
+ * Shown while the child is being asked what an app declares.
+ *
+ * This is not instant: Chrome declares hundreds of settings and the answer crosses a BLE link, which
+ * takes a few seconds. Without a dialog here the picker simply closed and nothing appeared, so the
+ * parent concluded their tap had not registered and pressed the button again.
+ */
+@Composable
+fun AppConfigLoadingDialog(label: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(label) },
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                CircularProgressIndicator()
+                Text(stringResource(R.string.appcfg_loading), style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_dialog_dismiss)) } },
     )
 }

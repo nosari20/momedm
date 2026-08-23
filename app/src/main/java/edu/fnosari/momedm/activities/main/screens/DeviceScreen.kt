@@ -37,6 +37,7 @@ import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.main.ControllerViewModel
 import edu.fnosari.momedm.activities.main.components.AppPickerDialog
 import edu.fnosari.momedm.activities.main.components.AppConfigDialog
+import edu.fnosari.momedm.activities.main.components.AppConfigLoadingDialog
 import edu.fnosari.momedm.activities.main.components.SafetyDialog
 import kotlinx.serialization.json.JsonObject
 import edu.fnosari.momedm.protocol.SafetyConfig
@@ -199,7 +200,7 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
     }
     schema?.let { (id, pkg, entries) ->
         if (id == deviceId) {
-            if (entries == null) Text(stringResource(R.string.appcfg_loading))
+            if (entries == null) AppConfigLoadingDialog(configAppLabel.ifBlank { pkg }) { viewModel.clearSchema() }
             else AppConfigDialog(
                 label = configAppLabel.ifBlank { pkg },
                 entries = entries,
