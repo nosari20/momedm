@@ -271,4 +271,25 @@
     <string name="repair_hint">Dirigez la caméra vers le code d\'association affiché sur le téléphone du parent.</string>
     <string name="repair_not_ours">Ce n\'est pas un code d\'association Môme DM.</string>
     <string name="repair_done">Associé. Reconnexion...</string>
+
+    <!-- Parent menu on the child device -->
+    <string name="menu_title">Menu parent</string>
+    <string name="menu_open">Menu</string>
+    <string name="menu_close">Fermer</string>
+    <string name="menu_rules">Ce qui est appliqué sur ce téléphone</string>
+    <string name="menu_child_mode">Mode enfant</string>
+    <string name="menu_lock_now">Verrouillé en ce moment</string>
+    <string name="menu_lock_night">Oui, pour la nuit</string>
+    <string name="menu_night_lock">Verrouillage la nuit</string>
+    <string name="menu_windows">École %1$s-%2$s, week-end %3$s-%4$s</string>
+    <string name="menu_app_settings">Apps avec réglages</string>
+    <string name="menu_connection">Parent</string>
+    <string name="menu_parent_link">Liaison</string>
+    <string name="menu_not_paired">non associé</string>
+    <string name="menu_device">Ce téléphone</string>
+    <string name="menu_model">Modèle</string>
+    <string name="menu_android">Android</string>
+    <string name="menu_version">Version de l\'app</string>
+    <string name="menu_managed">Géré par Môme DM</string>
+    <string name="menu_pause">Suspendre le mode enfant 10 minutes</string>
 </resources>

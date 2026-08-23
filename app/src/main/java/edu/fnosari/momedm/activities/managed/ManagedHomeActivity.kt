@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.managed.screens.BedtimeScreen
 import edu.fnosari.momedm.activities.managed.screens.ChildLauncherScreen
+import edu.fnosari.momedm.activities.managed.screens.ChildMenuScreen
 import edu.fnosari.momedm.ui.ManagedThemed
 import edu.fnosari.momedm.ui.components.ButtonRequestPermission
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
@@ -93,7 +94,15 @@ class ManagedHomeActivity : ComponentActivity() {
                         // PolicyManager.pause() already persisted the deadline; release lock task here.
                         runCatching { stopLockTask() }.onFailure { Log.w(LOG_TAG, "stopLockTask failed", it) }
                     }
-                    if (lock?.locked == true) BedtimeScreen(vm, onUnlocked) else ChildLauncherScreen(vm, onUnlocked)
+                    val menuOpen by vm.menuOpen.collectAsState()
+                    when {
+                        // The menu is a state of this Activity, not its own: pausing child mode from
+                        // it has to call stopLockTask(), which only the Activity holding the lock task
+                        // can do.
+                        menuOpen -> ChildMenuScreen(vm, onPause = { vm.pauseFromMenu(onUnlocked) })
+                        lock?.locked == true -> BedtimeScreen(vm, onUnlocked)
+                        else -> ChildLauncherScreen(vm, onUnlocked)
+                    }
                 }
             }
         }

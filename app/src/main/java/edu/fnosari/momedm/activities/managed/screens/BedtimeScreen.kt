@@ -77,10 +77,15 @@ fun BedtimeScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.then(
+                // With no PIN the gesture used to do nothing here, which left a completely locked
+                // phone with no way to reach the parent menu — the one situation where someone most
+                // needs to ask it what is going on.
                 if (pinSet) Modifier
                     .semantics { contentDescription = a11y }
                     .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
-                else Modifier,
+                else Modifier
+                    .semantics { contentDescription = a11y }
+                    .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.menuOpen.value = true }) },
             ),
         ) {
             // Both colours are explicit on purpose: this Column sits in a bare Box, not a Surface, so

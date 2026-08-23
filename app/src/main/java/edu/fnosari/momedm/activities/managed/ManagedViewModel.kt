@@ -15,6 +15,8 @@ import edu.fnosari.momedm.managed.ManagedSetup
 import edu.fnosari.momedm.managed.PolicyManager
 import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.persistence.ManagedPrefs
+import edu.fnosari.momedm.protocol.LockSchedule
+import edu.fnosari.momedm.protocol.SafetyConfig
 import edu.fnosari.momedm.protocol.LockState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,6 +55,20 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
      */
     val kioskConfig: StateFlow<KioskConfig?> = prefs.kioskConfig.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val pinSet: StateFlow<Boolean> = prefs.childPrefs.map { it.pinHash != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * True while the parent menu is open on the child device.
+     *
+     * Deliberately state inside the launcher rather than a separate Activity: pausing child mode from
+     * the menu has to call `stopLockTask()`, which only the Activity holding the lock task can do.
+     */
+    val menuOpen = MutableStateFlow(false)
+
+    /** Everything the menu shows, read locally so it still works with no parent in range. */
+    val controllerId: StateFlow<String> = prefs.controllerId.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val lockSchedule: StateFlow<LockSchedule> = prefs.lockSchedule.stateIn(viewModelScope, SharingStarted.Eagerly, LockSchedule())
+    val safety: StateFlow<SafetyConfig> = prefs.safety.stateIn(viewModelScope, SharingStarted.Eagerly, SafetyConfig())
+    val deviceOwner: Boolean get() = policy.isDeviceOwner
 
     /** Bumped by the Activity's ON_RESUME observer; combined with [kioskConfig] to drive the pinned-app bounce. */
     val resumeTick = MutableStateFlow(0)
@@ -181,7 +197,12 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
         if (policy.verifyPin(pin)) {
             pinFailures = 0; _pinError.value = null; pinLockDeadline = 0L; pinLockJob?.cancel(); _pinLockedRemaining.value = 0L
             prefs.setPinLock(0, 0L)
-            policy.pause(); onSuccess()
+            // A correct PIN opens the parent menu rather than only pausing: the parent who just
+            // proved themselves is usually here to look at something, and pausing is one tap away
+            // inside it. The pause itself still happens through [pauseFromMenu], which is what
+            // releases lock task.
+            menuOpen.value = true
+            onSuccess()
         } else {
             pinFailures++
             val lock = (PIN_LOCK_BASE_MS shl (pinFailures - 1).coerceAtMost(5)).coerceAtMost(PIN_LOCK_MAX_MS)
@@ -217,6 +238,20 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun clearPinError() { _pinError.value = null }
+
+    /**
+     * Pauses child mode from the parent menu and closes it, letting the Activity release lock task.
+     *
+     * Separate from [tryPin] so the PIN proves who you are and this decides what happens next — the
+     * parent may only have wanted to read the menu.
+     */
+    fun pauseFromMenu(onPaused: () -> Unit) {
+        viewModelScope.launch {
+            policy.pause()
+            menuOpen.value = false
+            onPaused()
+        }
+    }
 
     /** Ends a pause now (re-locks). */
     fun relock() { viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() } }

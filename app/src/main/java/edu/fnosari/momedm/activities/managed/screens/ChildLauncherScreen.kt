@@ -124,9 +124,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
                             .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
                         else if (config.on) Modifier
                             .semantics { contentDescription = headerA11y }
-                            .pointerInput(Unit) {
-                                detectTapGestures(onLongPress = { context.startActivity(Intent(context, RepairScanActivity::class.java)) })
-                            }
+                            .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.menuOpen.value = true }) }
                         else Modifier,
                     )
                     .padding(horizontal = 24.dp, vertical = 20.dp),
@@ -162,9 +160,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel, onUnlocked: () -> Unit) {
                         Spacer(Modifier.weight(1f))
                         // Only reachable while paused, which took the parent PIN: a child cannot
                         // re-point their own phone at a different parent.
-                        TextButton(onClick = {
-                            context.startActivity(Intent(context, RepairScanActivity::class.java))
-                        }) { Text(stringResource(R.string.repair_open)) }
+                        TextButton(onClick = { vm.menuOpen.value = true }) { Text(stringResource(R.string.menu_open)) }
                         TextButton(onClick = { vm.relock() }) { Text(stringResource(R.string.launcher_relock)) }
                     }
                 }
