@@ -145,7 +145,9 @@ class ManagedLinkService : Service() {
                 // does know) is exactly how a complete lock got silently downgraded to the ordinary
                 // child-mode allowlist on reboot. reevaluate() re-applies child mode whenever that is
                 // genuinely all that applies, so it is a strict superset of the old restore.
-                try { if (fromBoot) LockController(this@ManagedLinkService, prefs, policy).reevaluate(); startLink() } finally { linkStarting = false }
+                // PIN pause does not survive reboot; clear it here as well as in BootReceiver
+                // to close the race where whichever path runs first could observe a stale deadline.
+                try { if (fromBoot) { prefs.setPauseUntil(0L); LockController(this@ManagedLinkService, prefs, policy).reevaluate() }; startLink() } finally { linkStarting = false }
             }
         }
         return START_STICKY
@@ -236,10 +238,10 @@ class ManagedLinkService : Service() {
                 if (wait > 0) delay(wait)
                 if (prefs.kioskConfig.first().let { it.on && it.pauseUntil > 0L && it.pauseUntil <= System.currentTimeMillis() }) {
                     Log.d(LOG_TAG, "Pause lapsed; re-evaluating")
-                    // Re-evaluate rather than calling policy.resume() (plain kiosk re-apply) directly:
+                    // Re-evaluate through LockController rather than a direct kiosk re-apply:
                     // this watchdog only knows a pause has lapsed, not whether a complete lock should
                     // apply instead of child mode. LockController does know, and also clears the
-                    // stale pauseUntil that would otherwise re-trigger this same branch forever.
+                    // stale pauseUntil that would otherwise re-trigger this same branch.
                     LockController(this@ManagedLinkService, prefs, policy).reevaluate()
                 }
             }
