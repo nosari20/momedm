@@ -7,18 +7,23 @@ is fully bilingual and that contrast is intentional.
 | File | Shows |
 |---|---|
 | `parent-children.png` | "My children" list: the connected child card, green presence dot, "Child mode off" badge, "+" add-device button. |
-| `parent-device.png` | Child detail page: status card and the full Night lock card with a realistic schedule — toggle ON, School nights 21:00→07:00, Friday/Saturday 22:00→08:00, state line "Locked until 7:00 AM". |
+| `parent-device.png` | Child detail page: status card and the full Night lock card — toggle ON, School nights 21:00→07:00, Friday/Saturday 22:00→08:00, state line "Locked until 7:00 AM", and the top of the Content card. |
+| `parent-content.png` | The Content card on a child's page: level, then Change / Choose allowed apps / Advanced app settings. |
+| `parent-content-dialog.png` | "Content restrictions" dialog: the three levels, the phone-wide filtering resolvers, and the note about what browser settings do and do not cover. |
+| `parent-app-picker.png` | "Which app?" — the single-choice list behind Advanced app settings. One tap opens that app's form; no tick boxes, no confirm. |
+| `parent-app-config.png` | A settings form built from Chrome's *own* declared managed configuration — nothing about these fields is hardcoded in this project. |
 | `parent-apps-picker.png` | "Allowed apps" dialog with 5 apps ticked (Agenda, Appareil photo, Chrome, Gmail, Horloge) and the "Keep to a single app" toggle visible above the list. |
 | `parent-time-picker.png` | The Material clock dialog opened from the School-nights start-time row (24h dial, Cancel/Save). |
 | `parent-settings.png` | Settings list: Appearance & language, Parent PIN, Advanced, plus Legal/Licenses/version footer. |
 | `parent-appearance.png` | Appearance & language screen with the "App colour" picker dialog open (8 accent swatches, one checked), Appearance: Dark visible behind it. |
 | `parent-pin.png` | Parent PIN screen in the "PIN already set" state (Change PIN / Remove PIN) — no digits shown. |
 | `parent-provision.png` | Provision screen after tapping "Show the code": steps 1–3 of the enrolment flow. **The QR code and Wi-Fi credentials are deliberately blurred** — that code carries the shared pairing secret. Keep them redacted in any re-capture. |
-| `child-launcher-allapps.png` | Kid launcher with child mode OFF: full app grid, big clock, "Bon après-midi !" greeting, connection dot. |
+| `child-launcher-allapps.png` | Kid launcher with child mode OFF: full app grid, big clock, time-of-day greeting, connection dot. |
 | `child-launcher-childmode.png` | Kid launcher with child mode ON: grid reduced to only the 5 parent-allowed apps. |
-| `child-bedtime.png` | Bedtime/complete-lock screen: clock at 21:30, "Bonne nuit !", "Déverrouillage à 07:00", no app tiles. Captured with the child clock moved into a 21:00→07:00 window. |
+| `child-bedtime.png` | Bedtime/complete-lock screen: "Bonne nuit !", "Déverrouillage à 07:00", no app tiles, and the explicit "Appel d'urgence" button. Captured inside a real 21:00→07:00 window. |
 | `child-pin-dialog.png` | "Code PIN parental" dialog opened by long-pressing the header clock/greeting area — empty input field. |
-| `child-paused.png` | Launcher showing the "Mode enfant en pause · MM:SS" banner with "Reverrouiller", after entering the correct parent PIN — apps unlocked again. |
+| `child-paused.png` | Launcher showing the "Mode enfant en pause" banner with "Menu" and "Reverrouiller" — during a pause every installed app is listed, not just the allowed ones. |
+| `child-parent-menu.png` | The parent menu on the child's phone: rules in force, the parent link, device facts, then Pause / Re-pair / Close. Reached by long-pressing the header and entering the PIN. |
 
 ## Notes for re-capture
 
@@ -31,7 +36,12 @@ is fully bilingual and that contrast is intentional.
 - To reach `child-paused.png`, long-press the child's header to open the PIN dialog, type
   the parent PIN, dismiss the on-screen keyboard state carefully — tapping "Déverrouiller"
   while the keyboard is still up works; using the back button first can dismiss the whole
-  dialog instead of just the keyboard.
+  dialog instead of just the keyboard. A correct PIN lands on the parent menu
+  (`child-parent-menu.png`); the pause itself is the button inside it.
+- Driving the child's long-press over adb needs a settle delay, or the swipe arrives before
+  the launcher has resumed and is swallowed:
+  `adb shell "input keyevent 3; sleep 0.6; input swipe 300 150 302 152 2500"`. The on-screen
+  keyboard also moves the PIN dialog's buttons — re-read their bounds after typing.
 
 ## Re-capturing
 

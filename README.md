@@ -43,13 +43,42 @@ a dependency.
 ### Choose which apps exist
 
 The parent picks the apps their child may use. Everything else is not on the home
-screen and cannot be launched — this is Android's lock task mode, so Back and
-Home cannot escape it. Optionally pin the child to **one single app**, useful
-when handing a phone over for a specific purpose.
+screen and cannot be launched — this is Android's lock task mode. Home and recents
+still work, so the phone feels ordinary, but they only ever lead back to the
+allowed apps: the allowlist, not the navigation bar, is what decides what can
+start. Optionally pin the child to **one single app**, useful when handing a
+phone over for a specific purpose.
 
 <div align="center">
 <img src="docs/images/parent-apps-picker.png" width="245" alt="Choosing which apps the child may use">
 <img src="docs/images/child-launcher-allapps.png" width="245" alt="The child's home screen with child mode off">
+</div>
+
+### Content restrictions, and per-app settings
+
+Three levels — off, moderate, strict — that turn on SafeSearch, Chrome's Safe
+Browsing, and YouTube's Restricted Mode, plus an optional family DNS resolver
+applied to the whole phone rather than to one browser. The dialog says plainly
+what each covers and what it does not: browser settings only reach Chrome, and the
+YouTube app ignores them, so without the phone-wide resolver YouTube is
+unfiltered. Restricted Mode hides most mature content, not all of it.
+
+<div align="center">
+<img src="docs/images/parent-content-dialog.png" width="245" alt="Choosing a content-restriction level and a filtering resolver">
+<img src="docs/images/parent-content.png" width="245" alt="The content section of a child's page">
+</div>
+
+Underneath that sits a general escape hatch. Many apps declare their own
+**managed configuration** — Chrome declares hundreds of settings — and the app
+reads whatever an app declares on the child's phone and builds a form from it.
+Nothing about those settings is hardcoded here: switches, choices, numbers, text,
+groups of fields and repeatable lists of groups are all rendered from the app's
+own schema, so an app this project has never heard of can still be configured.
+Anything a form cannot represent is listed as not editable rather than hidden.
+
+<div align="center">
+<img src="docs/images/parent-app-picker.png" width="245" alt="Choosing which app to configure">
+<img src="docs/images/parent-app-config.png" width="245" alt="A form built from Chrome's own declared settings">
 </div>
 
 ### A home screen built for a child
@@ -85,7 +114,9 @@ answer — so a missed alarm or a changed clock cannot strand it in the wrong st
 
 Type the parent PIN on the child's phone and the lock pauses for ten minutes —
 enough to check something or deal with an exception — then it re-locks itself.
-The parent can end the pause early.
+During the pause the phone is genuinely unrestricted: every installed app is on
+the home screen and launchable, not just the allowed ones. Either side can end the
+pause early.
 
 <div align="center">
 <img src="docs/images/child-paused.png" width="245" alt="The child's phone during a ten-minute pause">
@@ -96,10 +127,28 @@ The PIN is hashed (PBKDF2-HMAC-SHA256, 20 000 iterations, per-device salt) on th
 parent's phone before it is ever sent; the child's phone stores and compares only
 the hash. Wrong guesses trigger a lockout that grows and survives killing the app.
 
+### A parent menu on the child's phone
+
+The same PIN opens a menu on the child's phone that answers "why is this phone
+behaving like this?" — the rules actually in force, whether the parent's phone is
+in range, which parent it is paired to, and what the device is. Everything is read
+from the child's own storage, so it still answers when the parent is nowhere near.
+
+From there a parent can pause child mode, or re-pair the phone to a different
+parent by scanning a fresh code — the way back if the parent's phone is lost,
+replaced, or reinstalled.
+
+<div align="center">
+<img src="docs/images/child-parent-menu.png" width="245" alt="The parent menu on the child's phone">
+</div>
+
 ### The parent's view
 
 Which apps are allowed, what the child is using right now, battery, when the
 phone was last seen, whether it is locked — with the controls to change any of it.
+Installing something new is done by name rather than by package id: type "Minecraft"
+and the child's Play Store opens on that search, so a parent never has to know
+what `com.mojang.minecraftpe` is.
 
 <div align="center">
 <img src="docs/images/parent-children.png" width="245" alt="The list of children">

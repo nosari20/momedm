@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.managed.ManagedViewModel
@@ -159,10 +160,17 @@ fun ChildMenuScreen(vm: ManagedViewModel, onPause: () -> Unit) {
 /** Minutes since midnight as HH:mm. */
 private fun hhmm(minutes: Int): String = "%02d:%02d".format(minutes / 60, minutes % 60)
 
+/**
+ * One label/value row.
+ *
+ * The value takes the remaining width and is aligned right rather than pushed there by SpaceBetween:
+ * several values here are full sentences or lists of package names that wrap, and SpaceBetween left
+ * the wrapped text flush against its label with no gap ("NiveauModéré - sites adultes bloqués").
+ */
 @Composable
 private fun Line(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+    Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
     }
 }

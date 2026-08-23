@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import edu.fnosari.momedm.R
@@ -131,7 +132,9 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel(stringResource(R.string.safety_section))
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                // The level's wording is a full sentence, so it wraps. SpaceBetween put the wrapped
+                // value flush against the label with no gap at all ("LevelModerate - block adult...").
+                Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.safety_level))
                     Text(
                         stringResource(
@@ -141,6 +144,8 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                                 else -> R.string.safety_off
                             },
                         ),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.End,
                     )
                 }
                 OutlinedButton(onClick = { editingSafety = true }, Modifier.fillMaxWidth()) {
