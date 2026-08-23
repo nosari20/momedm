@@ -10,14 +10,11 @@
     <!-- Settings -->
     <string name="settings_activity_name">Settings</string>
     <string name="settings_screen_title">Settings</string>
-    <string name="settings_screen_category_controller">Controller</string>
     <string name="settings_screen_category_legal">Legal</string>
     <string name="settings_screen_category_licenses">Licenses</string>
     <string name="settings_screen_category_easteregg">Easter Egg</string>
     <string name="settings_screen_category_easteregg_title">🎉</string>
     <string name="settings_screen_category_easteregg_text">You found the hidden chalkboard. Back to class!</string>
-    <string name="settings_screen_version">Version %1$s (%2$s)</string>
-    <string name="settings_screen_copyrights">© 2026 fnosari</string>
     <string name="settings_dialog_title_edit">Edit Value</string>
     <string name="settings_dialog_confirm">Save</string>
     <string name="settings_dialog_dismiss">Cancel</string>
@@ -65,85 +62,19 @@
     <string name="launcher_battery">%1$d %%</string>
 
     <!-- Controller UI (MainActivity) -->
-    <string name="main_activity_title">Môme DM</string>
     <string name="main_drawer_name">Controller</string>
-    <string name="main_route_devices">Devices</string>
-    <string name="main_route_provision">Provision</string>
     <string name="main_settings_button">Settings</string>
-    <string name="main_banner_stopped">Advertising stopped — managed devices cannot connect</string>
-    <string name="main_advertising">Advertising</string>
-    <string name="main_online_count">%1$d online</string>
-    <string name="devices_empty">No device yet. Tap + to provision one.</string>
-    <string name="devices_online">Online</string>
-    <string name="devices_offline">Offline</string>
-    <string name="device_title">Device</string>
-    <string name="device_status">Status</string>
-    <string name="device_kiosk">Kiosk</string>
-    <string name="device_account">Google account</string>
-    <string name="device_battery">Battery</string>
-    <string name="device_current">Current app</string>
-    <string name="device_last_seen">Last seen</string>
-    <string name="device_kiosk_on">Child mode: choose apps…</string>
-    <string name="device_kiosk_off">Turn child mode off</string>
-    <string name="device_install">Install from Play</string>
-    <string name="device_install_hint">Package name (e.g. org.mozilla.firefox)</string>
-    <string name="device_add_account">Add Google account</string>
-    <string name="device_refresh">Refresh status</string>
-    <string name="device_offline_msg">Device is offline</string>
-    <string name="device_sent">Command sent</string>
-    <string name="device_result">%1$s: %2$s</string>
-    <string name="device_allowed_apps">Allowed apps</string>
-    <string name="device_allowed_count">%1$d allowed</string>
-    <string name="device_pinned">Single app</string>
-    <string name="device_paused">Paused until %1$s</string>
-    <string name="device_relock">Lock again</string>
-    <string name="device_rename">Rename</string>
-    <string name="device_rename_hint">Name (e.g. Léa\'s tablet)</string>
-    <string name="device_mode_on">Child mode ON</string>
-    <string name="device_mode_off">Child mode OFF</string>
     <string name="apps_title">Allowed apps</string>
     <string name="apps_loading">Getting the app list…</string>
     <string name="apps_cancel">Cancel</string>
     <string name="apps_pin_one">Keep to a single app</string>
     <string name="apps_confirm">Confirm</string>
-    <string name="apps_search">Search</string>
-    <string name="provision_title">Provision a device</string>
-    <string name="provision_mode">Wi-Fi source</string>
-    <string name="provision_mode_hotspot">Hotspot (auto)</string>
-    <string name="provision_mode_manual">Shared Wi-Fi (manual)</string>
-    <string name="provision_mode_custom">Custom APK URL</string>
-    <string name="provision_ssid">SSID</string>
-    <string name="provision_password">Password</string>
-    <string name="provision_url">https://…/momedm.apk</string>
-    <string name="provision_start">Generate QR</string>
-    <string name="provision_stop">Stop</string>
-    <string name="provision_serving">Serving APK at %1$s</string>
-    <string name="provision_qr_error">QR payload too large to render</string>
-    <string name="provision_help">Factory-reset the device, tap the welcome screen 6 times and scan this QR.</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
 
     <!-- Settings: Controller identity -->
-    <string name="settings_controller_id">Controller ID</string>
-    <string name="settings_controller_secret">Secret fingerprint</string>
-    <string name="settings_controller_regenerate">Regenerate secret</string>
-    <string name="settings_controller_regenerate_warning">All devices provisioned with the current secret will stop authenticating until re-provisioned. Continue?</string>
-    <string name="settings_controller_regenerated">Secret regenerated</string>
 
     <!-- Settings: Parent PIN -->
-    <string name="settings_pin_title">Parent PIN</string>
-    <string name="settings_pin_set">Set PIN</string>
-    <string name="settings_pin_change">Change PIN</string>
-    <string name="settings_pin_clear">Remove PIN</string>
-    <string name="settings_pin_clear_warning">Children will stop accepting the PIN the next time they connect. Continue?</string>
-    <string name="settings_pin_status_set">A PIN is set. It unlocks a child device for 10 minutes.</string>
-    <string name="settings_pin_status_unset">No PIN yet. Without it, child mode can only be ended from this phone.</string>
-    <string name="settings_pin_hint">4–6 digits</string>
-    <string name="settings_pin_confirm_hint">Confirm PIN</string>
-    <string name="settings_pin_mismatch">PINs do not match</string>
-    <string name="settings_pin_invalid">Use 4 to 6 digits</string>
-    <string name="settings_pin_saved">PIN saved and sent to connected children</string>
-    <string name="settings_pin_cleared">PIN removed</string>
 
     <!-- ============================================================
          PARENT-FRIENDLY STRINGS (kiosk v2 plan 2, Task 2) — the keys
@@ -162,7 +93,6 @@
     <string name="failed">Failed: %1$s</string>
 
     <!-- Appearance & language (MaClasse-aligned keys) -->
-    <string name="settings">Settings</string>
     <string name="language">Language</string>
     <string name="theme">Appearance</string>
     <string name="system_default">System default</string>
@@ -184,7 +114,6 @@
     <string name="settings_pin_help">Unlocks a child device for a short while</string>
     <string name="settings_advanced">Advanced</string>
     <string name="settings_advanced_help">Pairing key and identifier</string>
-    <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s (%2$s)</string>
     <string name="settings_copyright">© 2026 fnosari</string>
 
@@ -204,7 +133,6 @@
 
     <!-- Advanced -->
     <string name="parent_id">Parent ID</string>
-    <string name="pairing_key">Pairing key</string>
     <string name="pairing_key_fp">Key fingerprint</string>
     <string name="regenerate_key">New pairing key</string>
     <string name="regenerate_key_warning">Every paired child will stop connecting until you pair it again. Continue?</string>

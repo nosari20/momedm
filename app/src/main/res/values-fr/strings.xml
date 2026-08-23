@@ -10,14 +10,11 @@
     <!-- Settings -->
     <string name="settings_activity_name">Réglages</string>
     <string name="settings_screen_title">Réglages</string>
-    <string name="settings_screen_category_controller">Contrôleur</string>
     <string name="settings_screen_category_legal">Mentions légales</string>
     <string name="settings_screen_category_licenses">Licences</string>
     <string name="settings_screen_category_easteregg">Œuf de Pâques</string>
     <string name="settings_screen_category_easteregg_title">🎉</string>
     <string name="settings_screen_category_easteregg_text">Vous avez trouvé le tableau caché. Retour en classe !</string>
-    <string name="settings_screen_version">Version %1$s (%2$s)</string>
-    <string name="settings_screen_copyrights">© 2026 fnosari</string>
     <string name="settings_dialog_title_edit">Modifier la valeur</string>
     <string name="settings_dialog_confirm">Enregistrer</string>
     <string name="settings_dialog_dismiss">Annuler</string>
@@ -65,85 +62,19 @@
     <string name="launcher_battery">%1$d %%</string>
 
     <!-- Controller UI (MainActivity) -->
-    <string name="main_activity_title">Môme DM</string>
     <string name="main_drawer_name">Contrôleur</string>
-    <string name="main_route_devices">Appareils</string>
-    <string name="main_route_provision">Association</string>
     <string name="main_settings_button">Réglages</string>
-    <string name="main_banner_stopped">Diffusion arrêtée — les appareils gérés ne peuvent pas se connecter</string>
-    <string name="main_advertising">Diffusion active</string>
-    <string name="main_online_count">%1$d en ligne</string>
-    <string name="devices_empty">Aucun appareil. Appuyez sur + pour en associer un.</string>
-    <string name="devices_online">En ligne</string>
-    <string name="devices_offline">Hors ligne</string>
-    <string name="device_title">Appareil</string>
-    <string name="device_status">État</string>
-    <string name="device_kiosk">Mode kiosque</string>
-    <string name="device_account">Compte Google</string>
-    <string name="device_battery">Batterie</string>
-    <string name="device_current">Application en cours</string>
-    <string name="device_last_seen">Vu pour la dernière fois</string>
-    <string name="device_kiosk_on">Mode enfant : choisir les apps…</string>
-    <string name="device_kiosk_off">Désactiver le mode enfant</string>
-    <string name="device_install">Installer depuis Play</string>
-    <string name="device_install_hint">Nom du paquet (ex. org.mozilla.firefox)</string>
-    <string name="device_add_account">Ajouter un compte Google</string>
-    <string name="device_refresh">Actualiser l\'état</string>
-    <string name="device_offline_msg">L\'appareil est hors ligne</string>
-    <string name="device_sent">Commande envoyée</string>
-    <string name="device_result">%1$s : %2$s</string>
-    <string name="device_allowed_apps">Apps autorisées</string>
-    <string name="device_allowed_count">%1$d autorisée(s)</string>
-    <string name="device_pinned">Application unique</string>
-    <string name="device_paused">En pause jusqu\'à %1$s</string>
-    <string name="device_relock">Reverrouiller</string>
-    <string name="device_rename">Renommer</string>
-    <string name="device_rename_hint">Nom (ex. tablette de Léa)</string>
-    <string name="device_mode_on">Mode enfant ACTIVÉ</string>
-    <string name="device_mode_off">Mode enfant DÉSACTIVÉ</string>
     <string name="apps_title">Apps autorisées</string>
     <string name="apps_loading">Récupération des apps…</string>
     <string name="apps_cancel">Annuler</string>
     <string name="apps_pin_one">N\'autoriser qu\'une seule app</string>
     <string name="apps_confirm">Valider</string>
-    <string name="apps_search">Rechercher</string>
-    <string name="provision_title">Associer un appareil</string>
-    <string name="provision_mode">Source Wi-Fi</string>
-    <string name="provision_mode_hotspot">Point d\'accès (automatique)</string>
-    <string name="provision_mode_manual">Wi-Fi partagé (manuel)</string>
-    <string name="provision_mode_custom">URL d\'APK personnalisée</string>
-    <string name="provision_ssid">SSID</string>
-    <string name="provision_password">Mot de passe</string>
-    <string name="provision_url">https://…/momedm.apk</string>
-    <string name="provision_start">Générer le QR</string>
-    <string name="provision_stop">Arrêter</string>
-    <string name="provision_serving">APK diffusé sur %1$s</string>
-    <string name="provision_qr_error">Contenu du QR trop volumineux à afficher</string>
-    <string name="provision_help">Réinitialisez l\'appareil, appuyez 6 fois sur l\'écran d\'accueil et scannez ce QR.</string>
     <string name="yes">Oui</string>
     <string name="no">Non</string>
 
     <!-- Settings: Controller identity -->
-    <string name="settings_controller_id">Identifiant du contrôleur</string>
-    <string name="settings_controller_secret">Empreinte du secret</string>
-    <string name="settings_controller_regenerate">Régénérer le secret</string>
-    <string name="settings_controller_regenerate_warning">Tous les appareils associés avec le secret actuel cesseront de s\'authentifier jusqu\'à une nouvelle association. Continuer ?</string>
-    <string name="settings_controller_regenerated">Secret régénéré</string>
 
     <!-- Settings: Parent PIN -->
-    <string name="settings_pin_title">Code PIN parental</string>
-    <string name="settings_pin_set">Définir le code</string>
-    <string name="settings_pin_change">Modifier le code</string>
-    <string name="settings_pin_clear">Supprimer le code</string>
-    <string name="settings_pin_clear_warning">Les enfants cesseront d\'accepter le code à leur prochaine connexion. Continuer ?</string>
-    <string name="settings_pin_status_set">Un code est défini. Il déverrouille un appareil enfant pendant 10 minutes.</string>
-    <string name="settings_pin_status_unset">Aucun code. Sans lui, le mode enfant ne peut être arrêté que depuis ce téléphone.</string>
-    <string name="settings_pin_hint">4 à 6 chiffres</string>
-    <string name="settings_pin_confirm_hint">Confirmer le code</string>
-    <string name="settings_pin_mismatch">Les codes ne correspondent pas</string>
-    <string name="settings_pin_invalid">Utilisez 4 à 6 chiffres</string>
-    <string name="settings_pin_saved">Code enregistré et envoyé aux enfants connectés</string>
-    <string name="settings_pin_cleared">Code supprimé</string>
 
     <!-- ============================================================
          PARENT-FRIENDLY STRINGS (kiosk v2 plan 2, Task 2) — the keys
@@ -162,7 +93,6 @@
     <string name="failed">Échec : %1$s</string>
 
     <!-- Appearance & language (MaClasse-aligned keys) -->
-    <string name="settings">Réglages</string>
     <string name="language">Langue</string>
     <string name="theme">Apparence</string>
     <string name="system_default">Par défaut du système</string>
@@ -184,7 +114,6 @@
     <string name="settings_pin_help">Déverrouille un appareil enfant pour un moment</string>
     <string name="settings_advanced">Avancé</string>
     <string name="settings_advanced_help">Clé d\'association et identifiant</string>
-    <string name="settings_about">À propos</string>
     <string name="settings_version">Version %1$s (%2$s)</string>
     <string name="settings_copyright">© 2026 fnosari</string>
 
@@ -204,7 +133,6 @@
 
     <!-- Advanced -->
     <string name="parent_id">Identifiant du parent</string>
-    <string name="pairing_key">Clé d\'association</string>
     <string name="pairing_key_fp">Empreinte de la clé</string>
     <string name="regenerate_key">Nouvelle clé d\'association</string>
     <string name="regenerate_key_warning">Chaque enfant associé cessera de se connecter jusqu\'à ce que vous l\'associiez de nouveau. Continuer ?</string>
