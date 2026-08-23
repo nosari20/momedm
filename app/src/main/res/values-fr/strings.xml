@@ -60,6 +60,9 @@
     <string name="launcher_no_apps_installed">Aucune app trouvée</string>
     <string name="launcher_online">Connecté au parent</string>
     <string name="launcher_offline">Parent hors de portée</string>
+    <string name="bedtime_title">Bonne nuit&#160;!</string>
+    <string name="bedtime_until">Déverrouillage à %1$s</string>
+    <string name="bedtime_manual">Un parent a verrouillé ce téléphone</string>
 
     <!-- Controller UI (MainActivity) -->
     <string name="main_drawer_name">Contrôleur</string>
@@ -159,6 +162,15 @@
     <string name="child_start">Activer le mode enfant</string>
     <string name="child_stop">Désactiver le mode enfant</string>
     <string name="child_relock">Reverrouiller</string>
+    <string name="child_night_section">Verrouillage la nuit</string>
+    <string name="child_night_enable">Verrouiller le téléphone la nuit</string>
+    <string name="child_night_school">Nuits d\'école (dim.–jeu.)</string>
+    <string name="child_night_weekend">Nuits du vendredi et du samedi</string>
+    <string name="child_lock_now">Verrouiller maintenant</string>
+    <string name="child_unlock">Déverrouiller</string>
+    <string name="child_locked_until">Verrouillé jusqu\'à %1$s</string>
+    <string name="child_locked_manual">Verrouillé par vous</string>
+    <string name="child_unlocked">Déverrouillé</string>
     <string name="child_install">Installer une app (Play Store)</string>
     <string name="child_install_hint">Nom de l\'app (ex. org.mozilla.firefox)</string>
     <string name="child_add_account">Ajouter un compte Google</string>

@@ -12,10 +12,12 @@ import android.os.Process
 import android.util.Log
 import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.AppInfo
+import edu.fnosari.momedm.protocol.LockState
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 /** Gathers the fields of [Message.Status] and the launchable app list. */
 class StatusCollector(private val context: Context, private val prefs: ManagedPrefs) : StatusSource {
@@ -39,10 +41,13 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
     override suspend fun collect(): Message.Status = withContext(Dispatchers.IO) {
         val c = prefs.kioskConfig.first(); val now = System.currentTimeMillis()
         val paused = c.isPaused(now)
+        val schedule = prefs.lockSchedule.first()
+        val lock = LockState.evaluate(schedule, prefs.manualLock.first(), c.pauseUntil, now, ZoneId.systemDefault())
         val s = Message.Status(kiosk = c.on, kioskPkg = c.pinned, account = hasGoogleAccount(), battery = batteryPercent(),
             currentApp = foregroundApp() ?: if (c.isLocked(now)) c.pinned else null,
-            kioskApps = if (c.on) c.apps else emptyList(), kioskPaused = paused, pauseEndsAt = if (paused) c.pauseUntil else null)
-        Log.d(LOG_TAG, "Status: kiosk=${s.kiosk} apps=${s.kioskApps.size} paused=${s.kioskPaused} battery=${s.battery}"); s
+            kioskApps = if (c.on) c.apps else emptyList(), kioskPaused = paused, pauseEndsAt = if (paused) c.pauseUntil else null,
+            locked = lock.locked, lockReason = lock.reason, lockUntil = lock.until, schedule = schedule)
+        Log.d(LOG_TAG, "Status: kiosk=${s.kiosk} apps=${s.kioskApps.size} paused=${s.kioskPaused} battery=${s.battery} locked=${s.locked}"); s
     }
 
     /** Current battery charge as a 0-100 percentage. */

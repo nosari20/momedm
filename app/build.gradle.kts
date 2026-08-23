@@ -33,6 +33,15 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            // Lets JVM unit tests exercise classes that call un-mocked Android SDK stubs (e.g.
+            // android.util.Log) without throwing — no mocking library is added to the project, this
+            // just makes those calls return their default (no-op/0/null) instead. First needed by
+            // LockControllerTest, which is the first JVM test to touch a class with Log.* calls.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

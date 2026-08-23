@@ -14,6 +14,7 @@ import edu.fnosari.momedm.persistence.DeviceRegistry
 import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.CmdType
+import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -104,6 +105,15 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         announce(id)
     }
     fun rename(deviceId: String, nickname: String?) { viewModelScope.launch { registry.rename(deviceId, nickname) } }
+
+    /** Pushes the nightly lock window to [deviceId]. */
+    fun setSchedule(deviceId: String, schedule: LockSchedule) {
+        val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SCHEDULE, schedule = schedule) }
+        Log.d(LOG_TAG, "setSchedule -> $deviceId: enabled=${schedule.enabled}: ${if (id == null) "offline" else "sent (id=$id)"}")
+        announce(id)
+    }
+    fun lockNow(deviceId: String) { send(deviceId, CmdType.LOCK_NOW) }
+    fun unlock(deviceId: String) { send(deviceId, CmdType.UNLOCK) }
 
     fun kioskOff(deviceId: String) { send(deviceId, CmdType.KIOSK_OFF) }
     fun install(deviceId: String, pkg: String) { send(deviceId, CmdType.INSTALL, pkg) }

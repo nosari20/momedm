@@ -56,4 +56,35 @@ class MessagesTest {
         val valid = ChildPrefs(pinSalt = "00".repeat(16), pinHash = "ab".repeat(32))
         assertEquals(valid, valid.sanitized())
     }
+
+    @Test fun scheduleCommandRoundTrips() {
+        val s = LockSchedule(enabled = true, weekdayStart = 20 * 60, weekdayEnd = 6 * 60)
+        val cmd = Message.Cmd("c1", CmdType.SET_SCHEDULE, schedule = s)
+        val back = MessageCodec.decodeMessage(MessageCodec.encodeMessage(cmd)) as Message.Cmd
+        assertEquals(CmdType.SET_SCHEDULE, back.type); assertEquals(s, back.schedule)
+    }
+
+    @Test fun lockCommandsRoundTrip() {
+        for (t in listOf(CmdType.LOCK_NOW, CmdType.UNLOCK)) {
+            val back = MessageCodec.decodeMessage(MessageCodec.encodeMessage(Message.Cmd("c2", t))) as Message.Cmd
+            assertEquals(t, back.type)
+        }
+    }
+
+    @Test fun statusCarriesLockFields() {
+        val s = Message.Status(kiosk = false, kioskPkg = null, account = false, battery = 50, currentApp = null,
+            locked = true, lockReason = LockState.REASON_NIGHT, lockUntil = 1_800_000_000_000L,
+            schedule = LockSchedule(enabled = true))
+        val back = MessageCodec.decodeMessage(MessageCodec.encodeMessage(s)) as Message.Status
+        assertEquals(true, back.locked); assertEquals("night", back.lockReason)
+        assertEquals(1_800_000_000_000L, back.lockUntil); assertEquals(LockSchedule(enabled = true), back.schedule)
+    }
+
+    @Test fun statusLockFieldsDefaultWhenAbsent() {
+        // A peer that predates this feature sends no lock fields; decoding must not fail.
+        val json = """{"t":"STATUS","kiosk":false,"kioskPkg":null,"account":false,"battery":10,"currentApp":null}"""
+        val back = MessageCodec.decodeMessage(json) as Message.Status
+        assertEquals(false, back.locked); assertEquals(null, back.lockReason)
+        assertEquals(null, back.lockUntil); assertEquals(null, back.schedule)
+    }
 }

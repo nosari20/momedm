@@ -8,25 +8,30 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import edu.fnosari.momedm.R
+import edu.fnosari.momedm.managed.LockController
 import edu.fnosari.momedm.managed.ManagedLinkService
 import edu.fnosari.momedm.managed.ManagedLinkState
 import edu.fnosari.momedm.managed.ManagedSetup
 import edu.fnosari.momedm.managed.PolicyManager
 import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.persistence.ManagedPrefs
+import edu.fnosari.momedm.protocol.LockState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 /** Child-launcher state: apps to show, child-mode config, PIN/pause handling, link state. */
 class ManagedViewModel(application: Application) : AndroidViewModel(application) {
@@ -54,6 +59,20 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     /** True while [edu.fnosari.momedm.activities.managed.components.PinDialog] is showing — suppresses the pinned-app bounce. */
     val pinDialogOpen = MutableStateFlow(false)
 
+    /**
+     * The current complete-lock state, or null while the persisted inputs are still loading (the
+     * launcher must not flash its tiles at a device that turns out to be locked).
+     *
+     * Recomputed on every input change, on each ON_RESUME (via [resumeTick]) and once a minute, so a
+     * window that opens while the screen is on takes effect without waiting for the alarm.
+     */
+    val lockState: StateFlow<LockState?> = combine(
+        prefs.lockSchedule, prefs.manualLock, prefs.kioskConfig, resumeTick,
+        flow { while (true) { emit(Unit); delay(30_000L) } },
+    ) { schedule, manual, config, _, _ ->
+        LockState.evaluate(schedule, manual, config.pauseUntil, System.currentTimeMillis(), ZoneId.systemDefault())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val _apps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val launcherApps: StateFlow<List<LauncherApp>> = _apps
     private val _pauseRemaining = MutableStateFlow(0L)
@@ -80,8 +99,21 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { kioskConfig.filterNotNull().collect { refreshApps(); trackPause(it) } }
     }
 
-    /** Bumps [resumeTick] — called from the Activity's ON_RESUME observer. */
-    fun onResumed() { resumeTick.value++ }
+    /**
+     * Bumps [resumeTick] and re-evaluates the lock — called from the Activity's ON_RESUME observer.
+     *
+     * This is spec §1.4's "launcher resumes" trigger, and §1.10's compensating control for a missed
+     * alarm (doze, an OEM task killer): as long as the launcher is ever brought back to the
+     * foreground, its lock state converges within one resume, even if the alarm never fired. It is
+     * safe to call unconditionally on every resume — including the resume that
+     * [LockController.reevaluate] itself causes via `lockComplete()`/`applyKiosk()`'s
+     * `CLEAR_TASK` relaunch — because [LockController] skips re-applying a [LockState] identical to
+     * the one it last applied; see its KDoc for why that cannot get the device stuck in a wrong state.
+     */
+    fun onResumed() {
+        resumeTick.value++
+        viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() }
+    }
 
     /**
      * Recomputes the tile list (allowed apps while locked, every launchable app otherwise); cancels
@@ -112,12 +144,16 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     private fun trackPause(c: KioskConfig) {
         pauseJob?.cancel()
         val now = System.currentTimeMillis()
-        if (c.on && c.pauseUntil > 0L && !c.isPaused(now)) { _pauseRemaining.value = 0L; viewModelScope.launch { policy.resume() }; return }
+        if (c.on && c.pauseUntil > 0L && !c.isPaused(now)) {
+            _pauseRemaining.value = 0L
+            viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() }
+            return
+        }
         if (!c.isPaused(now)) { _pauseRemaining.value = 0L; return }
         pauseJob = viewModelScope.launch {
             while (isActive) {
                 val left = c.pauseUntil - System.currentTimeMillis()
-                if (left <= 0L) { _pauseRemaining.value = 0L; policy.resume(); break }
+                if (left <= 0L) { _pauseRemaining.value = 0L; LockController(getApplication(), prefs, policy).reevaluate(); break }
                 _pauseRemaining.value = left; delay(1_000L)
             }
         }
@@ -125,9 +161,11 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
 
     /** Opens [pkg] — via [PolicyManager.launchAllowed], which requests lock task only while locked. */
     fun open(pkg: String) {
-        // Config not loaded yet: no tiles are rendered, so this can only be a stale bounce request —
-        // never ask for lock task on a guess.
-        val locked = kioskConfig.value?.isLocked(System.currentTimeMillis()) == true
+        // lockState not loaded yet: no tiles are rendered, so this can only be a stale bounce request —
+        // never ask for lock task on a guess. Reads lockState (not kioskConfig.isLocked) so this is the
+        // last call site to converge on the same "locked" notion LockController itself uses — a plain
+        // kiosk-mode flag has no idea a complete lock could apply with child mode off.
+        val locked = lockState.value?.locked == true
         val ok = policy.launchAllowed(pkg, locked)
         if (!ok) Log.w(LOG_TAG, "Could not open $pkg")
     }
@@ -169,7 +207,7 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     fun clearPinError() { _pinError.value = null }
 
     /** Ends a pause now (re-locks). */
-    fun relock() { viewModelScope.launch { policy.resume() } }
+    fun relock() { viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() } }
 
     fun ensureLink() { if (ManagedLinkState.state.value == ManagedLinkState.LinkState.IDLE) ManagedLinkService.start(getApplication()) }
 }

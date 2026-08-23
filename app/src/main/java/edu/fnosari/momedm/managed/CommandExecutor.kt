@@ -3,6 +3,7 @@ package edu.fnosari.momedm.managed
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.CmdType
+import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.Message
 
 /** Managed-role actions the [CommandExecutor] drives; implemented by [PolicyManager]. */
@@ -14,6 +15,10 @@ interface PolicyActions {
     suspend fun openAddAccount(): Result<Unit>
     /** Stores and applies parent-pushed preferences (language, theme, accent, PIN). */
     suspend fun applyPrefs(prefs: ChildPrefs): Result<Unit>
+    /** Persists the parent's nightly lock window and re-evaluates the lock immediately. */
+    suspend fun setSchedule(schedule: LockSchedule): Result<Unit>
+    /** Sets or clears the parent's manual lock and re-evaluates the lock immediately. */
+    suspend fun setManualLock(on: Boolean): Result<Unit>
 }
 
 /** Read-only device state the [CommandExecutor] reports back; implemented by [StatusCollector]. */
@@ -44,6 +49,13 @@ class CommandExecutor(private val policy: PolicyActions, private val status: Sta
                 val prefs = cmd.prefs ?: return listOf(Message.Result(cmd.id, false, "missing prefs"))
                 listOf(res(policy.applyPrefs(prefs.sanitized()), "prefs applied"))
             }
+            CmdType.SET_SCHEDULE -> {
+                val s = cmd.schedule ?: return listOf(Message.Result(cmd.id, false, "missing schedule"))
+                val r = policy.setSchedule(s.sanitized())
+                if (r.isSuccess) listOf(res(r, "schedule set"), status.collect()) else listOf(res(r, ""))
+            }
+            CmdType.LOCK_NOW -> { val r = policy.setManualLock(true); if (r.isSuccess) listOf(res(r, "locked"), status.collect()) else listOf(res(r, "")) }
+            CmdType.UNLOCK -> { val r = policy.setManualLock(false); if (r.isSuccess) listOf(res(r, "unlocked"), status.collect()) else listOf(res(r, "")) }
         }
     }
 }

@@ -145,3 +145,259 @@ colour swatches. On this project's pinned Compose BOM (2024.09.00) that threw
 — caught during this emulator pass and fixed by replacing `FlowRow` with a
 plain `Palette.PRESETS.chunked(4)` → `Column`/`Row` grid (commit `d794a09`).
 See the matching gotcha in `CLAUDE.md`.
+
+## G. Emulator checks — complete lock
+
+Verified on the emulator rig 2026-08-23 (same two-AVD rig as sections E/F:
+controller = emulator-5554, managed = emulator-5556, both API 35, branch
+`feature/complete-lock`). This pass exists because `PolicyManager`'s lock
+calls (lock task, alarms, the emergency path) have no JVM test and can only
+be judged on a device. **Two real defects were found and are not fixed by
+this task — see "Defects found" below; the human should decide how to
+prioritize them.**
+
+- [x] **Step 1: Bring up the rig.** Reinstalled the current debug build on
+  both AVDs (`-r`, so provisioning/link state survived), relaunched, and
+  confirmed `ManagedLinkService: Authenticated` in the managed logcat within
+  seconds. — **PASS**.
+- [x] **Step 2: Night window locks the device.** Parent → device page →
+  Night lock: set the Sun–Thu window to 12:50→13:50 via the Material3
+  `TimePicker` (dial-mode only; see the TimePicker note below), enabled the
+  toggle. At 12:50:00 the managed emulator logged `LockController:
+  Re-evaluated: locked=true reason=night` → `PolicyManager: Complete lock
+  applied`, driven by the armed alarm (not a poll). `dumpsys activity
+  activities` showed `mLockTaskModeState=LOCKED`,
+  `topResumedActivity=…ManagedHomeActivity`, and the screenshot showed the
+  bedtime screen ("Bonne nuit ! / Déverrouillage à 13:50") with no tiles. —
+  **PASS**.
+- [x] **Step 3: PIN pause and automatic re-lock.** Long-pressed the bedtime
+  screen → PIN dialog appeared (only after long-press; PIN masked as dots,
+  never shown or logged in the clear) → correct PIN → `mLockTaskModeState`
+  went to `NONE` and the device showed the normal child-mode launcher with a
+  "Mode enfant en pause · 09:59" banner. Forcing the pause to lapse (this is
+  exactly how Defect 1, below, was originally found) and re-evaluating
+  confirmed the device is recomputed back to `LOCKED` rather than
+  remembered. — **PASS**. Defect 1 (a busy-loop when a stale pause outlives
+  itself under an active complete lock) was found during this step on the
+  pre-fix build; it was fixed in `8bfe160` and re-verified — see "Defects
+  found and fixed" below.
+
+  **This PASS was stale and has been re-verified.** It was recorded before
+  `467d165` added `LockController`'s in-memory apply-dedup cache (the
+  ON_RESUME relaunch-loop guard). That cache's key was `LockState` alone,
+  and a still-active pause returned from `reevaluate()` without touching the
+  cache — so once the hosting Activity's `stopLockTask()` took the device
+  out of the applied policy, the cache kept recording the old lock as
+  "already applied." On this exact rig (PIN `1234`, manual lock, `auto_time`
+  toggled off and the clock advanced past the 10-minute pause deadline via
+  Settings → Date & time, since this AVD image has no root shell for `adb
+  shell date`), that meant the lapse step above silently stopped re-locking:
+  `mLockTaskModeState` stayed `NONE` and the bedtime screen never came back,
+  even though it still claimed "Un parent a verrouillé ce téléphone" (a
+  regression, not a re-confirmation, of Defect 1's fix — same symptom
+  family, different cause). Re-verified 2026-08-23 against this branch's fix
+  (cache now keyed on `(LockState, KioskConfig)`, and cleared outright on
+  entering the still-active-pause branch): after the same pause-then-lapse
+  sequence, logcat showed `LockController: Re-evaluated: locked=true
+  reason=manual` → `PolicyManager: Complete lock applied` at the lapse
+  instant, `dumpsys activity activities` showed `mLockTaskModeState=LOCKED`
+  again, and the bedtime screen reappeared unprompted. `top -m 10 -n 1`
+  immediately after showed the app process absent from the top 10 (idle) and
+  logcat showed no repeated activity starts — the ON_RESUME dedup guard
+  `467d165` added still holds. Full transcript in
+  `.superpowers/sdd/2026-08-23-complete-lock/regression-fix-report.md`. —
+  **PASS (re-verified)**.
+- [x] **Step 4: Reboot inside a window.** `adb reboot` while
+  `mLockTaskModeState=LOCKED` (reason=night). After boot, our
+  `BootReceiver: Boot completed; starting link service` fired, then
+  `LockController: Re-evaluated: locked=true reason=night` →
+  `PolicyManager: Complete lock applied`; `dumpsys` showed `LOCKED` and the
+  screenshot showed the bedtime screen again. — **PASS**.
+- [x] **Step 5: Manual lock and unlock.** With the schedule disabled: parent
+  **Lock now** → managed `PolicyManager: Manual lock = true` →
+  `LockController: Re-evaluated: locked=true reason=manual` → bedtime screen
+  reading "Un parent a verrouillé ce téléphone"; parent state line updated
+  to "Locked by you" (see the state-line note below). Parent **Unlock** →
+  child returned to its prior child-mode launcher (6 allowed apps), not a
+  free device, matching the "returns to what was configured before"
+  contract. Reboot while manually locked → `mLockTaskModeState=LOCKED`
+  survives and the bedtime screen shows the "locked by you" message again.
+  — **PASS**. Defect 2 (a reboot mid-lock silently downgrading to the plain
+  child-mode allowlist, invisible to `dumpsys`/the on-screen text alone) was
+  found during this exact reboot check on the pre-fix build; it was fixed in
+  `8bfe160` and re-verified — see "Defects found and fixed" below.
+- [x] **Step 6: Emergency path (spec §1.6).** Long-pressed power
+  (`adb shell input keyevent --longpress KEYCODE_POWER`) while the device
+  was genuinely locked with `LOCK_TASK_FEATURE_GLOBAL_ACTIONS` confirmed
+  granted (`dumpsys device_policy` showed `LockTaskPolicy {mPackages=
+  edu.fnosari.momedm; mFlags=17}`, i.e. `SYSTEM_INFO|GLOBAL_ACTIONS`). **No
+  menu of any kind appeared** — `mCurrentFocus`/`mFocusedApp` stayed on
+  `ManagedHomeActivity`, and the screenshot is pixel-identical to the
+  bedtime screen before the key event. As a control, the same command on
+  the *unlocked* controller emulator does bring up a system sheet — but it
+  is the Google Assistant ("Hi. Your Google Assistant here…"), not the
+  classic power menu, confirming this AVD image maps a long-press of
+  `KEYCODE_POWER` to the Assistant gesture rather than `GlobalActions`, and
+  that lock task suppresses even that fallback. **Finding, not fixed**: on
+  this image, this task cannot confirm the "Emergency" entry is reachable
+  the way the design intends — either because the synthetic long-press
+  event doesn't reach `PhoneWindowManager`'s global-actions path the way a
+  real hardware long-press would, or because a real long-press on this
+  Android build genuinely goes to Assistant first. This is worth re-testing
+  on real hardware; §1.6 stays **unproven**.
+- [x] **Step 7: Clock-change trigger.** No root shell (`adb root` refused:
+  "cannot run as root in production builds"; `adb shell date` refused:
+  "Operation not permitted") so the change was made via Settings → Date &
+  time → disable **Set time automatically** → set the time forward past the
+  window boundary → the managed emulator logged `TimeChangeReceiver: Clock
+  changed (android.intent.action.TIME_SET); re-evaluating lock` within
+  under a second, followed by a correct re-evaluation once state was clean
+  (this same clock-change trigger, combined with a stale pause, is what
+  originally surfaced Defect 1 — see "Defects found and fixed" below).
+  Restored **Set time automatically** afterwards (`settings get global
+  auto_time` → `1`). — **PASS**.
+- [x] **Step 8: Record results.** This section.
+
+**Extra checks run opportunistically:**
+- [x] The Material3 `TimePicker` dialog (`TimeRangeRow.kt`) renders
+  correctly on this Compose BOM (dial mode only — no keyboard-input toggle
+  is wired up in this composable) and a changed time reaches the child:
+  saving a new start/end time immediately logged `ManagedLinkService:
+  Command SET_SCHEDULE` → `PolicyManager: Lock schedule set` on the managed
+  side, and the parent's own display of the time updated. — **PASS**.
+- [x] **Lock now**/**Unlock** do flip the parent's state line. Each command
+  handler (`CommandExecutor.execute` for `LOCK_NOW`/`UNLOCK`) sends a fresh
+  `Message.Status` right after the result, and separately every
+  `LockController.reevaluate()` call also emits a status push
+  (`ManagedLinkState.statusPushRequests`) — both paths were observed firing
+  in practice. The device page went "Unlocked" → **Locked by you** → tapped
+  **Unlock** → back to "Unlocked" within about a second each time, matching
+  the button's own toggled label (**Lock now** ↔ **Unlock**). — **PASS**.
+
+### Defects found and fixed
+
+Both defects below were found during this task's rig pass (on the pre-fix
+build described in each) and were **not** fixed at the time this section was
+first written. They have since been fixed in `8bfe160` (converge
+kiosk/lock restore paths on `LockController.reevaluate()`) and `0440bab`
+(clear a stale pause on the service boot path too), and re-verified against
+their original reproduction scenarios on this same two-emulator rig — full
+before/after evidence, commands, and logcat/dumpsys output are in
+`.superpowers/sdd/2026-08-23-complete-lock/task-9-fix-report.md`. What
+follows is the original found-state writeup (left intact as the record of
+what was wrong), followed by a summary of the fix and re-verification.
+
+**Defect 1 — busy-loop when a stale PIN-pause outlives itself under an
+active complete lock.** `ManagedViewModel.trackPause()` (activity-scoped
+ViewModel, `ManagedViewModel.kt:131`) calls
+`LockController(...).reevaluate()` on *every* emission of `kioskConfig`
+whenever `c.on && c.pauseUntil > 0L && !c.isPaused(now)` — i.e. whenever
+child mode is on and a pause deadline exists but has already passed.
+`PolicyManager.lockComplete()` (`PolicyManager.kt:95`), which is what
+`reevaluate()` calls when a night-lock or manual lock should be in force,
+**never clears `pauseUntil`** — only `kioskOn()` does that (via
+`prefs.setKioskConfig(... pauseUntil = 0L)`, `PolicyManager.kt:72`). Each
+`reevaluate()` → `lockComplete()` → `launchHomeLocked()` uses
+`FLAG_ACTIVITY_CLEAR_TASK`, which recreates `ManagedHomeActivity` and its
+(activity-scoped) `ManagedViewModel` — whose fresh `init` immediately
+re-collects `kioskConfig`, re-enters the same branch, and repeats. Observed
+on the rig: `ActivityTaskManager` `START`/`Displayed` for
+`ManagedHomeActivity` every ~300–400 ms for at least 90+ seconds straight,
+`top` showing 600% aggregate CPU (system_server alone at 135%), and the app
+process was eventually replaced (pid changed under load, consistent with
+the OS killing and restarting it). The loop only stops when something calls
+`kioskOn()` (clearing `pauseUntil`) — the parent re-sending an app-picker
+selection was what stopped it during this run.
+
+Reachable in the ordinary product, not just under clock manipulation:
+**any** child-mode + PIN-pause combination (from either the bedtime screen
+or the child-mode launcher — both funnel through the same
+`KioskConfig.pauseUntil`) whose 10-minute pause naturally lapses while a
+manual or scheduled complete lock is (still) supposed to be in effect will
+hit this. Requires `c.on` (child/kiosk mode) to be true; a complete lock
+with kiosk fully off does not loop (confirmed by reading `trackPause`'s
+other branch).
+
+**Defect 2 — a reboot while a complete lock is active silently downgrades
+it to the ordinary child-mode kiosk allowlist.** `BootReceiver` starts
+`ManagedLinkService` (`fromBoot = true`) *and* separately calls
+`LockController.of(app).reevaluate()`, racing each other.
+`ManagedLinkService.onStartCommand` (`ManagedLinkService.kt:142`) runs
+`if (fromBoot) policy.restoreKiosk()` unconditionally whenever child mode
+was on — `PolicyManager.restoreKiosk()` (`PolicyManager.kt:175`) calls
+`kioskOn()` with no regard for whether a manual lock or night schedule
+should currently override it. On this rig, `restoreKiosk()`'s `kioskOn()`
+finished *after* `BootReceiver`'s `reevaluate()` → `lockComplete()`, so it
+won: `dumpsys device_policy` showed `LockTaskPolicy {mPackages=
+com.google.android.apps.maps, com.google.android.gm, edu.fnosari.momedm,
+com.google.android.apps.docs, com.android.vending,
+com.google.android.deskclock, com.google.android.gms,
+com.google.android.calendar, com.android.chrome; mFlags=1}` — the full
+6-app child-mode allowlist plus Play/GMS, features downgraded to
+`SYSTEM_INFO` only (no `GLOBAL_ACTIONS`) — **while the launcher UI still
+rendered the bedtime screen** ("Bonne nuit ! / Un parent a verrouillé ce
+téléphone"), because that text is driven by a separately-computed,
+DPM-independent `lockState` flow. Proven exploitable, not just a dumpsys
+oddity: `adb shell am start -n com.android.chrome/…Main` **launched Chrome
+successfully inside lock task** (`mLockTaskModeState` stayed `LOCKED`
+because Chrome is a member of the leaked allowlist) while the phone was
+supposedly under a parent's manual complete lock. Re-sending **Unlock**
+then **Lock now** from the parent restored the correct
+`{mPackages=edu.fnosari.momedm; mFlags=17}` state. This directly
+contradicts the Step 5 reboot check's apparent pass: `dumpsys activity
+activities` and the on-screen bedtime text both looked right after reboot,
+but the actual enforcement was wrong until manually kicked.
+
+Both defects share a root cause: three independent call sites
+(`ManagedViewModel.trackPause`'s pause-lapse branch,
+`ManagedLinkService.startPauseWatchdog`'s `resume()`, and
+`ManagedLinkService`'s boot-time `restoreKiosk()`) can each call
+`kioskOn()`/`resume()` directly, and none of them checks whether a
+complete lock (manual or scheduled) should currently take precedence
+before doing so — only `LockController.reevaluate()` knows how to make
+that decision, and these paths bypass it (or, for Defect 1, invoke it in a
+way that never resolves because `lockComplete()` doesn't clear the
+condition that triggered the call).
+
+**Fixed, in `8bfe160` and `0440bab`.** `PolicyManager.restoreKiosk()` and
+`PolicyManager.resume()` — the two direct-apply bypasses named above — were
+deleted outright; they no longer exist on this branch (a mention of either
+name anywhere else in this repo, including code review comments predating
+this fix, refers to this removed pre-fix state, not the current code).
+Every path that can apply kiosk/lock state now converges on
+`LockController.reevaluate()`:
+
+- `LockController.reevaluate()` (`8bfe160`) clears a lapsed pause deadline
+  (`prefs.setPauseUntil(0L)`) *before* deciding whether the outcome is a
+  lock — closing Defect 1's loop at its root, since every subsequent
+  `kioskConfig` emission now carries `pauseUntil = 0` and the "lapsed
+  pause" branches that used to re-trigger `reevaluate()` have nothing left
+  to fire on.
+- `ManagedLinkService`'s boot-time restore and its pause watchdog
+  (`8bfe160`) both now call `LockController(...).reevaluate()` instead of
+  `policy.restoreKiosk()` / `policy.resume()` — closing Defect 2's race,
+  since both of `BootReceiver`'s and `ManagedLinkService`'s boot-time
+  callers now compute the same deterministic answer from the same
+  persisted inputs, so racing them is harmless instead of one path being
+  categorically wrong.
+- `0440bab` additionally clears a stale pause on the service's own boot
+  path (`prefs.setPauseUntil(0L)` before `reevaluate()` in
+  `ManagedLinkService.onStartCommand`), so a pause that was still nominally
+  "active" in prefs at the instant of a reboot cannot survive into the
+  post-boot re-evaluation either — pauses are never meant to survive a
+  reboot in the first place (see §1.3), and this closes the one path that
+  could have let a stale one leak through.
+
+**Re-verified on the rig** (full transcripts in `task-9-fix-report.md`):
+Defect 1's scenario (PIN pause lapsing under an active manual lock, forced
+via the same `auto_time`-off clock-forward technique as Step 7) now settles
+into exactly two expected `reevaluate()`/`lockComplete()` pairs (racing
+triggers, not a loop) and then zero further activity starts or CPU usage
+for 28+ seconds — versus continuous relaunches at ~300–400 ms intervals for
+90+ seconds on the pre-fix build. Defect 2's scenario (reboot while a
+manual complete lock is active) now leaves `dumpsys device_policy` showing
+`LockTaskPolicy {mPackages= edu.fnosari.momedm; mFlags= 17}` after boot —
+not the leaked 9-package allowlist — and the same `am start -n
+com.android.chrome/…Main` probe that launched Chrome successfully on the
+pre-fix build now fails with `unknown error code 101` and leaves
+`topResumedActivity` on `ManagedHomeActivity`. Both scenarios: **PASS**.
