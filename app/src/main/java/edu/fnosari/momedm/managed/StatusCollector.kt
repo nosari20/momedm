@@ -48,8 +48,13 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
         val s = Message.Status(kiosk = c.on, kioskPkg = c.pinned, account = hasGoogleAccount(), battery = batteryPercent(),
             currentApp = foregroundApp() ?: if (c.isLocked(now)) c.pinned else null,
             kioskApps = if (c.on) c.apps else emptyList(), kioskPaused = paused, pauseEndsAt = if (paused) c.pauseUntil else null,
-            locked = lock.locked, lockReason = lock.reason, lockUntil = lock.until, schedule = schedule)
-        Log.d(LOG_TAG, "Status: kiosk=${s.kiosk} apps=${s.kioskApps.size} paused=${s.kioskPaused} battery=${s.battery} locked=${s.locked}"); s
+            locked = lock.locked, lockReason = lock.reason, lockUntil = lock.until, schedule = schedule,
+            // Reported, not just read: the parent keeps no copy of its own. Without these the level
+            // always displayed as Off however strict the child actually was, the per-app form opened
+            // blank every time, and — worst — saving one app's settings merged into a null config and
+            // wiped every other app's.
+            safetyLevel = safetyConfig.level, safety = safetyConfig)
+        Log.d(LOG_TAG, "Status: kiosk=${s.kiosk} apps=${s.kioskApps.size} paused=${s.kioskPaused} battery=${s.battery} locked=${s.locked} safety=${s.safetyLevel}"); s
     }
 
     /** Current battery charge as a 0-100 percentage. */

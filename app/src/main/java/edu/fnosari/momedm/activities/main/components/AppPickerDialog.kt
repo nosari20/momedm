@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -38,7 +41,9 @@ import edu.fnosari.momedm.ui.theme.pastelOf
  *
  * [singleChoice] reuses the same list to pick exactly one app — the advanced settings form needs to
  * ask "which app?" and this list, with its search box, is already the right answer. In that mode the
- * pin switch and the allowed-count pill are hidden, since neither means anything for a single pick.
+ * pin switch and the allowed-count pill are hidden, since neither means anything for a single pick,
+ * and the row acts as a menu entry: tapping an app opens it, with no tick to place and nothing to
+ * confirm. Ticking a box and then confirming asks for two taps to express one choice.
  */
 @Composable
 fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initiallyPinned: String?,
@@ -56,8 +61,10 @@ fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initia
                 if (apps != null && !singleChoice) AccentPill(text = stringResource(R.string.child_allowed_count, selected.size), accent = MaterialTheme.colorScheme.primary)
             }
         },
-        confirmButton = { TextButton(enabled = selected.isNotEmpty() && (!pinOne || pinned in selected),
-            onClick = { onConfirm(selected.toList(), if (pinOne) pinned else null) }) { Text(stringResource(R.string.apps_confirm)) } },
+        confirmButton = {
+            if (!singleChoice) TextButton(enabled = selected.isNotEmpty() && (!pinOne || pinned in selected),
+                onClick = { onConfirm(selected.toList(), if (pinOne) pinned else null) }) { Text(stringResource(R.string.apps_confirm)) }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.apps_cancel)) } },
         text = {
             if (apps == null) {
@@ -73,11 +80,12 @@ fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initia
                 }
                 LazyColumn(Modifier.weight(1f, fill = false)) {
                     items(apps.filter { query.isBlank() || it.label.contains(query, true) || it.pkg.contains(query, true) }, key = { it.pkg }) { a ->
-                        val checked = a.pkg in selected
+                        val checked = !singleChoice && a.pkg in selected
                         Row(
                             Modifier.fillMaxWidth()
                                 .clickable {
-                                    if (singleChoice) { selected = setOf(a.pkg); return@clickable }
+                                    // One tap is the whole choice: hand the app straight back.
+                                    if (singleChoice) { onConfirm(listOf(a.pkg), null); return@clickable }
                                     if (checked && pinned == a.pkg) pinned = null
                                     selected = if (checked) selected - a.pkg else selected + a.pkg
                                 }
@@ -85,8 +93,9 @@ fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initia
                                 .padding(horizontal = 8.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Checkbox(checked = checked, onCheckedChange = null)
+                            if (!singleChoice) Checkbox(checked = checked, onCheckedChange = null)
                             Column(Modifier.weight(1f).padding(start = 8.dp)) { Text(a.label, style = MaterialTheme.typography.bodyLarge); Text(a.pkg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            if (singleChoice) Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (pinOne && checked) RadioButton(selected = pinned == a.pkg, onClick = { pinned = a.pkg })
                         }
                     }

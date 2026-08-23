@@ -146,6 +146,11 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 OutlinedButton(onClick = { editingSafety = true }, Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.safety_change))
                 }
+                // Which apps a child may open is the same question as what they can reach, so it sits
+                // here beside the level and the per-app settings rather than adrift below the card.
+                OutlinedButton(onClick = { viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.child_choose_apps))
+                }
                 OutlinedButton(onClick = { pickingConfigApp = true; viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.appcfg_open))
                 }
@@ -155,7 +160,6 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         Button(onClick = { if (s?.kiosk == true) viewModel.kioskOff(deviceId) else viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
             Text(stringResource(if (s?.kiosk == true) R.string.child_stop else R.string.child_start))
         }
-        OutlinedButton(onClick = { viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_choose_apps)) }
         if (s?.kioskPaused == true) OutlinedButton(onClick = { viewModel.relock(deviceId) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_relock)) }
         OutlinedTextField(value = pkg, onValueChange = { pkg = it }, label = { Text(stringResource(R.string.child_install_hint)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Button(onClick = { viewModel.install(deviceId, pkg.trim()) }, enabled = pkg.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_install)) }

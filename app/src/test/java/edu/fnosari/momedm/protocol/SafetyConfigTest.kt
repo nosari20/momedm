@@ -1,5 +1,7 @@
 package edu.fnosari.momedm.protocol
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
@@ -110,6 +112,30 @@ class SafetyConfigTest {
         assertEquals(listOf("test_hostname", "test_port"), list.itemFields.map { it.key })
         // A plain bundle offers its own children.
         assertEquals(listOf("test_hostname", "test_port"), template.itemFields.map { it.key })
+    }
+
+    @Test fun statusCarriesTheWholeConfigBackToTheParent() {
+        // The parent keeps no copy: it merges each edit into what the child reports. A status that
+        // omitted this would make every save overwrite the other apps' settings with nothing.
+        val nested = JsonObject(
+            mapOf(
+                "test_list" to JsonArray(
+                    listOf(JsonObject(mapOf("test_hostname" to JsonPrimitive("example.org"), "test_port" to JsonPrimitive(8443)))),
+                ),
+            ),
+        )
+        val config = SafetyConfig(SafetyLevel.MODERATE, SafetyConfig.DNS_ADGUARD, mapOf("com.example.app" to nested))
+        val back = MessageCodec.decodeMessage(
+            MessageCodec.encodeMessage(
+                Message.Status(
+                    kiosk = true, kioskPkg = null, account = false, battery = 50, currentApp = null,
+                    safetyLevel = config.level, safety = config,
+                ),
+            ),
+        ) as Message.Status
+        assertEquals(SafetyLevel.MODERATE, back.safetyLevel)
+        assertEquals(config, back.safety)
+        assertEquals(nested, back.safety?.appConfigs?.get("com.example.app"))
     }
 
     @Test fun statusDefaultsToOffWhenAPeerSendsNoLevel() {
