@@ -1,6 +1,12 @@
 <resources>
     <string name="app_name">Môme DM</string>
 
+    <!-- ============================================================
+         LEGACY (Plan 1) KEYS — kept for backward compatibility so old
+         screens keep compiling. Superseded by the parent-friendly keys
+         below (Task 2 of kiosk v2 plan 2). Orphan removal is Task 6.
+         ============================================================ -->
+
     <!-- Settings -->
     <string name="settings_activity_name">Settings</string>
     <string name="settings_screen_title">Settings</string>
@@ -103,10 +109,10 @@
     <string name="device_mode_on">Child mode ON</string>
     <string name="device_mode_off">Child mode OFF</string>
     <string name="apps_title">Allowed apps</string>
-    <string name="apps_loading">Fetching apps…</string>
+    <string name="apps_loading">Getting the app list…</string>
     <string name="apps_cancel">Cancel</string>
-    <string name="apps_pin_one">Pin a single app</string>
-    <string name="apps_confirm">Activate</string>
+    <string name="apps_pin_one">Keep to a single app</string>
+    <string name="apps_confirm">Confirm</string>
     <string name="apps_search">Search</string>
     <string name="provision_title">Provision a device</string>
     <string name="provision_mode">Wi-Fi source</string>
@@ -145,4 +151,144 @@
     <string name="settings_pin_invalid">Use 4 to 6 digits</string>
     <string name="settings_pin_saved">PIN saved and sent to connected children</string>
     <string name="settings_pin_cleared">PIN removed</string>
+
+    <!-- ============================================================
+         PARENT-FRIENDLY STRINGS (kiosk v2 plan 2, Task 2) — the keys
+         all Task 3–5 screens reference via stringResource(...).
+         ============================================================ -->
+
+    <!-- Core / shared -->
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="ok">OK</string>
+    <string name="back">Back</string>
+    <string name="close">Close</string>
+    <string name="loading">Loading…</string>
+    <string name="search">Search</string>
+    <string name="done">Done</string>
+    <string name="failed">Failed: %1$s</string>
+
+    <!-- Appearance & language (MaClasse-aligned keys) -->
+    <string name="settings">Settings</string>
+    <string name="language">Language</string>
+    <string name="theme">Appearance</string>
+    <string name="system_default">System default</string>
+    <string name="lang_fr">Français</string>
+    <string name="lang_en">English</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="accent_color">App colour</string>
+    <string name="custom_color">Custom…</string>
+    <string name="color_hue">Hue</string>
+    <string name="color_saturation">Saturation</string>
+    <string name="color_brightness">Brightness</string>
+    <string name="color_hex">Hex</string>
+
+    <!-- Settings categories -->
+    <string name="settings_appearance">Appearance &amp; language</string>
+    <string name="settings_appearance_help">Colour, light or dark, French or English</string>
+    <string name="settings_pin">Parent PIN</string>
+    <string name="settings_pin_help">Unlocks a child device for a short while</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_help">Pairing key and identifier</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version %1$s (%2$s)</string>
+    <string name="settings_copyright">© 2026 fnosari</string>
+
+    <!-- Parent PIN (moved out of the old Controller screen) -->
+    <string name="pin_status_set">A PIN is set. It unlocks a child device for 10 minutes.</string>
+    <string name="pin_status_unset">No PIN yet. Without it, child mode can only be ended from this phone.</string>
+    <string name="pin_set">Set PIN</string>
+    <string name="pin_change">Change PIN</string>
+    <string name="pin_remove">Remove PIN</string>
+    <string name="pin_digits">4–6 digits</string>
+    <string name="pin_confirm">Confirm PIN</string>
+    <string name="pin_mismatch">PINs do not match</string>
+    <string name="pin_invalid">Use 4 to 6 digits</string>
+    <string name="pin_saved">PIN saved and sent to connected children</string>
+    <string name="pin_removed">PIN removed</string>
+    <string name="pin_clear_warning">Children will stop accepting the PIN the next time they connect. Continue?</string>
+
+    <!-- Advanced -->
+    <string name="parent_id">Parent ID</string>
+    <string name="pairing_key">Pairing key</string>
+    <string name="pairing_key_fp">Key fingerprint</string>
+    <string name="regenerate_key">New pairing key</string>
+    <string name="regenerate_key_warning">Every paired child will stop connecting until you pair it again. Continue?</string>
+    <string name="regenerate_key_done">New key generated</string>
+
+    <!-- Devices (parent home) -->
+    <string name="children_title">My children</string>
+    <string name="children_empty">No child device yet. Tap + to pair one.</string>
+    <string name="child_online">Connected</string>
+    <string name="child_offline">Offline</string>
+    <string name="child_mode_on">Child mode on</string>
+    <string name="child_mode_paused">Paused</string>
+    <string name="child_mode_off">Child mode off</string>
+    <string name="children_visible">Visible to children</string>
+    <string name="children_online_count">%1$d connected</string>
+    <string name="children_not_visible">Children can\'t connect while this is off</string>
+
+    <!-- Child (device) page -->
+    <string name="child_page_status">Status</string>
+    <string name="child_allowed_apps">Allowed apps</string>
+    <string name="child_allowed_count">%1$d allowed</string>
+    <string name="child_single_app">Single app</string>
+    <string name="child_current_app">Current app</string>
+    <string name="child_battery">Battery</string>
+    <string name="child_google">Google account</string>
+    <string name="child_last_seen">Last seen</string>
+    <string name="child_paused_until">Paused until %1$s</string>
+    <string name="child_choose_apps">Choose allowed apps…</string>
+    <string name="child_start">Start child mode</string>
+    <string name="child_stop">Stop child mode</string>
+    <string name="child_relock">Lock again</string>
+    <string name="child_install">Install an app (Play Store)</string>
+    <string name="child_install_hint">App name (e.g. org.mozilla.firefox)</string>
+    <string name="child_add_account">Add a Google account</string>
+    <string name="child_refresh">Refresh</string>
+    <string name="child_rename">Rename</string>
+    <string name="child_rename_hint">Name (e.g. Léa\'s tablet)</string>
+    <string name="child_offline_msg">This device is offline</string>
+    <string name="child_sent">Done</string>
+    <string name="child_result">%1$s</string>
+
+    <!-- App picker (apps_title/apps_confirm/apps_pin_one/apps_loading already
+         exist above with Plan 1 wording; values updated in place to the
+         parent-friendly wording since the key names are unchanged) -->
+
+    <!-- Pairing (provisioning) -->
+    <string name="pair_title">Pair a device</string>
+    <string name="pair_step1">1. Choose how the child device gets online</string>
+    <string name="pair_step2">2. Create the pairing code</string>
+    <string name="pair_step3">3. On the child\'s reset device, tap the welcome screen 6 times and scan this code</string>
+    <string name="pair_wifi_hotspot">Hotspot (automatic)</string>
+    <string name="pair_wifi_manual">Shared Wi-Fi</string>
+    <string name="pair_wifi_custom">Custom app link</string>
+    <string name="pair_ssid">Wi-Fi name</string>
+    <string name="pair_password">Wi-Fi password</string>
+    <string name="pair_url">https://…/momedm.apk</string>
+    <string name="pair_generate">Show the code</string>
+    <string name="pair_stop">Stop</string>
+    <string name="pair_serving">Ready — hotspot %1$s</string>
+    <string name="pair_qr_error">Code too large to display</string>
+    <string name="pair_help">The child device must be factory-reset first.</string>
+    <string name="pair_ssid_value">%1$s: %2$s</string>
+    <string name="pair_password_value">%1$s: %2$s</string>
+
+    <!-- Child launcher (managed) -->
+    <string name="launcher_child_mode">Child mode</string>
+    <string name="launcher_all_apps">All apps</string>
+    <string name="managed_pin_title">Parent PIN</string>
+    <string name="managed_pin_hint">4–6 digits</string>
+    <string name="managed_pin_wrong">Wrong PIN</string>
+    <string name="managed_pin_locked">Try again in %1$d s</string>
+    <string name="managed_pin_ok">Unlock</string>
+    <string name="managed_pin_cancel">Cancel</string>
+
+    <!-- Permission gate (Task 5 maps each Manifest permission to a friendly name) -->
+    <string name="permission_allow">Allow %1$s</string>
+    <string name="perm_bluetooth">Bluetooth</string>
+    <string name="perm_notifications">Notifications</string>
+    <string name="perm_nearby">Nearby devices</string>
 </resources>
