@@ -13,6 +13,7 @@ import edu.fnosari.momedm.activities.managed.ManagedHomeActivity
 import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.ChildPrefs
+import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.PinHash
 import edu.fnosari.momedm.ui.AppLocale
 import kotlinx.coroutines.CancellationException
@@ -193,6 +194,21 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         this.prefs.setChildPrefs(prefs)
         AppLocale.apply(context, prefs.language)
         Log.d(LOG_TAG, "Prefs applied (lang=${prefs.language}, theme=${prefs.theme}, pin=${prefs.pinHash != null})")
+        Result.success(Unit)
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
+
+    // Task 6 adds the LockController.reevaluate() call to both, once that class exists. Until then a
+    // schedule/manual-lock change takes effect at the next trigger rather than instantly, which is
+    // correct but slower.
+    override suspend fun setSchedule(schedule: LockSchedule): Result<Unit> = try {
+        prefs.setLockSchedule(schedule)
+        Log.d(LOG_TAG, "Lock schedule set (enabled=${schedule.enabled})")
+        Result.success(Unit)
+    } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
+
+    override suspend fun setManualLock(on: Boolean): Result<Unit> = try {
+        prefs.setManualLock(on)
+        Log.d(LOG_TAG, "Manual lock = $on")
         Result.success(Unit)
     } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }
 

@@ -3,6 +3,7 @@ package edu.fnosari.momedm.managed
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.protocol.ChildPrefs
 import edu.fnosari.momedm.protocol.CmdType
+import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.Message
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -22,6 +23,9 @@ class CommandExecutorTest {
         override suspend fun openPlay(pkg: String) = run { played = pkg; Result.success(Unit) }
         override suspend fun openAddAccount() = if (kiosk != null) Result.failure(IllegalStateException("kiosk is on; turn it off first")) else run { accountOpened = true; Result.success(Unit) }
         override suspend fun applyPrefs(prefs: ChildPrefs) = run { this.prefs = prefs; Result.success(Unit) }
+        var schedule: LockSchedule? = null; var manual: Boolean? = null
+        override suspend fun setSchedule(schedule: LockSchedule) = run { this.schedule = schedule; Result.success(Unit) }
+        override suspend fun setManualLock(on: Boolean) = run { manual = on; Result.success(Unit) }
     }
     private class FakeStatus : StatusSource {
         override suspend fun collect() = Message.Status(false, null, true, 42, "x")
@@ -73,5 +77,27 @@ class CommandExecutorTest {
         val out = ex.execute(Message.Cmd("10", CmdType.ADD_ACCOUNT))
         val result = out[0] as Message.Result
         assertFalse(result.ok); assertEquals("kiosk is on; turn it off first", result.msg); assertFalse(p.accountOpened)
+    }
+    @Test fun setScheduleSanitizesAndReturnsStatus() = runTest {
+        val p = FakePolicy()
+        val out = CommandExecutor(p, FakeStatus()).execute(
+            Message.Cmd("20", CmdType.SET_SCHEDULE, schedule = LockSchedule(enabled = true, weekdayStart = 9999)))
+        assertEquals(Message.Result("20", true, "schedule set"), out[0]); assertTrue(out[1] is Message.Status)
+        assertEquals(21 * 60, p.schedule?.weekdayStart)   // clamped by sanitized()
+        assertEquals(true, p.schedule?.enabled)
+    }
+
+    @Test fun setScheduleWithoutPayloadFails() = runTest {
+        val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("21", CmdType.SET_SCHEDULE))
+        val r = out[0] as Message.Result; assertFalse(r.ok); assertEquals("missing schedule", r.msg)
+    }
+
+    @Test fun lockNowAndUnlockSetTheFlag() = runTest {
+        val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
+        val locked = ex.execute(Message.Cmd("22", CmdType.LOCK_NOW))
+        assertEquals(Message.Result("22", true, "locked"), locked[0]); assertTrue(locked[1] is Message.Status)
+        assertEquals(true, p.manual)
+        val unlocked = ex.execute(Message.Cmd("23", CmdType.UNLOCK))
+        assertEquals(Message.Result("23", true, "unlocked"), unlocked[0]); assertEquals(false, p.manual)
     }
 }
