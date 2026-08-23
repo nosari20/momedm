@@ -114,6 +114,36 @@ class SafetyConfigTest {
         assertEquals(listOf("test_hostname", "test_port"), template.itemFields.map { it.key })
     }
 
+    @Test fun changingLevelKeepsTheParentsOwnAppSettings() {
+        // Changing the level used to rebuild from the preset alone, throwing away every per-app
+        // setting the parent had entered.
+        val mine = JsonObject(mapOf("test_hostname" to JsonPrimitive("test.local")))
+        val before = SafetyConfig(SafetyLevel.OFF, null, mapOf("com.example.app" to mine))
+        val after = before.withPreset(SafetyLevel.STRICT, SafetyConfig.DNS_ADGUARD)
+        assertEquals(SafetyLevel.STRICT, after.level)
+        assertEquals(SafetyConfig.DNS_ADGUARD, after.dnsHost)
+        assertEquals(mine, after.appConfigs["com.example.app"])
+        // ...and the new preset is applied on top.
+        assertEquals(2, (after.appConfigs.getValue(SafetyConfig.CHROME_PKG)["ForceYouTubeRestrict"] as JsonPrimitive).intOrNull)
+    }
+
+    @Test fun turningRestrictionsOffTakesThePresetKeysBackOut() {
+        // Otherwise "off" would leave the last preset's values in force and relax nothing.
+        val strict = SafetyConfig().withPreset(SafetyLevel.STRICT, null)
+        assertTrue(strict.appConfigs.containsKey(SafetyConfig.CHROME_PKG))
+        assertTrue(strict.withPreset(SafetyLevel.OFF, null).appConfigs.isEmpty())
+    }
+
+    @Test fun aParentsOwnKeyOnAPresetAppSurvivesALevelChange() {
+        val custom = JsonObject(mapOf("HomepageLocation" to JsonPrimitive("https://example.org"), "ForceYouTubeRestrict" to JsonPrimitive(0)))
+        val after = SafetyConfig(SafetyLevel.OFF, null, mapOf(SafetyConfig.CHROME_PKG to custom))
+            .withPreset(SafetyLevel.MODERATE, null)
+        val chrome = after.appConfigs.getValue(SafetyConfig.CHROME_PKG)
+        // Their own key is kept; the key the preset owns is the preset's.
+        assertEquals("https://example.org", (chrome["HomepageLocation"] as JsonPrimitive).content)
+        assertEquals(1, (chrome["ForceYouTubeRestrict"] as JsonPrimitive).intOrNull)
+    }
+
     @Test fun statusCarriesTheWholeConfigBackToTheParent() {
         // The parent keeps no copy: it merges each edit into what the child reports. A status that
         // omitted this would make every save overwrite the other apps' settings with nothing.

@@ -25,6 +25,22 @@ data class SafetyConfig(
     /** Drops a malformed [dnsHost] rather than handing it to the platform. */
     fun sanitized(): SafetyConfig = copy(dnsHost = dnsHost?.takeIf { isValidHostname(it) })
 
+    /**
+     * This config with [level]'s preset applied, keeping whatever the parent set by hand.
+     *
+     * Rebuilding from the preset alone — which is what [of] does — throws away every per-app setting
+     * the parent entered, so merely switching level silently wiped their work. Only keys a preset owns
+     * are replaced; a parent's own keys, and any app no preset covers, are carried across untouched.
+     */
+    fun withPreset(level: SafetyLevel, dnsHost: String?): SafetyConfig {
+        val preset = presetFor(level)
+        val merged = (appConfigs.keys + preset.keys).associateWith { pkg ->
+            val own = appConfigs[pkg].orEmpty().filterKeys { it !in presetKeys[pkg].orEmpty() }
+            JsonObject(own + preset[pkg].orEmpty())
+        }.filterValues { it.isNotEmpty() }
+        return copy(level = level, dnsHost = dnsHost, appConfigs = merged).sanitized()
+    }
+
     companion object {
         const val CHROME_PKG = "com.android.chrome"
 
@@ -62,6 +78,17 @@ data class SafetyConfig(
         /** A preset built from [level], keeping the parent's [dnsHost] choice. */
         fun of(level: SafetyLevel, dnsHost: String?): SafetyConfig =
             SafetyConfig(level, dnsHost, presetFor(level)).sanitized()
+
+        /**
+         * Every key any preset may set, per package.
+         *
+         * Swapping presets has to take the previous one's keys back out, or turning restrictions off
+         * would leave the last preset's values in force — "off" that does not actually relax anything.
+         */
+        private val presetKeys: Map<String, Set<String>> =
+            SafetyLevel.entries.flatMap { presetFor(it).entries }
+                .groupBy({ it.key }, { it.value.keys })
+                .mapValues { (_, keySets) -> keySets.flatten().toSet() }
 
         /**
          * Resolvers offered to the parent. Both force YouTube Restricted Mode and Google SafeSearch —

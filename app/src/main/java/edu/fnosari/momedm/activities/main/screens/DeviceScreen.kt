@@ -205,8 +205,10 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         }
     }
     if (editingSafety) SafetyDialog(
-        current = SafetyConfig.of(s?.safetyLevel ?: SafetyLevel.OFF, null),
-        onConfirm = { level, dns -> viewModel.setSafety(deviceId, level, dns); editingSafety = false },
+        // What the child actually holds, so the resolver field opens on the resolver in force rather
+        // than blank — and so the level change merges into the per-app settings instead of losing them.
+        current = s?.safety ?: SafetyConfig.of(s?.safetyLevel ?: SafetyLevel.OFF, null),
+        onConfirm = { level, dns -> viewModel.setSafety(deviceId, s?.safety, level, dns); editingSafety = false },
         onDismiss = { editingSafety = false },
     )
     if (renaming) {

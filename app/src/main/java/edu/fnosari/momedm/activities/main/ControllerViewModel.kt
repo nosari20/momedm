@@ -127,9 +127,15 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         Log.d(LOG_TAG, "setSchedule -> $deviceId: enabled=${schedule.enabled}: ${if (id == null) "offline" else "sent (id=$id)"}")
         announce(id)
     }
-    /** Pushes a content-restriction preset (and the filtering resolver) to [deviceId]. */
-    fun setSafety(deviceId: String, level: SafetyLevel, dnsHost: String?) {
-        val cfg = SafetyConfig.of(level, dnsHost)
+    /**
+     * Pushes a content-restriction preset (and the filtering resolver) to [deviceId].
+     *
+     * [current] is the config the child reported, for the same reason [setAppConfig] needs it: the
+     * parent stores nothing of its own, and building the new config from the preset alone would drop
+     * every per-app setting the parent had entered.
+     */
+    fun setSafety(deviceId: String, current: SafetyConfig?, level: SafetyLevel, dnsHost: String?) {
+        val cfg = (current ?: SafetyConfig()).withPreset(level, dnsHost)
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SAFETY, safety = cfg) }
         Log.d(LOG_TAG, "setSafety -> $deviceId: level=$level dns=${dnsHost != null}: ${if (id == null) "offline" else "sent (id=$id)"}")
         announce(id)
