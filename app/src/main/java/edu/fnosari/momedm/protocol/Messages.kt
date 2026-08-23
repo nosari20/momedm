@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS }
+enum class CmdType { KIOSK_ON, KIOSK_OFF, INSTALL, ADD_ACCOUNT, LIST_APPS, GET_STATUS, SET_PREFS, SET_SCHEDULE, LOCK_NOW, UNLOCK }
 
 @Serializable
 data class AppInfo(val pkg: String, val label: String)
@@ -71,6 +71,14 @@ sealed class Message {
         /** True while a parent-PIN pause is active (lock task released until [pauseEndsAt]). */
         val kioskPaused: Boolean = false,
         val pauseEndsAt: Long? = null,
+        /** True while a complete lock (night window or parent "Lock now") is in force. */
+        val locked: Boolean = false,
+        /** [LockState.REASON_NIGHT], [LockState.REASON_MANUAL], or null when unlocked. */
+        val lockReason: String? = null,
+        /** Epoch ms the night window ends; null for a manual lock and when unlocked. */
+        val lockUntil: Long? = null,
+        /** The child's current lock schedule, so the parent UI can render it after a restart. */
+        val schedule: LockSchedule? = null,
     ) : Message()
     @Serializable @SerialName("APPS")      data class Apps(val apps: List<AppInfo>) : Message()
     @Serializable @SerialName("RESULT")    data class Result(val cmdId: String, val ok: Boolean, val msg: String) : Message()
@@ -79,6 +87,7 @@ sealed class Message {
         /** KIOSK_ON: allowed apps (non-empty). */ val apps: List<String> = emptyList(),
         /** KIOSK_ON: the single app to pin, must be in [apps]. */ val pinned: String? = null,
         /** SET_PREFS payload. */ val prefs: ChildPrefs? = null,
+        /** SET_SCHEDULE payload. */ val schedule: LockSchedule? = null,
     ) : Message()
 }
 

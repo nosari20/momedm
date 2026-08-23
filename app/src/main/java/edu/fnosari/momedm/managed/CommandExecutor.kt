@@ -44,6 +44,7 @@ class CommandExecutor(private val policy: PolicyActions, private val status: Sta
                 val prefs = cmd.prefs ?: return listOf(Message.Result(cmd.id, false, "missing prefs"))
                 listOf(res(policy.applyPrefs(prefs.sanitized()), "prefs applied"))
             }
+            CmdType.SET_SCHEDULE, CmdType.LOCK_NOW, CmdType.UNLOCK -> listOf(Message.Result(cmd.id, false, "not yet implemented"))
         }
     }
 }
