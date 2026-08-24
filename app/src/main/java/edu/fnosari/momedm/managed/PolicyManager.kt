@@ -29,10 +29,20 @@ import java.time.ZoneId
 
 /** Thin, logged wrapper around [DevicePolicyManager] for the managed role. */
 class PolicyManager(private val context: Context, private val prefs: ManagedPrefs) : PolicyActions, LockActions {
+    /**
+     * Mirror of [ManagedPrefs.playUntil] that [applyKiosk] can read without suspending.
+     *
+     * Seeded from prefs on the first suspending call that needs it, so a window still open across a
+     * process restart is honoured rather than silently dropped.
+     */
+    @Volatile private var playUntilCache = 0L
     companion object {
         private const val LOG_TAG = "PolicyManager"
         const val PLAY_PKG = "com.android.vending"
         const val GMS_PKG = "com.google.android.gms"
+
+        /** How long the Play Store stays launchable after a parent asks for an install. */
+        private const val PLAY_WINDOW_MS = 10 * 60_000L
         /** The long-standing implicit action for the platform emergency dialer; OEMs answer it with their own component. */
         const val EMERGENCY_DIAL_ACTION = "com.android.phone.EmergencyDialer.DIAL"
     }
@@ -136,7 +146,12 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         // are the device's HOME, and nothing else guarantees that still holds — a reinstall drops the
         // preferred-activity entry, and home would then land the child on the stock launcher.
         setAsDefaultHome()
-        dpm.setLockTaskPackages(admin, (allowed + context.packageName + PLAY_PKG + GMS_PKG + listOfNotNull(emergencyDialerPackage())).toTypedArray())
+        // The store is allowlisted only while a parent-initiated install is in flight. Permanently
+        // reachable, it undid the allowlist it sits beside: a market:// link from any allowed app —
+        // a browser, an in-app "rate us" button — put a child in the Play Store, where they could
+        // install whatever they liked. It is a door the parent opens, not one left open.
+        val storeAllowed = if (playWindowOpen()) listOf(PLAY_PKG, GMS_PKG) else emptyList()
+        dpm.setLockTaskPackages(admin, (allowed + context.packageName + storeAllowed + listOfNotNull(emergencyDialerPackage())).toTypedArray())
         // HOME and OVERVIEW give the child the two buttons they expect from a phone: home returns to
         // our launcher (we are the persistent HOME), and recents lists only the allowed apps, because
         // lock task hides everything else. Neither widens what is launchable — the allowlist above
@@ -178,6 +193,27 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * `com.android.phone`, this Samsung with `com.samsung.android.emergency` — and a wrong constant
      * would silently mean no emergency route at all.
      */
+    /** True while a parent-opened Play window is still live. Read synchronously; applyKiosk is not suspending. */
+    private fun playWindowOpen(): Boolean = playUntilCache > System.currentTimeMillis()
+
+    /**
+     * Opens the Play window and re-applies the allowlist so the store is reachable right now.
+     *
+     * The deadline is persisted, so a reboot mid-window does not strand the store as launchable: the
+     * next apply recomputes from it and drops the store once it has passed.
+     */
+    /** Loads the persisted window into [playUntilCache]; call before an apply that must respect it. */
+    suspend fun refreshPlayWindow() { playUntilCache = prefs.playUntil.first() }
+
+    suspend fun openPlayWindow() {
+        val until = System.currentTimeMillis() + PLAY_WINDOW_MS
+        playUntilCache = until
+        prefs.setPlayUntil(until)
+        // The apply cache is keyed on lock state and kiosk config, neither of which changed here.
+        LockController.invalidate()
+        LockController(context, prefs, this).reevaluate()
+    }
+
     fun emergencyDialerPackage(): String? = runCatching {
         // MATCH_SYSTEM_ONLY, and the flags are checked again on what comes back. Whatever this
         // returns gets added to the lock-task allowlist and can therefore be launched from a
@@ -229,6 +265,9 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * which would each start a new reevaluate() and recurse back into this function.
      */
     override suspend fun restoreNormal(): Result<Unit> = try {
+        // Every apply reads the persisted Play window first, so a window that has elapsed — or that
+        // survived a reboot — is reflected in the allowlist this call is about to write.
+        refreshPlayWindow()
         val c = prefs.kioskConfig.first()
         if (c.on && c.apps.isNotEmpty()) applyKiosk(c.apps, c.pinned) else clearKiosk()
         Result.success(Unit)
@@ -296,6 +335,9 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
         openPlayUri("market://search?q=${Uri.encode(term)}&c=apps", "search for \"$term\"")
 
     private suspend fun openPlayUri(uri: String, what: String): Result<Unit> {
+        // Open the window first: applyKiosk has to have put the store in the allowlist before the
+        // intent lands, or lock task refuses it.
+        openPlayWindow()
         val locked = prefs.kioskConfig.first().isLocked(System.currentTimeMillis())
         return runCatching {
             val i = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).setPackage(PLAY_PKG).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

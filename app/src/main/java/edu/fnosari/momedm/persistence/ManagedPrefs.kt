@@ -45,6 +45,8 @@ class ManagedPrefs(private val p: PreferencesProvider) {
          * nothing to take away as a consequence.
          */
         const val KEY_CHILD_NAME = "managed_child_name"
+        /** Epoch ms until which the Play Store is launchable in child mode; 0 = never. */
+        const val KEY_PLAY_UNTIL = "managed_play_until"
         const val KEY_SAFETY = "managed_safety"
     }
     val controllerId: Flow<String> = p.readString(KEY_CONTROLLER_ID, "")
@@ -82,6 +84,9 @@ class ManagedPrefs(private val p: PreferencesProvider) {
 
     /** What the child asked to be called; blank when they have not chosen one. */
     val childName: Flow<String> = p.readString(KEY_CHILD_NAME, "")
+
+    /** Deadline for the Play Store window opened by an INSTALL or SEARCH_APP. */
+    val playUntil: Flow<Long> = p.readString(KEY_PLAY_UNTIL, "0").map { it.toLongOrNull() ?: 0L }
 
     /** Persists the controller identity (id + secret) received from the QR admin extras. */
     suspend fun saveProvisioning(controllerId: String, secretBase64: String) { p.write(KEY_CONTROLLER_ID, controllerId); p.write(KEY_SECRET, secretBase64) }
@@ -124,6 +129,9 @@ class ManagedPrefs(private val p: PreferencesProvider) {
 
     /** Stores the child's chosen name, trimmed and length-capped; blank clears it. */
     suspend fun setChildName(name: String) = p.write(KEY_CHILD_NAME, name.trim().take(20))
+
+    /** Opens (or closes, with 0) the window in which the Play Store may be launched. */
+    suspend fun setPlayUntil(t: Long) = p.write(KEY_PLAY_UNTIL, t.toString())
 
     /**
      * The parent's content restrictions, stored as JSON because [SafetyConfig.appConfigs] is an open

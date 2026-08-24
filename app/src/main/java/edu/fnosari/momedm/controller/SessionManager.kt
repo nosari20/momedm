@@ -32,7 +32,19 @@ class SessionManager(
         sessions.remove(key)?.let { events.onDropped(key, it.endpoint.deviceId) }
         val ep = ControllerEndpoint(secret, { f -> transport.sendFrame(key, f) }, object : ControllerEndpoint.Listener {
             override fun onAuthenticated(hello: Message.Hello) {
-                // one session per deviceId: drop an older link of the same device
+                // One session per deviceId, and the NEWER link wins. Deliberate, and load-bearing:
+                // BLE links die without a clean disconnect all the time, so a child coming back has to
+                // be able to reclaim its slot. Refusing the newcomer instead — which is what a review
+                // suggested, to stop one child evicting a sibling by claiming its id — would mean a
+                // device whose link died silently could not reconnect until the stale session aged
+                // out, and the parent would have lost control of it in the meantime.
+                //
+                // That the id is self-asserted, and that every child of one parent shares a secret, is
+                // real: a sibling can knock another out of the parent's list. It costs presence in the
+                // UI, not enforcement — the evicted child keeps applying its rules locally, since none
+                // of that depends on the link. Per-device secrets, already planned in
+                // docs/architecture.md, are what actually closes it. Pinned by
+                // SessionManagerTest.duplicateDeviceIdDisconnectsOlderLink.
                 sessions.values.filter { it.key != key && it.endpoint.deviceId == hello.deviceId }.forEach { transport.disconnect(it.key) }
                 events.onAuthenticated(key, hello)
             }

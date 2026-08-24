@@ -94,6 +94,16 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
          */
         internal fun resetCacheForTest() { lastApplied = null }
 
+        /**
+         * Forces the next [reevaluate] to apply, even though its inputs look unchanged.
+         *
+         * The cache is keyed on (LockState, KioskConfig), which is everything that normally decides
+         * the applied policy — but not quite everything. The Play window changes the allowlist while
+         * both of those stay identical, so without this the store would be opened and the allowlist
+         * never rewritten, and the launch would be refused by lock task.
+         */
+        fun invalidate() { lastApplied = null }
+
         /** Convenience for the receivers, which have only a [Context]. */
         fun of(context: Context): LockController {
             val p = ManagedSetup.prefs(context)

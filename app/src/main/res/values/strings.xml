@@ -227,6 +227,7 @@
     <string name="pair_password">Wi-Fi password</string>
     <string name="pair_url">https://…/momedm.apk</string>
     <string name="pair_generate">Show the code</string>
+    <string name="pair_expired">The pairing code expired and the download was switched off. Show it again when you are ready.</string>
     <string name="pair_stop">Stop</string>
     <string name="pair_serving">Ready — hotspot %1$s</string>
     <string name="pair_qr_error">Code too large to display</string>

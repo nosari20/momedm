@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.PersistableBundle
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /** Device-owner admin component. Also catches provisioning extras on older flows. */
 class AdminReceiver : DeviceAdminReceiver() {
@@ -16,6 +19,14 @@ class AdminReceiver : DeviceAdminReceiver() {
     override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
         Log.d(LOG_TAG, "Provisioning complete")
         val bundle = intent.getParcelableExtra(DevicePolicyManager.EXTRA_PROVISIONING_ADMIN_EXTRAS_BUNDLE, PersistableBundle::class.java)
-        ManagedSetup.persistExtras(context, bundle)
+        // goAsync so the disk write happens off the main thread without the broadcast returning
+        // first: a receiver runs on the main thread and under a timeout, which is the one place this
+        // write could cost an ANR. finish() is called in every path, including failure.
+        val result = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try { ManagedSetup.persistExtrasAsync(context, bundle) }
+            catch (t: Throwable) { Log.w(LOG_TAG, "Could not persist provisioning extras", t) }
+            finally { result.finish() }
+        }
     }
 }

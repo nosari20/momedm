@@ -115,7 +115,15 @@ class ControllerService : Service() {
             }
             override fun onMessage(key: String, deviceId: String, m: Message) {
                 when (m) {
-                    is Message.Status -> scope.launch { registry.updateStatus(deviceId, m, System.currentTimeMillis()) }
+                    // Sanitised on the way in, exactly as the child sanitises a Cmd on the way in. A
+                    // Status carries the whole SafetyConfig back (deliberately — the parent keeps no
+                    // copy and has to merge against it), and it is written verbatim into a DataStore
+                    // blob on every push, so an inflated appConfigs would have the parent rewriting a
+                    // very large preferences file every few minutes.
+                    is Message.Status -> scope.launch {
+                        val safe = m.copy(safety = m.safety?.sanitized())
+                        registry.updateStatus(deviceId, safe, System.currentTimeMillis())
+                    }
                     is Message.Result -> ControllerLink.results.tryEmit(deviceId to m)
                     is Message.Ping -> scope.launch { registry.upsertSeen(deviceId, registry.get(deviceId)?.model ?: "?", System.currentTimeMillis()) }
                     is Message.Apps -> ControllerLink.apps.tryEmit(deviceId to m)

@@ -227,6 +227,7 @@
     <string name="pair_password">Mot de passe Wi-Fi</string>
     <string name="pair_url">https://…/momedm.apk</string>
     <string name="pair_generate">Afficher le code</string>
+    <string name="pair_expired">Le code d’association a expiré et le téléchargement a été coupé. Affichez-le de nouveau quand vous êtes prêt.</string>
     <string name="pair_stop">Arrêter</string>
     <string name="pair_serving">Prêt — point d\'accès %1$s</string>
     <string name="pair_qr_error">Code trop grand à afficher</string>

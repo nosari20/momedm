@@ -158,6 +158,8 @@ fun ProvisionScreen(navController: NavHostController, viewModel: ControllerViewM
             Text(stringResource(R.string.pair_serving, it), style = MaterialTheme.typography.bodySmall)
         }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        // Says why the code went away, rather than leaving the parent staring at an empty step 3.
+        if (s.expired) Text(stringResource(R.string.pair_expired), style = MaterialTheme.typography.bodyMedium)
 
         s.qrPayload?.let { payload ->
             SectionLabel(stringResource(R.string.pair_step3), modifier = Modifier.fillMaxWidth())

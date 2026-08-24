@@ -19,6 +19,9 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     companion object {
         private const val LOG_TAG = "ProvisioningController"
         private const val IP_POLL_ATTEMPTS = 10
+
+        /** How long a pairing code stays live. Enrolment takes a couple of minutes. */
+        private const val EXPIRY_MS = 5 * 60_000L
         private const val IP_POLL_DELAY_MS = 300L
     }
 
@@ -32,6 +35,8 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         val mode: String = ControllerPrefs.MODE_HOTSPOT, val ssid: String = "", val password: String = "", val customUrl: String = "",
         val hotspotSsid: String = "", val hotspotPassword: String = "",
         val ip: String? = null, val serverRunning: Boolean = false, val qrPayload: String? = null, val error: String? = null,
+        /** True once a code was shown and then timed out, so the UI can say why it went away. */
+        val expired: Boolean = false,
     )
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -40,6 +45,7 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     /** The in-flight hotspot IP poll started by [serveAndBuild], if any — cancelled by [stop] so a Stop
      * during the poll window can't have a late [onIpResolved] resurrect state after the user stopped. */
     private var pollJob: Job? = null
+    private var expiryJob: Job? = null
 
     init { scope.launch { _state.value = State(prefs.wifiMode.first(), prefs.manualSsid.first(), prefs.manualPassword.first(), prefs.customUrl.first()) } }
 
@@ -85,7 +91,7 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         // reservation was overwritten and never released, so that hotspot stayed up until the process
         // died. Nothing here is cheap enough to be worth doing twice.
         if (_state.value.serverRunning || _state.value.hotspotSsid.isNotBlank()) return
-        _state.update { it.copy(error = null, qrPayload = null) }
+        _state.update { it.copy(error = null, qrPayload = null, expired = false) }
         when (_state.value.mode) {
             ControllerPrefs.MODE_HOTSPOT -> hotspot.start(
                 onReady = { ssid, pass -> _state.update { it.copy(hotspotSsid = ssid, hotspotPassword = pass) }; serveAndBuild() },
@@ -151,10 +157,30 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         val (ssid, password) = if (s.mode == ControllerPrefs.MODE_HOTSPOT) s.hotspotSsid to s.hotspotPassword else s.ssid to s.password
         val payload = QrPayloadBuilder.build(ProvisioningParams(url, checksum, ssid.ifBlank { null }, password, id.controllerId, id.secretBase64))
         _state.update { it.copy(qrPayload = payload) }
+        armExpiry()
         Log.d(LOG_TAG, "QR payload ready (${payload.length} chars)")
     }
 
+    /**
+     * Takes the code, the server and the hotspot down after [EXPIRY_MS].
+     *
+     * The QR carries the 32-byte shared secret and, in hotspot mode, the Wi-Fi password. Left alone
+     * it stayed on screen and the listener stayed bound for as long as the screen was composed — a
+     * parent who starts an enrolment and is called away leaves both sitting there. Enrolment takes a
+     * couple of minutes; anything much past that is a code nobody is using.
+     */
+    private fun armExpiry() {
+        expiryJob?.cancel()
+        expiryJob = scope.launch {
+            delay(EXPIRY_MS)
+            Log.d(LOG_TAG, "Pairing code expired; tearing down")
+            stop()
+            _state.update { it.copy(expired = true) }
+        }
+    }
+
     fun stop() {
+        expiryJob?.cancel(); expiryJob = null
         pollJob?.cancel(); pollJob = null
         http?.stop(); http = null; hotspot.stop()
         _state.update { it.copy(hotspotSsid = "", hotspotPassword = "", ip = null, error = null, qrPayload = null, serverRunning = false) }

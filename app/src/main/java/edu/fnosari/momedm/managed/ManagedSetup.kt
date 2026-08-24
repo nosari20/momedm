@@ -8,6 +8,8 @@ import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
 import edu.fnosari.momedm.protocol.ProvisioningExtras
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 /** One-shot helpers used by provisioning components (receiver + activities). */
 object ManagedSetup {
@@ -28,4 +30,17 @@ object ManagedSetup {
         Log.d(LOG_TAG, "Provisioning extras persisted for controller $controllerId")
         return true
     }
+
+    /**
+     * [persistExtras] without blocking the caller's thread.
+     *
+     * For [edu.fnosari.momedm.managed.AdminReceiver], which runs on the main thread under the
+     * broadcast timeout — a disk write there is the one place this actually risks an ANR. The two
+     * provisioning Activities keep the blocking form on purpose: both act on the result immediately
+     * (one calls finish(), the other builds a UI from prefs), so making them asynchronous would put a
+     * cancelled write between persisting the secret and using it. The extras are written at up to
+     * three points during one enrolment, so any single one is belt to another's braces.
+     */
+    suspend fun persistExtrasAsync(context: Context, bundle: PersistableBundle?): Boolean =
+        withContext(Dispatchers.IO) { persistExtras(context, bundle) }
 }
