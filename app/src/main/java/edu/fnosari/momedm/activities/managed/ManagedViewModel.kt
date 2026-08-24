@@ -65,6 +65,20 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     val menuOpen = MutableStateFlow(false)
 
     /**
+     * True when the menu currently open was reached by entering the parent PIN.
+     *
+     * The menu is also reachable with no PIN at all, deliberately — a family that never set one must
+     * still be able to see why the phone is behaving as it is, and must still have a way back if the
+     * parent's phone is lost. But "reachable" and "may act" are different questions: without this, a
+     * child on a locked phone could open the menu and simply pause child mode, or re-pair the device
+     * to a controller of their own. Actions consult this; the information does not.
+     */
+    val menuAuthed = MutableStateFlow(false)
+
+    /** Closes the menu and drops any authentication it was carrying. */
+    fun closeMenu() { menuOpen.value = false; menuAuthed.value = false }
+
+    /**
      * True while a finger is down on the launcher header.
      *
      * The pinned-app bounce waits for this to clear. Without it the parent had to complete a
@@ -217,6 +231,7 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
             // inside it. The pause itself still happens through [pauseFromMenu], which is what
             // releases lock task.
             pinDialogOpen.value = false
+            menuAuthed.value = true
             menuOpen.value = true
         } else {
             pinFailures++
@@ -263,7 +278,7 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     fun pauseFromMenu(onPaused: () -> Unit) {
         viewModelScope.launch {
             policy.pause()
-            menuOpen.value = false
+            closeMenu()
             onPaused()
         }
     }

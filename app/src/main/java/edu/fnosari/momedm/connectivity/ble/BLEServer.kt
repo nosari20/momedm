@@ -207,6 +207,16 @@ class BLEServer(
             }
             val c = _services.find { it.uuid == characteristic.service.uuid }?.characteristics?.find { it.uuid == characteristic.uuid }
 
+            // A notify characteristic holds the last frame written to it. Answering a read hands that
+            // frame to whoever asked — and nothing here establishes that the caller is the peer we
+            // completed a handshake with, so any central in range could simply connect and poll.
+            // Refuse, rather than trusting the characteristic's own flags to have excluded reads.
+            if (c != null && c.notifies) {
+                Log.w(LOG_TAG, "Refusing read of notify-only ${characteristic.uuid}")
+                _gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_READ_NOT_PERMITTED, offset, null)
+                return
+            }
+
             if (c != null) {
                 Log.d(LOG_TAG,"Responding to read of ${characteristic.uuid} (${c.value.length} chars)")
                 _gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, c.value.toByteArray())

@@ -55,8 +55,10 @@ import java.util.concurrent.Executors
  * child can never authenticate again — previously only a factory reset could fix it. Scanning the
  * parent's current code writes the new identity and restarts the link.
  *
- * Reachable only from the launcher's paused state, which requires the parent PIN, so a child cannot
- * re-point their own phone at something else.
+ * Reached from the parent menu, which offers this action only to someone who entered the parent PIN
+ * — or, when no PIN has been set at all, only while the phone is neither in child mode nor locked.
+ * The activity itself trusts any code it is handed, so that gate is the whole of the protection: it
+ * is what stops a child on a restricted phone re-pointing the device at a controller of their own.
  */
 class RepairScanActivity : ComponentActivity() {
     companion object { private const val LOG_TAG = "RepairScanActivity" }

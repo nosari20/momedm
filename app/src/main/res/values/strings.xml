@@ -277,6 +277,8 @@
     <!-- Parent menu on the child device -->
     <string name="menu_title">Parent menu</string>
     <string name="menu_open">Menu</string>
+    <string name="menu_actions_need_pin">Enter the parent PIN to pause child mode or re-pair this phone.</string>
+    <string name="menu_actions_need_pin_unset">Child mode is on, so pausing and re-pairing need a parent PIN. Ask a parent to set one.</string>
     <string name="menu_close">Close</string>
     <string name="menu_rules">What is set on this phone</string>
     <string name="menu_child_mode">Child mode</string>

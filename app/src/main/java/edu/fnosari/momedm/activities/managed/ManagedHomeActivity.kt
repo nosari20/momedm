@@ -61,7 +61,7 @@ class ManagedHomeActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.action == Intent.ACTION_MAIN) {
-            ViewModelProvider(this)[ManagedViewModel::class.java].menuOpen.value = false
+            ViewModelProvider(this)[ManagedViewModel::class.java].closeMenu()
         }
     }
 

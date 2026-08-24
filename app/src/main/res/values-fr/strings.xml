@@ -277,6 +277,8 @@
     <!-- Parent menu on the child device -->
     <string name="menu_title">Menu parent</string>
     <string name="menu_open">Menu</string>
+    <string name="menu_actions_need_pin">Saisissez le code PIN parental pour suspendre le mode enfant ou ré-associer ce téléphone.</string>
+    <string name="menu_actions_need_pin_unset">Le mode enfant est actif : suspendre ou ré-associer demande un code PIN parental. Demandez à un parent d’en créer un.</string>
     <string name="menu_close">Fermer</string>
     <string name="menu_rules">Ce qui est appliqué sur ce téléphone</string>
     <string name="menu_child_mode">Mode enfant</string>

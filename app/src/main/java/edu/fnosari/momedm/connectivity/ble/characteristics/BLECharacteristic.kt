@@ -46,7 +46,9 @@ abstract class BLECharacteristic(val uuid: UUID, val name: String, open var valu
             Permission.READ -> BluetoothGattCharacteristic.PROPERTY_READ
             Permission.WRITE -> BluetoothGattCharacteristic.PROPERTY_WRITE
             Permission.READ_WRITE -> BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_WRITE
-            Permission.NOTIFY -> BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY
+            // Notify only: deliberately NOT readable. A notify characteristic stages the last frame
+            // sent, and advertising PROPERTY_READ let any central connect and read it back.
+            Permission.NOTIFY -> BluetoothGattCharacteristic.PROPERTY_NOTIFY
         }
 
     /**
@@ -61,7 +63,9 @@ abstract class BLECharacteristic(val uuid: UUID, val name: String, open var valu
             Permission.READ -> BluetoothGattCharacteristic.PERMISSION_READ
             Permission.WRITE -> BluetoothGattCharacteristic.PERMISSION_WRITE
             Permission.READ_WRITE -> BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE
-            Permission.NOTIFY -> BluetoothGattCharacteristic.PERMISSION_READ
+            // No permission at all: subscribing is governed by the CCCD descriptor, not by a read
+            // permission on the characteristic itself, so granting one only exposed traffic.
+            Permission.NOTIFY -> 0
         }
 
     /** True when a central should subscribe (write the CCCD) for this characteristic. */

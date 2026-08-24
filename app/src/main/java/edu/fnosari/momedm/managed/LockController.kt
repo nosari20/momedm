@@ -6,6 +6,8 @@ import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.LockState
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.ZoneId
 
 /**
@@ -71,6 +73,22 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         @Volatile private var lastApplied: Applied? = null
 
         /**
+         * Serialises [reevaluate] across every trigger.
+         *
+         * The call sites are an alarm, boot, a clock or timezone change, the launcher resuming, the
+         * pause watchdog and three lock commands — on three different dispatchers, against one
+         * process-wide [lastApplied]. Interleaved, two runs can read the same inputs, both apply, and
+         * leave [lastApplied] recording the policy of whichever finished second while the device
+         * carries the other. Every later re-evaluation then matches that cache entry and skips the
+         * apply that would have corrected it, so the device stays wrong until something else changes
+         * — the "locked screen, launchable apps" class of defect the emulator rig has caught before.
+         *
+         * Companion-scoped for the same reason as the cache: each call site builds its own
+         * LockController, so an instance field would not serialise anything.
+         */
+        private val gate = Mutex()
+
+        /**
          * Test-only: clears the in-memory apply cache between test cases so they don't leak state
          * into each other via this class's shared companion field. Never called from production code.
          */
@@ -97,7 +115,9 @@ class LockController(private val prefs: ManagedPrefs, private val actions: LockA
         reevaluate()
     }
 
-    suspend fun reevaluate() {
+    suspend fun reevaluate() = gate.withLock { reevaluateLocked() }
+
+    private suspend fun reevaluateLocked() {
         val now = System.currentTimeMillis()
         val zone = ZoneId.systemDefault()
         val schedule = prefs.lockSchedule.first()

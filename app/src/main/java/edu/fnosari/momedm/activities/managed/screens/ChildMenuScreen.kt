@@ -56,6 +56,8 @@ fun ChildMenuScreen(vm: ManagedViewModel, onPause: () -> Unit) {
     val link by vm.linkState.collectAsState()
     val controllerId by vm.controllerId.collectAsState()
     val pauseLeft by vm.pauseRemainingMs.collectAsState()
+    val menuAuthed by vm.menuAuthed.collectAsState()
+    val pinSet by vm.pinSet.collectAsState()
     val version = remember { getAppVersion(context)?.versionName ?: "?" }
 
     // Back closes the menu. Without this the gesture falls through to a launcher that deliberately
@@ -142,16 +144,35 @@ fun ChildMenuScreen(vm: ManagedViewModel, onPause: () -> Unit) {
             }
         }
 
-        // Only offered while child mode is on and not already paused — pausing an unrestricted phone
-        // would mean nothing, and the launcher's own banner already handles an active pause.
-        if (config?.on == true && pauseLeft <= 0L) {
-            Button(onClick = onPause, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.menu_pause)) }
+        // Everything above is information, and is shown to whoever opens the menu. What follows
+        // changes the phone, so it needs the PIN.
+        //
+        // When no PIN exists the menu opens on a long-press alone, which is the recovery path for a
+        // family that never set one — but it must not also be a way out of the rules. So the actions
+        // appear either to someone who proved the PIN, or, when there is no PIN to prove, only while
+        // the phone is not actually restricted. A child on a locked or child-mode phone sees the
+        // explanation and nothing to press.
+        val restricted = config?.on == true || lock?.locked == true
+        val mayAct = menuAuthed || (!pinSet && !restricted)
+
+        if (mayAct) {
+            // Only offered while child mode is on and not already paused — pausing an unrestricted
+            // phone would mean nothing, and the launcher's banner already handles an active pause.
+            if (config?.on == true && pauseLeft <= 0L) {
+                Button(onClick = onPause, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.menu_pause)) }
+            }
+            OutlinedButton(
+                onClick = { context.startActivity(Intent(context, RepairScanActivity::class.java)) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(stringResource(R.string.repair_open)) }
+        } else {
+            Text(
+                stringResource(if (pinSet) R.string.menu_actions_need_pin else R.string.menu_actions_need_pin_unset),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        OutlinedButton(
-            onClick = { context.startActivity(Intent(context, RepairScanActivity::class.java)) },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.repair_open)) }
-        OutlinedButton(onClick = { vm.menuOpen.value = false }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { vm.closeMenu() }, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.menu_close))
         }
     }
