@@ -42,8 +42,10 @@ class SessionManager(
                 // That the id is self-asserted, and that every child of one parent shares a secret, is
                 // real: a sibling can knock another out of the parent's list. It costs presence in the
                 // UI, not enforcement — the evicted child keeps applying its rules locally, since none
-                // of that depends on the link. Per-device secrets, already planned in
-                // docs/architecture.md, are what actually closes it. Pinned by
+                // of that depends on the link. Per-device secrets would close it, and have been
+                // deliberately rejected: one secret and one PIN for the whole family is the product
+                // decision (docs/architecture.md, Known limitations). So this is a consequence to
+                // live with, not a bug awaiting a fix. Pinned by
                 // SessionManagerTest.duplicateDeviceIdDisconnectsOlderLink.
                 sessions.values.filter { it.key != key && it.endpoint.deviceId == hello.deviceId }.forEach { transport.disconnect(it.key) }
                 events.onAuthenticated(key, hello)

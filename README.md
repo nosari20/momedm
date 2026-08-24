@@ -308,8 +308,10 @@ than useless:
   else — verified on hardware.
 - **A night lock cannot currently be ended remotely** — only by the parent PIN on
   the child's phone, or by waiting for the window to close.
-- **One shared secret per parent**, not per child. Compromising one child's phone
-  exposes the others until the parent regenerates the secret and re-enrols.
+- **One shared secret and one PIN for the whole family**, not one per child. That
+  is deliberate — a parent should not have to track which code belongs to which
+  phone — but it means that extracting the secret from one child's phone exposes
+  the others, until the parent regenerates it and re-enrols them all.
 - **No silent app installation.** The parent can open a Play listing on the
   child's phone; someone still has to tap Install. Silent installation requires
   being a registered enterprise EMM.

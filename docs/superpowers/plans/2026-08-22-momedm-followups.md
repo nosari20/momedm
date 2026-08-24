@@ -3,7 +3,7 @@
 Deferred minors and parked findings from the per-task and final code reviews of branch `feature/momedm-v1`. None blocks on-device testing; triage before v1.1.
 
 ## Parked (real, deferred with ruling)
-- Final: Ruling (PARKED, spec-level): I6 single fleet-wide secret kept for v1, documented in README limitations; per-device secrets planned — cost if wrong: one extracted secret compromises fleet until regenerate+re-provision.
+- Final: Ruling (CLOSED, 2026-08-24): I6 single fleet-wide secret is now the settled product decision, not a v1 compromise — one secret and one PIN for the whole family, because a parent tracking a code per child is worse than the risk it removes. Per-device secrets will not be built. Cost accepted and documented in README limitations and docs/architecture.md: one extracted secret compromises the fleet until regenerate + re-provision.
 - Final: parked — BLEClient.reportConnectedOnce check-then-set non-atomic vs MTU watchdog (µs window) — Ruling: real but negligible; synchronize in a follow-up — cost: rare double onConnected → re-handshake.
 - Final: parked — PolicyManager.openPlay prefs read outside runCatching (non-IOException DataStore failure would crash service) — Ruling: real, deferred; same shape as openAddAccount — cost: crash on corrupt-store edge.
 - Final: parked — second onServicesDiscovered orphans first MTU watchdog (guarded by _connectedReported) — Ruling: deferred — cost: redundant CCCD enqueue.

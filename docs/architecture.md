@@ -271,9 +271,21 @@ menu, so the check is inconclusive there).
 
 ## Known limitations
 
-- v1 uses one shared secret for all devices provisioned by a controller;
-  compromise of one device's secret exposes the fleet until `Regenerate secret`
-  + re-provisioning. Per-device secrets are planned.
+- **One shared secret for every device a controller provisions — a decision, not
+  a gap.** Per-device secrets were considered and rejected: they would mean a
+  parent tracking which code belongs to which child, and a different recovery
+  story per device, in an app whose whole premise is that a parent should not have
+  to think about key management. The cost is real and worth stating plainly:
+  extracting the secret from one child's phone exposes every sibling until the
+  parent uses `Regenerate secret` and re-enrols them all. The same applies to the
+  parent PIN, which is pushed to every child.
+
+  Two consequences follow from it rather than being separate faults. A child can
+  authenticate while claiming a sibling's `deviceId`, taking that sibling out of
+  the parent's list (it does not affect what the sibling enforces — that is all
+  local). And any child that can read its own storage can impersonate any other.
+  Both are bounded by physical access to a child's phone, which is also the point
+  at which a factory reset removes the app entirely.
 - No silent Play install: `INSTALL` opens the Play listing for the user to
   tap Install — a custom (non-registered-EMM) DPC cannot install silently.
 - Usage access (for `currentApp` in `STATUS`) is optional and skippable
