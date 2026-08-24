@@ -147,12 +147,21 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     private var pinFailures = 0
     private var pauseJob: Job? = null
     private var pinLockJob: Job? = null
+    /**
+     * The read that restores the persisted lockout.
+     *
+     * [tryPin] joins it before deciding anything: until it completes, pinFailures and the deadline
+     * are still 0, so an attempt landing in that window would be judged against no history at all.
+     * The launcher is recreated with CLEAR_TASK on every LockController apply, so fresh ViewModels
+     * are routine rather than rare.
+     */
+    private var lockoutRestore: Job? = null
     private var refreshJob: Job? = null
 
     init {
         // The lockout survives process death: restore it before the first tryPin can run, or
         // force-stopping the launcher would reset the brute-force backoff to zero every time.
-        viewModelScope.launch {
+        lockoutRestore = viewModelScope.launch {
             pinFailures = prefs.pinFailures.first()
             pinLockDeadline = prefs.pinLockUntil.first()
             if (pinLockDeadline > System.currentTimeMillis()) startPinLockTicker()
@@ -245,6 +254,7 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
      * be reset by killing the launcher. Neither the clear PIN nor its hash is stored or logged here.
      */
     fun tryPin(pin: String) { viewModelScope.launch {
+        lockoutRestore?.join()
         if (System.currentTimeMillis() < pinLockDeadline) return@launch
         if (policy.verifyPin(pin)) {
             pinFailures = 0; _pinError.value = null; pinLockDeadline = 0L; pinLockJob?.cancel(); _pinLockedRemaining.value = 0L

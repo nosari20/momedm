@@ -174,7 +174,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                                     CustomAccessibilityAction(parentMenuAction) { vm.pinDialogOpen.value = true; true },
                                 )
                             }
-                            .pointerInput(Unit) {
+                            .pointerInput(canUnlock, config.on) {
                                 detectTapGestures(
                                     onPress = { vm.headerPressed.value = true; tryAwaitRelease(); vm.headerPressed.value = false },
                                     onLongPress = { vm.pinDialogOpen.value = true },
@@ -187,7 +187,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                                     CustomAccessibilityAction(parentMenuAction) { vm.menuOpen.value = true; true },
                                 )
                             }
-                            .pointerInput(Unit) {
+                            .pointerInput(canUnlock, config.on) {
                                 detectTapGestures(
                                     onPress = { vm.headerPressed.value = true; tryAwaitRelease(); vm.headerPressed.value = false },
                                     onLongPress = { vm.menuOpen.value = true },

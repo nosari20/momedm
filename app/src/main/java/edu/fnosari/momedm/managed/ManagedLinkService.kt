@@ -195,9 +195,13 @@ class ManagedLinkService : Service() {
     }
 
     private suspend fun startLink() {
-        val secret = prefs.secretBytes()
-        if (secret == null) { Log.w(LOG_TAG, "Not provisioned; no secret"); ManagedLinkState.lastError.value = "Not provisioned"; return }
+        // Inside the try: secretBytes() decodes base64 and throws on a malformed stored value. Outside
+        // it, that became an uncaught exception on the main dispatcher — process death, START_STICKY
+        // restart, same crash, forever. A device provisioned with a bad secret could not be recovered
+        // without a factory reset.
         try {
+            val secret = prefs.secretBytes()
+            if (secret == null) { Log.w(LOG_TAG, "Not provisioned; no secret"); ManagedLinkState.lastError.value = "Not provisioned"; return }
             val deviceId = prefs.ensureDeviceId()
             val model = "${Build.MANUFACTURER} ${Build.MODEL}"
             endpoint = ManagedEndpoint(secret, deviceId, model, { frame -> sendFrame(frame) }, object : ManagedEndpoint.Listener {

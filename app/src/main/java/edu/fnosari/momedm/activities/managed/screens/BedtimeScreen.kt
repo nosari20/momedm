@@ -96,10 +96,10 @@ fun BedtimeScreen(vm: ManagedViewModel) {
                 // needs to ask it what is going on.
                 if (pinSet) Modifier
                     .semantics { contentDescription = a11y }
-                    .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
+                    .pointerInput(pinSet) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
                 else Modifier
                     .semantics { contentDescription = a11y }
-                    .pointerInput(Unit) { detectTapGestures(onLongPress = { vm.menuOpen.value = true }) },
+                    .pointerInput(pinSet) { detectTapGestures(onLongPress = { vm.menuOpen.value = true }) },
             ),
         ) {
             // Both colours are explicit on purpose: this Column sits in a bare Box, not a Surface, so

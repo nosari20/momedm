@@ -25,7 +25,8 @@ object PairingPayload {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 32 bytes, standard base64 with padding — what `Crypto.randomSecret` produces. */
-    private val SECRET_RE = Regex("^[A-Za-z0-9+/]{43}=$")
+    /** A 32-byte secret in standard base64. Public so provisioning can refuse a bad one at the door. */
+    val SECRET_RE = Regex("^[A-Za-z0-9+/]{43}=$")
 
     /**
      * Returns the identity encoded in [scanned], or null when it is not one of our pairing codes.

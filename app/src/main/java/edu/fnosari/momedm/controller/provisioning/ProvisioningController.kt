@@ -81,6 +81,10 @@ class ProvisioningController(private val context: Context, private val prefs: Co
 
     /** Starts hotspot (if mode HOTSPOT) and the APK server (unless CUSTOM_URL), then builds the QR. */
     fun start() {
+        // Tapping "Show the code" twice used to start a second local-only hotspot: the first
+        // reservation was overwritten and never released, so that hotspot stayed up until the process
+        // died. Nothing here is cheap enough to be worth doing twice.
+        if (_state.value.serverRunning || _state.value.hotspotSsid.isNotBlank()) return
         _state.update { it.copy(error = null, qrPayload = null) }
         when (_state.value.mode) {
             ControllerPrefs.MODE_HOTSPOT -> hotspot.start(

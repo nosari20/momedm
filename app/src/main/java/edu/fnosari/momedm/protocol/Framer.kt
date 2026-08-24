@@ -41,7 +41,10 @@ object Framer {
  * once full, the globally least-recently-active partial is evicted to make room for a new one.
  */
 class Reassembler(private val timeoutMs: Long = 10_000) {
-    private class Partial(val count: Int, var startedAt: Long) { val chunks = HashMap<Int, String>() }
+    private class Partial(val count: Int, var startedAt: Long) {
+        val chunks = HashMap<Int, String>()
+        var bytes = 0
+    }
     private val partials = LinkedHashMap<Int, Partial>()
 
     fun feed(frame: String, nowMs: Long): String? {
@@ -56,6 +59,14 @@ class Reassembler(private val timeoutMs: Long = 10_000) {
             p.startedAt = nowMs
         }
         if (partials[f.msgId] !== p) return null // evicted just now to respect MAX_PARTIALS
+
+        // MAX_PARTIALS bounds how many messages are tracked, not how large they are: sixteen partials
+        // of arbitrary length is still unbounded memory from a peer that never completes any of them.
+        // Count the bytes too, and drop a partial that outgrows what a real message could ever need.
+        val added = f.chunk.length - (p.chunks[f.index]?.length ?: 0)
+        if (p.bytes + added > MAX_PARTIAL_BYTES) { partials.remove(f.msgId); return null }
+        p.bytes += added
+
         p.chunks[f.index] = f.chunk
         if (p.chunks.size < p.count) return null
         partials.remove(f.msgId)
@@ -65,5 +76,12 @@ class Reassembler(private val timeoutMs: Long = 10_000) {
     companion object {
         /** Upper bound on concurrently-tracked incomplete messages, to cap memory before a peer authenticates. */
         const val MAX_PARTIALS = 16
+
+        /**
+         * Upper bound on one incomplete message. The largest thing this protocol really sends is an
+         * app list or a managed-configuration schema — tens of KB at the very most — so 256 KB is
+         * generous for anything legitimate and still bounded for anything that is not.
+         */
+        const val MAX_PARTIAL_BYTES = 256 * 1024
     }
 }

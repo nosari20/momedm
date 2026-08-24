@@ -27,13 +27,26 @@ class SafetyManager(private val context: Context, private val dpm: DevicePolicyM
     companion object {
         private const val LOG_TAG = "SafetyManager"
 
+        /** Deepest nesting a real managed configuration uses, with room to spare. */
+        private const val MAX_DEPTH = 4
+
         /**
          * Converts one app's managed configuration to a [Bundle], total and explicit: booleans, ints,
          * strings and string arrays are carried across, anything else is skipped with a warning rather
          * than crashing on a value a peer sent.
          */
-        fun toBundle(config: JsonObject): Bundle {
+        fun toBundle(config: JsonObject): Bundle = toBundle(config, 0)
+
+        /**
+         * [depth] stops a peer's nesting from becoming our stack.
+         *
+         * A managed-configuration bundle is a group inside a list inside a bundle at worst — three
+         * levels. A deeply nested object from a peer would otherwise recurse until the process died,
+         * and a StackOverflowError is not something the runCatching around apply() can save.
+         */
+        private fun toBundle(config: JsonObject, depth: Int): Bundle {
             val b = Bundle()
+            if (depth > MAX_DEPTH) { Log.w(LOG_TAG, "Dropping settings nested deeper than $MAX_DEPTH"); return b }
             for ((key, value) in config) {
                 when {
                     value is JsonPrimitive && value.booleanOrNull != null -> b.putBoolean(key, value.booleanOrNull!!)
@@ -44,9 +57,9 @@ class SafetyManager(private val context: Context, private val dpm: DevicePolicyM
                     // Nested groups and lists of groups: the shape apps use for a list of servers,
                     // bookmarks and the like. Without these, such a setting could be shown but never
                     // written, which is worse than not offering it.
-                    value is JsonObject -> b.putBundle(key, toBundle(value))
+                    value is JsonObject -> b.putBundle(key, toBundle(value, depth + 1))
                     value is JsonArray && value.all { it is JsonObject } ->
-                        b.putParcelableArray(key, value.map { toBundle(it as JsonObject) }.toTypedArray())
+                        b.putParcelableArray(key, value.map { toBundle(it as JsonObject, depth + 1) }.toTypedArray())
                     else -> Log.w(LOG_TAG, "Skipping unsupported value for $key")
                 }
             }

@@ -13,6 +13,9 @@ class HotspotManager(context: Context) {
     private var reservation: WifiManager.LocalOnlyHotspotReservation? = null
 
     fun start(onReady: (ssid: String, pass: String) -> Unit, onFailed: (reason: String) -> Unit) {
+        // Belt and braces with ProvisioningController.start()'s own guard: overwriting a live
+        // reservation leaks the hotspot it was holding, and only process death releases it.
+        if (reservation != null) { Log.d(LOG_TAG, "Hotspot already reserved; ignoring start"); return }
         try {
             wifi.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
                 override fun onStarted(r: WifiManager.LocalOnlyHotspotReservation) {

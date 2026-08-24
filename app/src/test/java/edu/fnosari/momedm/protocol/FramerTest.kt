@@ -61,4 +61,17 @@ class FramerTest {
         // The most recently added (msgId 16) is still tracked and completes normally.
         assertEquals("AB", r.feed(firstChunks[16][1], 18L))
     }
+
+    @Test fun reassemblerCapsTheSizeOfOnePartial() {
+        // MAX_PARTIALS bounds how MANY messages are tracked; without a byte budget a single message
+        // that never completes could still grow without limit.
+        val r = Reassembler()
+        val payload = "x".repeat(Reassembler.MAX_PARTIAL_BYTES + 64 * 1024)
+        val frames = Framer.split(1, payload, 32 * 1024)
+        var out: String? = null
+        for ((t, f) in frames.withIndex()) out = r.feed(f, t.toLong())
+        // The partial is dropped once it outgrows the budget, so the message never assembles — rather
+        // than the reassembler holding every byte a peer cares to send.
+        assertNull(out)
+    }
 }
