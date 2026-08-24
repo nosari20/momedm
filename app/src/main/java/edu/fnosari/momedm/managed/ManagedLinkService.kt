@@ -49,6 +49,9 @@ class ManagedLinkService : Service() {
         /** Tear the current link down and rebuild it from persisted prefs (new secret / re-provisioning). */
         const val EXTRA_RESTART = "restart"
         private const val STATUS_PERIOD_MS = 5 * 60_000L
+        /** How long a connected peer has to complete the handshake before we give up on it. */
+        private const val AUTH_TIMEOUT_MS = 8_000L
+
         /** Sealed PING cadence while authenticated: bounds how long a dead session goes unnoticed. */
         private const val KEEPALIVE_PERIOD_MS = 60_000L
         private const val BACKOFF_MIN_MS = 2_000L
@@ -169,6 +172,28 @@ class ManagedLinkService : Service() {
         super.onDestroy()
     }
 
+    /**
+     * Drops a connection that never authenticates, and moves on.
+     *
+     * The scanner takes the first advertiser carrying our service UUID, which is a public 128-bit
+     * constant — anything can advertise it. Without this, a peripheral that accepts the connection and
+     * then simply says nothing holds the link open indefinitely: the child stays CONNECTED, never
+     * AUTHENTICATED, and never scans again, so the real parent can no longer be found. Silence is the
+     * whole attack, and it needs no credentials.
+     */
+    private val authWatchdog = Runnable {
+        if (endpoint?.authenticated != true) {
+            Log.w(LOG_TAG, "Peer did not authenticate in time; dropping and rescanning")
+            ManagedLinkState.lastError.value = "peer did not authenticate"
+            statusJob?.cancel(); endpoint?.reset(); client?.disconnect(); scheduleRescan()
+        }
+    }
+
+    private fun armAuthWatchdog() {
+        main.removeCallbacks(authWatchdog)
+        main.postDelayed(authWatchdog, AUTH_TIMEOUT_MS)
+    }
+
     private suspend fun startLink() {
         val secret = prefs.secretBytes()
         if (secret == null) { Log.w(LOG_TAG, "Not provisioned; no secret"); ManagedLinkState.lastError.value = "Not provisioned"; return }
@@ -193,8 +218,14 @@ class ManagedLinkService : Service() {
             })
             client = BLEClient(this, serverName = null, servicesToListen = listOf(gatt), callBack = object : BLEClient.BLEClientCallBack {
                 override fun onMtuChanged(mtu: Int) { this@ManagedLinkService.mtu = mtu }
-                override fun onConnected() { Log.d(LOG_TAG, "Connected, mtu=$mtu"); setState(LinkState.CONNECTED); endpoint?.onConnected(mtu) }
-                override fun onDisconnected() { Log.d(LOG_TAG, "Disconnected"); statusJob?.cancel(); endpoint?.reset(); scheduleRescan() }
+                override fun onConnected() {
+                    Log.d(LOG_TAG, "Connected, mtu=$mtu"); setState(LinkState.CONNECTED); endpoint?.onConnected(mtu)
+                    armAuthWatchdog()
+                }
+                override fun onDisconnected() {
+                    Log.d(LOG_TAG, "Disconnected"); statusJob?.cancel(); endpoint?.reset()
+                    main.removeCallbacks(authWatchdog); scheduleRescan()
+                }
                 override fun onWriteFailed(characteristic: android.bluetooth.BluetoothGattCharacteristic, status: Int) {
                     // The controller rejected our frame: it no longer holds a session for this link (e.g. its
                     // GATT server restarted). Notifications would not reach us on this stale link, so drop it

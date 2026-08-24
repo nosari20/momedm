@@ -62,6 +62,8 @@
     <string name="launcher_greeting_evening">Good evening!</string>
     <string name="launcher_relock">Lock again</string>
     <string name="launcher_lock_cd">Parent unlock</string>
+    <string name="launcher_parent_menu_action">Open the parent menu</string>
+    <string name="launcher_some_hidden">%1$d more apps are on this phone. A parent chose which ones to show.</string>
     <string name="launcher_no_apps">No app allowed yet. Ask a parent.</string>
     <string name="launcher_no_apps_installed">No app found</string>
     <string name="launcher_online">Connected to parent</string>

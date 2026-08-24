@@ -33,6 +33,8 @@ internal class FrameLayer(private val sink: FrameSink, private val clock: () -> 
  * and the session state (handshake progress, secure channel, sequence numbers, reassembly buffers) is
  * plain mutable state that must not be touched concurrently.
  */
+private const val REHELLO_MIN_GAP_MS = 10_000L
+
 class ManagedEndpoint(
     private val secret: ByteArray,
     private val deviceId: String,
@@ -47,12 +49,15 @@ class ManagedEndpoint(
         fun onProtocolError(reason: String)
     }
     private val frames = FrameLayer(sink, clock)
+    private val now = clock
     private var handshake: ManagedHandshake? = null
     private var channel: SecureChannel? = null
     /** True only once the controller's sealed AUTH_OK has been verified — not merely after we sent our AUTH. */
     private var confirmed = false
     /** MTU of the current link (0 = [onConnected] never called); reused when the controller asks for a REHELLO. */
     private var linkMtu = 0
+    /** When the last REHELLO was honoured, so a peer cannot use them to hold the link in handshake. */
+    private var lastRehelloAt = 0L
     val authenticated: Boolean get() = confirmed
 
     /** Call once the link is up and MTU known: resets state and sends HELLO. */
@@ -67,10 +72,22 @@ class ManagedEndpoint(
 
     @Synchronized fun onFrame(frame: String) {
         val env = try { frames.receive(frame) } catch (e: Exception) { reset(); listener.onProtocolError("bad frame: ${e.message}"); return } ?: return
-        // Controller lost its session state for this link (e.g. its GATT server restarted while the BLE link
-        // stayed up) and asks us to start over. Only honoured once we have a link (onConnected was called);
-        // the worst an impostor on the same link could do is force a re-handshake.
-        if (env.seq == 0L && linkMtu > 0 && isPlainRehello(env)) { onConnected(linkMtu); return }
+        // Controller lost its session state for this link (e.g. its GATT server restarted while the BLE
+        // link stayed up) and asks us to start over. It arrives unauthenticated by necessity — the
+        // sender has no session to sign with — so it is bounded in two ways rather than trusted.
+        //
+        // It must still be honoured on a *confirmed* session — that is the case it exists for, and
+        // EndpointLoopbackTest.controllerSessionLossRecoversViaRehello pins it: the controller has
+        // lost its state while this side still believes it is authenticated, and only a re-handshake
+        // resyncs them. What is bounded instead is the rate: at most one per REHELLO_MIN_GAP_MS, so a
+        // peer that can write to this link can cost us one re-handshake now and then rather than hold
+        // the device permanently unauthenticated by repeating it.
+        if (env.seq == 0L && linkMtu > 0 && isPlainRehello(env)) {
+            val t = now()
+            if (lastRehelloAt != 0L && t - lastRehelloAt < REHELLO_MIN_GAP_MS) return
+            lastRehelloAt = t
+            onConnected(linkMtu); return
+        }
         val ch = channel
         if (ch == null) {
             val hs = handshake ?: run { reset(); listener.onProtocolError("message before HELLO"); return }

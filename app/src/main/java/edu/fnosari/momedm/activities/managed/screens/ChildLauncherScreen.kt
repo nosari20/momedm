@@ -9,6 +9,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.ui.draw.alpha
@@ -85,6 +88,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     val showPin by vm.pinDialogOpen.collectAsState()
     val childName by vm.childName.collectAsState()
     val naming by vm.namingOpen.collectAsState()
+    val hidden by vm.hiddenApps.collectAsState()
     val paused = pauseLeft > 0L
     val context = LocalContext.current
     val connected = link == LinkState.AUTHENTICATED
@@ -151,6 +155,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
             // Header — long-press anywhere on it reveals the parent PIN pad (kids can't discover it by sight).
             val headerA11y = stringResource(R.string.launcher_lock_cd)
+            val parentMenuAction = stringResource(R.string.launcher_parent_menu_action)
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -163,7 +168,12 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                         // onPress holds the pinned-app bounce off for as long as the finger is down, so
                         // the long-press can be completed at leisure instead of raced against a grace period.
                         if (canUnlock) Modifier
-                            .semantics { contentDescription = headerA11y }
+                            .semantics {
+                                contentDescription = headerA11y
+                                customActions = listOf(
+                                    CustomAccessibilityAction(parentMenuAction) { vm.pinDialogOpen.value = true; true },
+                                )
+                            }
                             .pointerInput(Unit) {
                                 detectTapGestures(
                                     onPress = { vm.headerPressed.value = true; tryAwaitRelease(); vm.headerPressed.value = false },
@@ -171,7 +181,12 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                                 )
                             }
                         else if (config.on) Modifier
-                            .semantics { contentDescription = headerA11y }
+                            .semantics {
+                                contentDescription = headerA11y
+                                customActions = listOf(
+                                    CustomAccessibilityAction(parentMenuAction) { vm.menuOpen.value = true; true },
+                                )
+                            }
                             .pointerInput(Unit) {
                                 detectTapGestures(
                                     onPress = { vm.headerPressed.value = true; tryAwaitRelease(); vm.headerPressed.value = false },
@@ -262,6 +277,20 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    // Says plainly that the short grid is a choice someone made, not a fault. Only
+                    // when apps are genuinely hidden — on a phone with nothing held back it would be
+                    // a reminder of restriction where there is none.
+                    if (hidden > 0) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                stringResource(R.string.launcher_some_hidden, hidden),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                            )
+                        }
+                    }
                     itemsIndexed(apps, key = { _, a -> a.pkg }) { index, app ->
                         // The grid arrives rather than appears: each tile fades and lifts in, a beat
                         // after the one before it. One-shot on first composition — nothing here runs

@@ -23,7 +23,22 @@ data class SafetyConfig(
     val appConfigs: Map<String, JsonObject> = emptyMap(),
 ) {
     /** Drops a malformed [dnsHost] rather than handing it to the platform. */
-    fun sanitized(): SafetyConfig = copy(dnsHost = dnsHost?.takeIf { isValidHostname(it) })
+    /**
+     * This config with anything a peer could have malformed removed.
+     *
+     * The link is authenticated but the peer on the other end is still untrusted input, and this is
+     * the one choke point every inbound SET_SAFETY passes through before [appConfigs] reaches
+     * `setApplicationRestrictions`. Package names are checked, and both the number of apps and the
+     * number of keys per app are bounded — an unbounded map here is written to disk by the platform
+     * and re-applied on every boot, so a single hostile message would persist.
+     */
+    fun sanitized(): SafetyConfig = copy(
+        dnsHost = dnsHost?.takeIf { isValidHostname(it) },
+        appConfigs = appConfigs
+            .filterKeys { PKG_RE.matches(it) }
+            .filterValues { it.size <= MAX_KEYS_PER_APP }
+            .entries.take(MAX_APPS).associate { it.toPair() },
+    )
 
     /**
      * This config with [level]'s preset applied, keeping whatever the parent set by hand.
@@ -43,6 +58,12 @@ data class SafetyConfig(
 
     companion object {
         const val CHROME_PKG = "com.android.chrome"
+
+        /** A conservative Android package name. */
+        private val PKG_RE = Regex("""^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$""")
+        /** Generous next to a real preset (one app, six keys) and far below anything that could hurt. */
+        private const val MAX_APPS = 32
+        private const val MAX_KEYS_PER_APP = 128
 
         /**
          * The preset for [level], as managed configuration for the apps that support it.

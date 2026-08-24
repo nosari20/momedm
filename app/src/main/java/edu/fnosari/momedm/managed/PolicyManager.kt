@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
@@ -178,9 +179,18 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * would silently mean no emergency route at all.
      */
     fun emergencyDialerPackage(): String? = runCatching {
+        // MATCH_SYSTEM_ONLY, and the flags are checked again on what comes back. Whatever this
+        // returns gets added to the lock-task allowlist and can therefore be launched from a
+        // completely locked phone; an ordinary installed app that happened to declare the emergency
+        // dial action would otherwise become a way out of the lock.
         context.packageManager
-            .resolveActivity(Intent(EMERGENCY_DIAL_ACTION), PackageManager.ResolveInfoFlags.of(0))
-            ?.activityInfo?.packageName
+            .resolveActivity(
+                Intent(EMERGENCY_DIAL_ACTION),
+                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_SYSTEM_ONLY.toLong()),
+            )
+            ?.activityInfo
+            ?.takeIf { it.applicationInfo.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0 }
+            ?.packageName
     }.getOrNull()
 
     /**

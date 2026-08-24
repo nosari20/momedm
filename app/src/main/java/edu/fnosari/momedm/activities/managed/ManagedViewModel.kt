@@ -125,6 +125,15 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
         LockState.evaluate(schedule, manual, config.pauseUntil, System.currentTimeMillis(), ZoneId.systemDefault())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    private val _hiddenApps = MutableStateFlow(0)
+    /**
+     * How many installed apps the allowlist is currently keeping off the grid.
+     *
+     * Shown to the child, because "my parent chose this" and "my phone is broken" look identical from
+     * a short grid, and only one of those is worth being upset about.
+     */
+    val hiddenApps: StateFlow<Int> = _hiddenApps
+
     private val _apps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val launcherApps: StateFlow<List<LauncherApp>> = _apps
     private val _pauseRemaining = MutableStateFlow(0L)
@@ -183,7 +192,8 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
                     .filter { it.activityInfo.packageName != getApplication<Application>().packageName }
                     .map { LauncherApp(it.activityInfo.packageName, it.loadLabel(pm).toString(), runCatching { it.loadIcon(pm) }.getOrNull()) }
                     .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }
-                if (locked) all.filter { it.pkg in c.apps } else all
+                if (locked) all.filter { it.pkg in c.apps }.also { _hiddenApps.value = all.size - it.size }
+                else all.also { _hiddenApps.value = 0 }
             }
         }
     }
