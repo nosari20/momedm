@@ -54,6 +54,19 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
      * known yet": no tiles, no bounce, no resume.
      */
     val kioskConfig: StateFlow<KioskConfig?> = prefs.kioskConfig.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    /**
+     * The name the child chose for themselves, or blank.
+     *
+     * Local to this phone: it is not in ChildPrefs, never crosses the link, and never appears in the
+     * parent's app. The parent decides the rules; this is the one thing the child decides.
+     */
+    val childName: StateFlow<String> = prefs.childName.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    /** True while the child is editing their name. */
+    val namingOpen = MutableStateFlow(false)
+
+    fun setChildName(name: String) { viewModelScope.launch { prefs.setChildName(name); namingOpen.value = false } }
+
     val pinSet: StateFlow<Boolean> = prefs.childPrefs.map { it.pinHash != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**

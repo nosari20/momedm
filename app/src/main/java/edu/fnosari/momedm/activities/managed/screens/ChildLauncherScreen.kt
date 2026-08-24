@@ -1,7 +1,19 @@
 package edu.fnosari.momedm.activities.managed.screens
 
 import android.content.Intent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.ui.draw.alpha
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,6 +83,8 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     val pinError by vm.pinError.collectAsState()
     val pinLockedRemaining by vm.pinLockedRemainingMs.collectAsState()
     val showPin by vm.pinDialogOpen.collectAsState()
+    val childName by vm.childName.collectAsState()
+    val naming by vm.namingOpen.collectAsState()
     val paused = pauseLeft > 0L
     val context = LocalContext.current
     val connected = link == LinkState.AUTHENTICATED
@@ -90,19 +104,46 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     val cal = remember(tick) { Calendar.getInstance() }
     val hour = cal.get(Calendar.HOUR_OF_DAY)
     val clock = remember(tick) { String.format(Locale.getDefault(), "%02d:%02d", hour, cal.get(Calendar.MINUTE)) }
-    val greeting = when {
-        hour < 12 -> R.string.launcher_greeting_morning
-        hour < 18 -> R.string.launcher_greeting_afternoon
-        else -> R.string.launcher_greeting_evening
+    // The name goes inside the time-of-day greeting rather than replacing it: a bare "Hi Max!" at
+    // eleven at night reads oddly, and the hour is half of what makes the greeting feel like a person
+    // rather than a label.
+    val greetingText = if (childName.isBlank()) {
+        stringResource(
+            when {
+                hour < 12 -> R.string.launcher_greeting_morning
+                hour < 18 -> R.string.launcher_greeting_afternoon
+                else -> R.string.launcher_greeting_evening
+            },
+        )
+    } else {
+        stringResource(
+            when {
+                hour < 12 -> R.string.launcher_greeting_morning_named
+                hour < 18 -> R.string.launcher_greeting_afternoon_named
+                else -> R.string.launcher_greeting_evening_named
+            },
+            childName,
+        )
     }
 
     // Soft accent gradient (accent-tinted primaryContainer fading into the themed background), calm in
     // both light and dark because it is built from theme roles rather than fixed colors.
+    // One very faint layer of time of day over the parent's chosen accent — warm early, neutral
+    // through the day, cool in the evening. Felt rather than looked at, and deliberately tied to the
+    // clock and nothing else: it is identical whether the child has been cooperative or is mid-
+    // argument, so it can never read as a reward or a telling-off. Rides the 30s tick already running.
+    val mood = when {
+        hour < 11 -> Color(0xFFFFB067)
+        hour < 17 -> Color.Transparent
+        else -> Color(0xFF8E86D6)
+    }
+    // Tint the accent itself and keep the original translucency: compositing over the background
+    // first makes the top of the screen opaque and much darker, which is what the accent's 45% alpha
+    // was avoiding in the first place.
+    val top = if (mood == Color.Transparent) MaterialTheme.colorScheme.primaryContainer
+              else lerp(MaterialTheme.colorScheme.primaryContainer, mood, 0.18f)
     val gradient = Brush.verticalGradient(
-        listOf(
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-            MaterialTheme.colorScheme.background,
-        ),
+        listOf(top.copy(alpha = 0.45f), MaterialTheme.colorScheme.background),
     )
     val canUnlock = config.on && pinSet
 
@@ -143,15 +184,33 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
-                    Text(clock, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-                    Text(stringResource(greeting), style = MaterialTheme.typography.titleMedium)
+                    Text(clock, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground)
+                    // A plain tap belongs to the child (choose your name); the long-press stays the
+                    // parent's. Crossfade so the greeting changing at an hour boundary, or the moment a
+                    // name is saved, is a soft change rather than a flicker.
+                    Crossfade(targetState = greetingText, label = "greeting") { g ->
+                        Text(
+                            g,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.clickable { vm.namingOpen.value = true },
+                        )
+                    }
                 }
                 Spacer(Modifier.weight(1f))
+                // A single bounce when the link changes — the register of a chat app's presence dot,
+                // not a pulse that runs forever on a phone that sits on a table.
+                val dotScale = remember { Animatable(1f) }
+                LaunchedEffect(connected) {
+                    dotScale.animateTo(1.35f, tween(140)); dotScale.animateTo(1f, tween(220))
+                }
                 val dotColor = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                 val dotCd = stringResource(if (connected) R.string.launcher_online else R.string.launcher_offline)
                 Box(
                     Modifier
                         .size(14.dp)
+                        .scale(dotScale.value)
                         .clip(CircleShape)
                         .background(dotColor)
                         .semantics { contentDescription = dotCd },
@@ -181,7 +240,20 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
             if (apps.isEmpty()) {
                 val emptyText = if (config.on) R.string.launcher_no_apps else R.string.launcher_no_apps_installed
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(emptyText), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, modifier = Modifier.padding(32.dp))
+                    // Bare centred text on an empty screen reads as a crash. The same soft rounded card
+                    // the tiles use says "this is the app, working, with nothing to show yet" instead.
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.padding(32.dp),
+                    ) {
+                        Text(
+                            stringResource(emptyText),
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+                        )
+                    }
                 }
             } else {
                 LazyVerticalGrid(
@@ -190,12 +262,53 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    items(apps, key = { it.pkg }) { app ->
-                        AppTile(app = app, onClick = { vm.open(app.pkg) })
+                    itemsIndexed(apps, key = { _, a -> a.pkg }) { index, app ->
+                        // The grid arrives rather than appears: each tile fades and lifts in, a beat
+                        // after the one before it. One-shot on first composition — nothing here runs
+                        // after the screen has settled. The stagger is capped so a full grid finishes
+                        // in well under half a second instead of crawling down the screen.
+                        val enter = remember { Animatable(0f) }
+                        LaunchedEffect(app.pkg) {
+                            delay(index.coerceAtMost(6) * 45L)
+                            enter.animateTo(1f, tween(260))
+                        }
+                        AppTile(
+                            app = app,
+                            onClick = { vm.open(app.pkg) },
+                            modifier = Modifier
+                                .alpha(enter.value)
+                                .scale(0.92f + 0.08f * enter.value),
+                        )
                     }
                 }
             }
         }
+    }
+
+    if (naming) {
+        var draft by remember { mutableStateOf(childName) }
+        AlertDialog(
+            onDismissRequest = { vm.namingOpen.value = false },
+            title = { Text(stringResource(R.string.launcher_name_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.launcher_name_hint), style = MaterialTheme.typography.bodyMedium)
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it.take(20) },
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.launcher_name_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.setChildName(draft) }) { Text(stringResource(R.string.settings_dialog_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.namingOpen.value = false }) { Text(stringResource(R.string.settings_dialog_dismiss)) }
+            },
+        )
     }
 
     if (showPin) PinDialog(

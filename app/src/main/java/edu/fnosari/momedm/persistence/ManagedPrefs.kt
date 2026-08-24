@@ -35,6 +35,16 @@ class ManagedPrefs(private val p: PreferencesProvider) {
         const val KEY_LOCK_WE_START = "managed_lock_we_start"
         const val KEY_LOCK_WE_END = "managed_lock_we_end"
         const val KEY_LOCK_MANUAL = "managed_lock_manual"
+        /**
+         * The child's own name for themselves.
+         *
+         * Deliberately NOT part of [edu.fnosari.momedm.protocol.ChildPrefs]: the parent pushes theme,
+         * accent and language, and this is the one thing on the phone that travels the other way — or
+         * rather, does not travel at all. It is never sent over the link and never shown in the parent
+         * app, which is what makes it the child's: there is nothing here for a parent to approve, and
+         * nothing to take away as a consequence.
+         */
+        const val KEY_CHILD_NAME = "managed_child_name"
         const val KEY_SAFETY = "managed_safety"
     }
     val controllerId: Flow<String> = p.readString(KEY_CONTROLLER_ID, "")
@@ -69,6 +79,9 @@ class ManagedPrefs(private val p: PreferencesProvider) {
      * a manual lock is a deliberate parent act and must not be undone by the child restarting.
      */
     val manualLock: Flow<Boolean> = p.readBoolean(KEY_LOCK_MANUAL, false)
+
+    /** What the child asked to be called; blank when they have not chosen one. */
+    val childName: Flow<String> = p.readString(KEY_CHILD_NAME, "")
 
     /** Persists the controller identity (id + secret) received from the QR admin extras. */
     suspend fun saveProvisioning(controllerId: String, secretBase64: String) { p.write(KEY_CONTROLLER_ID, controllerId); p.write(KEY_SECRET, secretBase64) }
@@ -108,6 +121,9 @@ class ManagedPrefs(private val p: PreferencesProvider) {
     }
 
     suspend fun setManualLock(on: Boolean) = p.write(KEY_LOCK_MANUAL, on)
+
+    /** Stores the child's chosen name, trimmed and length-capped; blank clears it. */
+    suspend fun setChildName(name: String) = p.write(KEY_CHILD_NAME, name.trim().take(20))
 
     /**
      * The parent's content restrictions, stored as JSON because [SafetyConfig.appConfigs] is an open

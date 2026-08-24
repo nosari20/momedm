@@ -51,6 +51,12 @@
 
     <!-- Child launcher (ManagedHomeActivity: ChildLauncherScreen, PinDialog); PIN strings are managed_pin_* below -->
     <string name="launcher_paused">Mode enfant en pause · %1$s</string>
+    <string name="launcher_greeting_morning_named">Bonjour %1$s !</string>
+    <string name="launcher_greeting_afternoon_named">Salut %1$s !</string>
+    <string name="launcher_greeting_evening_named">Bonsoir %1$s !</string>
+    <string name="launcher_name_title">Comment ce téléphone doit-il t’appeler ?</string>
+    <string name="launcher_name_hint">C’est juste pour toi. Personne d’autre ne le voit, et ça ne change rien aux règles.</string>
+    <string name="launcher_name_label">Ton prénom</string>
     <string name="launcher_greeting_morning">Bonjour&#160;!</string>
     <string name="launcher_greeting_afternoon">Bon après-midi&#160;!</string>
     <string name="launcher_greeting_evening">Bonsoir&#160;!</string>
