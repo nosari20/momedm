@@ -1,74 +1,100 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 872" width="980" height="872" role="img" aria-label="Setting up a child’s phone, in six steps">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 1052" width="980" height="1052" role="img" aria-label="Setting up a child’s phone in six steps, including the three ways of getting it onto a network">
 <title>Setting up a child’s phone, in six steps</title>
-<rect x="0" y="0" width="980" height="872" rx="18" fill="#fdfaf3"/>
-<path d="M34.157484567901236,14.364811385459534 L946.5721382030179,14.779465020576131 Q966.9867918381344,15.19411865569273 967.401445473251,35.60877229080933 L967.8160991083677,840.023425925926 Q968.2307527434842,860.4380795610425 943.4454063786009,855.6527331961591 L31.860060013717423,856.0673868312757 Q12.27471364883402,856.4820404663923 12.689367283950617,836.896694101509 L13.104020919067215,33.311347736625514 Q13.518674554183814,13.726001371742113 33.93332818930041,14.140655006858712" fill="none" stroke="#2f2b28" stroke-width="2" stroke-opacity="0.35"/>
-<text x="490.0" y="66" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="30" font-weight="bold" fill="#2f2b28" text-anchor="middle">Setting up a child’s phone</text>
-<text x="490.0" y="96" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="17" fill="#7c736a" text-anchor="middle">once, at the kitchen table — about ten minutes</text>
-<path d="M108.63887860082305,150.84620541838134 L403.05353223593966,151.26085905349794 Q417.4681858710562,151.67551268861453 417.88283950617284,166.09016632373113 L418.29749314128946,278.50481995884775 Q418.71214677640603,292.9194735939643 405.12680041152265,293.33412722908093 L111.54145404663923,293.74878086419756 Q97.95610768175582,294.1634344993141 98.37076131687243,280.57808813443074 L93.58541495198902,163.79274176954732 Q94.00006858710563,150.2073954046639 108.41472222222222,150.62204903978053" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
+<rect x="0" y="0" width="980" height="1052" rx="18" fill="#fdfaf3"/>
+<path d="M34.2,14.4 L946.6,14.8 Q967.0,15.2 967.4,35.6 L967.8,1020.0 Q968.2,1040.4 943.4,1035.7 L31.9,1036.1 Q12.3,1036.5 12.7,1016.9 L13.1,33.3 Q13.5,13.7 33.9,14.1" fill="none" stroke="#2f2b28" stroke-width="2" stroke-opacity="0.35"/>
+<text x="490" y="66" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="30" font-weight="bold" fill="#2f2b28" text-anchor="middle">Setting up a child’s phone</text>
+<text x="490" y="96" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="17" fill="#7c736a" text-anchor="middle">once, at the kitchen table — about ten minutes</text>
+<path d="M108.6,150.8 L403.1,151.3 Q417.5,151.7 417.9,166.1 L418.3,278.5 Q418.7,292.9 405.1,293.3 L111.5,293.7 Q98.0,294.2 98.4,280.6 L93.6,163.8 Q94.0,150.2 108.4,150.6" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
 <text x="116" y="192" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Wipe it</text>
 <text x="116" y="224" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">Factory reset the child’s phone.</text>
 <text x="116" y="248" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">Android hands over control only</text>
 <text x="116" y="272" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">during first-time setup.</text>
 <circle cx="122" cy="150" r="17" fill="#3d7ea6" stroke="#2f2b28" stroke-width="2.4"/>
 <text x="122" y="157" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
-<path d="M577.3341272290809,153.54145404663925 L871.7487808641976,153.95610768175584 Q886.1634344993141,154.37076131687243 886.5780881344307,163.58541495198904 L881.7927417695473,276.0000685871056 Q882.2073954046639,290.4147222222222 868.6220490397806,290.82937585733885 L575.0367026748971,291.2440294924554 Q561.4513563100137,291.65868312757203 561.8660099451304,278.0733367626886 L562.2806635802469,166.48799039780522 Q562.6953172153635,152.9026440329218 577.1099708504801,153.3172976680384" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
+<path d="M577.3,153.5 L871.7,154.0 Q886.2,154.4 886.6,163.6 L881.8,276.0 Q882.2,290.4 868.6,290.8 L575.0,291.2 Q561.5,291.7 561.9,278.1 L562.3,166.5 Q562.7,152.9 577.1,153.3" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
 <text x="582" y="192" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Pick the network</text>
-<text x="582" y="224" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">On your phone, tap “+” and choose</text>
-<text x="582" y="248" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">your Wi-Fi, your phone’s own hotspot,</text>
-<text x="582" y="272" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">or a plain download link.</text>
+<text x="582" y="224" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">The child’s phone needs to reach</text>
+<text x="582" y="248" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">yours, just long enough to fetch</text>
+<text x="582" y="272" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">the app. Three ways to do it:</text>
 <circle cx="588" cy="150" r="17" fill="#3d7ea6" stroke="#2f2b28" stroke-width="2.4"/>
 <text x="588" y="157" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
-<path d="M108.82937585733882,335.0367026748971 L403.2440294924554,335.4513563100137 Q417.65868312757203,335.8660099451303 418.0733367626886,350.28066358024694 L418.4879903978052,462.6953172153635 Q418.9026440329218,477.1099708504801 405.3172976680384,477.5246244855967 L111.731951303155,477.9392781207133 Q98.14660493827161,478.3539317558299 98.5612585733882,459.5685853909465 L93.7759122085048,347.9832390260631 Q94.1905658436214,334.3978926611797 108.605219478738,334.8125462962963" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
-<text x="116" y="376" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Show the code</text>
-<text x="116" y="408" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">Your phone draws a QR code.</text>
-<text x="116" y="432" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">It carries the pairing secret —</text>
-<text x="116" y="456" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">don’t photograph it.</text>
-<circle cx="122" cy="334" r="17" fill="#3d7ea6" stroke="#2f2b28" stroke-width="2.4"/>
-<text x="122" y="341" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
-<path d="M577.5246244855967,337.73195130315503 L871.9392781207133,338.1466049382716 Q886.3539317558299,338.5612585733882 881.5685853909465,347.7759122085048 L881.9832390260631,460.1905658436214 Q882.3978926611798,474.605219478738 868.8125462962963,475.0198731138546 L575.2271999314129,475.43452674897117 Q561.6418535665294,475.8491803840878 562.0565072016461,462.2638340192044 L562.4711608367627,350.678487654321 Q562.8858144718793,337.0931412894376 577.3004681069959,337.50779492455416" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
-<text x="582" y="376" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Tap six times</text>
-<text x="582" y="408" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">On the wiped phone, tap the first</text>
-<text x="582" y="432" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">welcome screen six times.</text>
-<text x="582" y="456" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">A scanner opens.</text>
-<circle cx="588" cy="334" r="17" fill="#4f8a5b" stroke="#2f2b28" stroke-width="2.4"/>
-<text x="588" y="341" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
-<path d="M109.0198731138546,519.2271999314129 L403.43452674897117,519.6418535665294 Q417.8491803840878,520.0565072016461 418.2638340192044,534.4711608367627 L418.678487654321,646.8858144718793 Q419.0931412894376,661.3004681069959 405.50779492455416,661.7151217421125 L111.92244855967078,662.1297753772291 Q98.33710219478738,662.5444290123456 93.55175582990398,643.7590826474623 L93.96640946502058,532.1737362825788 Q94.38106310013717,518.5883899176955 108.79571673525378,519.0030435528121" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
-<text x="116" y="560" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Scan it</text>
-<text x="116" y="592" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">The child’s phone downloads the app</text>
-<text x="116" y="616" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">from your phone and installs itself</text>
-<text x="116" y="640" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">as the device owner.</text>
-<circle cx="122" cy="518" r="17" fill="#4f8a5b" stroke="#2f2b28" stroke-width="2.4"/>
-<text x="122" y="525" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
-<path d="M577.7151217421125,521.9224485596708 L872.1297753772291,522.3371021947873 Q886.5444290123456,517.551755829904 881.7590826474623,531.9664094650205 L882.1737362825788,644.3810631001372 Q882.5883899176955,658.7957167352538 869.0030435528121,659.2103703703704 L575.4176971879286,659.6250240054869 Q561.8323508230453,660.0396776406036 562.2470044581619,646.4543312757202 L562.6616580932784,534.8689849108367 Q563.076311728395,521.2836385459534 577.4909653635117,521.69829218107" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
-<text x="582" y="560" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">That’s it</text>
-<text x="582" y="592" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">The two phones find each other and</text>
-<text x="582" y="616" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">pair. From here the rules hold, with</text>
-<text x="582" y="640" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">or without you nearby.</text>
-<circle cx="588" cy="518" r="17" fill="#4f8a5b" stroke="#2f2b28" stroke-width="2.4"/>
-<text x="588" y="525" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
-<path d="M424,222.0 Q489.9,237.1 554,222.0" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M554,222.0 L544.5,230.9" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M554,222.0 L541.5,218.3" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M723.0,300 Q512.7,341.3 297.0,324" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M297.0,324 L308.7,318.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M297.0,324 L307.7,331.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M424,406.0 Q490.4,421.6 554,406.0" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M554,406.0 L544.6,415.0" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M554,406.0 L541.5,402.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M723.0,484 Q513.2,525.8 297.0,508" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M297.0,508 L308.8,502.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M297.0,508 L307.7,515.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M424,590.0 Q490.9,606.1 554,590.0" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M554,590.0 L544.7,599.1" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<path d="M554,590.0 L541.5,586.5" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
-<text x="490.0" y="706" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#4f8a5b" text-anchor="middle">Bluetooth — no cloud, no account, no subscription</text>
-<path d="M360.50424211248287,746.7115689300412 L402.91889574759944,747.1262225651577 Q413.33354938271606,747.5408762002744 413.7482030178326,757.955529835391 L414.16285665294924,830.3701834705075 Q414.57751028806587,840.7848371056241 404.99216392318243,841.1994907407408 L363.40681755829905,841.6141443758573 Q353.8214711934156,842.0287980109739 354.23612482853224,832.4434516460906 L349.4507784636488,755.6581052812071 Q349.86543209876544,746.0727589163238 360.280085733882,746.4874125514403" fill="#ffffff" stroke="#2f2b28" stroke-width="2.4"/>
-<path d="M363.5973148148148,761.8046416323731 L406.01196844993143,762.2192952674897 Q410.426622085048,757.4339489026063 405.64127572016463,761.8486025377229 L406.0559293552812,822.2632561728395 Q406.4705829903978,826.6779098079561 402.8852366255144,827.0925634430727 L361.299890260631,827.5072170781893 Q357.7145438957476,827.9218707133059 358.1291975308642,824.3365243484225 L358.5438511659808,764.7511779835392 Q358.9585048010974,761.1658316186557 363.373158436214,761.5804852537723" fill="#3d7ea6" fill-opacity="0.13" stroke="#3d7ea6" stroke-width="1.6"/>
-<line x1="376.0" y1="754" x2="390.0" y2="754.6" stroke="#2f2b28" stroke-width="2" stroke-linecap="round"/>
-<text x="383.0" y="862" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="15" fill="#7c736a" text-anchor="middle">parent’s phone</text>
-<path d="M576.5438511659808,748.7511779835392 L618.9585048010974,749.1658316186557 Q629.373158436214,749.5804852537723 629.7878120713306,759.9951388888888 L630.2024657064472,832.4097925240055 Q625.4171193415638,837.624446159122 615.8317729766804,838.0390997942387 L574.246426611797,838.4537534293553 Q564.6610802469136,838.8684070644719 565.0757338820301,829.2830606995885 L565.4903875171468,757.6977143347051 Q565.9050411522634,748.1123679698217 576.31969478738,748.5270216049382" fill="#ffffff" stroke="#2f2b28" stroke-width="2.4"/>
-<path d="M574.4369238683128,758.644250685871 L616.8515775034293,759.0589043209876 Q621.266231138546,759.4735579561043 621.6808847736626,763.8882115912209 L622.0955384087791,824.3028652263374 Q622.5101920438957,828.7175188614541 618.9248456790124,829.1321724965707 L577.339499314129,829.5468261316872 Q573.7541529492455,829.9614797668038 574.1688065843622,826.3761334019205 L574.5834602194788,761.590787037037 Q569.7981138545954,758.0054406721537 574.212767489712,758.4200943072702" fill="#4f8a5b" fill-opacity="0.13" stroke="#4f8a5b" stroke-width="1.6"/>
-<line x1="590.0" y1="754" x2="604.0" y2="754.6" stroke="#2f2b28" stroke-width="2" stroke-linecap="round"/>
-<text x="597.0" y="862" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="15" fill="#7c736a" text-anchor="middle">child’s phone</text>
-<path d="M420,782 Q490,742 560,782" fill="none" stroke="#4f8a5b" stroke-width="2.4" stroke-dasharray="7 8" stroke-linecap="round"/>
+<path d="M108.8,495.0 L403.2,495.5 Q417.7,495.9 418.1,510.3 L418.5,622.7 Q418.9,637.1 405.3,637.5 L111.7,637.9 Q98.1,638.4 98.6,619.6 L93.8,508.0 Q94.2,494.4 108.6,494.8" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
+<text x="116" y="536" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Show the code</text>
+<text x="116" y="568" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">Your phone draws a QR code.</text>
+<text x="116" y="592" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">It carries the pairing secret —</text>
+<text x="116" y="616" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">don’t photograph it.</text>
+<circle cx="122" cy="494" r="17" fill="#3d7ea6" stroke="#2f2b28" stroke-width="2.4"/>
+<text x="122" y="501" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<path d="M577.5,497.7 L871.9,498.1 Q886.4,498.6 881.6,507.8 L882.0,620.2 Q882.4,634.6 868.8,635.0 L575.2,635.4 Q561.6,635.8 562.1,622.3 L562.5,510.7 Q562.9,497.1 577.3,497.5" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
+<text x="582" y="536" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Tap six times</text>
+<text x="582" y="568" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">On the wiped phone, tap the first</text>
+<text x="582" y="592" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">welcome screen six times.</text>
+<text x="582" y="616" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">A scanner opens.</text>
+<circle cx="588" cy="494" r="17" fill="#4f8a5b" stroke="#2f2b28" stroke-width="2.4"/>
+<text x="588" y="501" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<path d="M109.0,691.2 L403.4,691.6 Q417.8,692.1 418.3,706.5 L418.7,818.9 Q419.1,833.3 405.5,833.7 L111.9,834.1 Q98.3,834.5 93.6,815.8 L94.0,704.2 Q94.4,690.6 108.8,691.0" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
+<text x="116" y="732" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">Scan it</text>
+<text x="116" y="764" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">The child’s phone downloads the app</text>
+<text x="116" y="788" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">from your phone and installs itself</text>
+<text x="116" y="812" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">as the device owner.</text>
+<circle cx="122" cy="690" r="17" fill="#4f8a5b" stroke="#2f2b28" stroke-width="2.4"/>
+<text x="122" y="697" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<path d="M577.7,693.9 L872.1,694.3 Q886.5,689.6 881.8,704.0 L882.2,816.4 Q882.6,830.8 869.0,831.2 L575.4,831.6 Q561.8,832.0 562.2,818.5 L562.7,706.9 Q563.1,693.3 577.5,693.7" fill="#ffffff" stroke="#2f2b28" stroke-width="2.6"/>
+<text x="582" y="732" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="20" font-weight="bold" fill="#2f2b28">That’s it</text>
+<text x="582" y="764" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">The two phones find each other and</text>
+<text x="582" y="788" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">pair. From here the rules hold, with</text>
+<text x="582" y="812" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#7c736a">or without you nearby.</text>
+<circle cx="588" cy="690" r="17" fill="#4f8a5b" stroke="#2f2b28" stroke-width="2.4"/>
+<text x="588" y="697" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="19" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
+<path d="M60.6,320.9 L917.1,321.3 Q933.5,321.7 933.9,338.1 L934.3,452.5 Q934.7,468.9 919.1,469.3 L63.5,469.8 Q48.0,470.2 48.4,454.6 L43.6,335.8 Q44.0,320.2 60.4,320.6" fill="#3d7ea6" fill-opacity="0.06" stroke="#3d7ea6" stroke-width="2" stroke-dasharray="9 7"/>
+<text x="66" y="352" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="17" font-weight="bold" fill="#3d7ea6">Any of the three does the same job — pick whichever suits your house</text>
+<path d="M76.4,364.6 L324.8,365.0 Q337.2,365.4 337.6,377.8 L338.0,442.2 Q338.4,454.7 326.9,455.1 L79.3,455.5 Q67.7,455.9 68.1,444.3 L68.5,375.5 Q63.7,363.9 76.1,364.4" fill="#ffffff" stroke="#2f2b28" stroke-width="2.2"/>
+<path d="M96.8,411.4 Q104.0,398.0 111.2,411.4" fill="none" stroke="#3d7ea6" stroke-width="2.4" stroke-linecap="round" opacity="0.95"/>
+<path d="M91.0,414.1 Q104.0,390.0 117.0,414.1" fill="none" stroke="#3d7ea6" stroke-width="2.4" stroke-linecap="round" opacity="0.81"/>
+<path d="M85.3,416.8 Q104.0,382.0 122.7,416.8" fill="none" stroke="#3d7ea6" stroke-width="2.4" stroke-linecap="round" opacity="0.67"/>
+<circle cx="104.0" cy="420.0" r="3.4" fill="#3d7ea6"/>
+<text x="138" y="404" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="17" font-weight="bold" fill="#2f2b28">Your home Wi-Fi</text>
+<text x="138" y="428" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="14.5" fill="#7c736a">both phones join the network</text>
+<path d="M366.7,366.9 L615.1,367.3 Q627.5,367.7 627.9,380.1 L628.3,444.5 Q623.5,451.7 611.9,452.1 L364.4,452.6 Q352.8,453.0 353.2,441.4 L353.6,377.8 Q354.0,366.2 366.4,366.6" fill="#ffffff" stroke="#2f2b28" stroke-width="2.2"/>
+<path d="M387.4,391.7 L397.9,392.1 Q402.3,392.5 402.7,396.9 L403.1,423.3 Q403.5,422.5 394.7,422.9 L385.2,423.4 Q381.6,423.8 382.0,420.2 L382.4,394.6 Q382.8,391.0 387.2,391.4" fill="#ffffff" stroke="#2f2b28" stroke-width="2"/>
+<path d="M378.2,398.8 Q369.0,408.0 378.2,417.2" fill="none" stroke="#3d7ea6" stroke-width="2.6" stroke-linecap="round" opacity="1.00"/>
+<path d="M375.2,392.8 Q360.0,408.0 375.2,423.2" fill="none" stroke="#3d7ea6" stroke-width="2.6" stroke-linecap="round" opacity="0.78"/>
+<path d="M405.8,398.8 Q415.0,408.0 405.8,417.2" fill="none" stroke="#3d7ea6" stroke-width="2.6" stroke-linecap="round" opacity="1.00"/>
+<path d="M408.8,392.8 Q424.0,408.0 408.8,423.2" fill="none" stroke="#3d7ea6" stroke-width="2.6" stroke-linecap="round" opacity="0.78"/>
+<text x="426" y="404" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="17" font-weight="bold" fill="#2f2b28">Your phone’s hotspot</text>
+<text x="426" y="428" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="14.5" fill="#7c736a">no network needed at all</text>
+<path d="M651.7,363.9 L900.1,364.4 Q912.6,364.8 913.0,377.2 L913.4,441.6 Q913.8,454.0 902.2,454.4 L654.6,454.8 Q643.0,455.3 643.5,443.7 L643.9,380.1 Q644.3,368.5 651.5,363.7" fill="#ffffff" stroke="#2f2b28" stroke-width="2.2"/>
+<path d="M662.0,404.0 q-8,-1 -8,-8 q0,-7 8,-7 q2,-8 11,-8 q7,0 9,6 q2,-2 5,-2 q7,0 7,7 q7,1 7,7 q0,5 -7,5 z" fill="#ffffff" stroke="#3d7ea6" stroke-width="2.2"/>
+<path d="M680.0,410.0 L680.0,427.0" stroke="#3d7ea6" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M673.0,420.0 L680.0,428.0 L687.0,420.0" fill="none" stroke="#3d7ea6" stroke-width="2.6" stroke-linecap="round"/>
+<text x="714" y="404" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="17" font-weight="bold" fill="#2f2b28">A link you host</text>
+<text x="714" y="428" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="14.5" fill="#7c736a">if you’d rather serve the file</text>
+<path d="M424,222 Q489.9,237.1 554,222" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M554,222 L544.5,230.9" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M554,222 L541.5,218.3" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M723,300 Q691.8,323.1 653,312" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M653,312 L665.6,308.9" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M653,312 L662.0,321.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M327,476 Q295.9,498.2 257,484" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M257,484 L269.8,481.8" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M257,484 L265.3,494.0" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M424,566 Q490.4,581.6 554,566" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M554,566 L544.6,575.0" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M554,566 L541.5,562.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M723,646 Q493.9,697.8 257,678" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M257,678 L268.8,672.5" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M257,678 L267.7,685.4" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M424,762 Q490.9,778.1 554,762" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M554,762 L544.7,771.1" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M554,762 L541.5,758.5" fill="none" stroke="#2f2b28" stroke-width="2.4" stroke-linecap="round"/>
+<text x="490" y="880" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="16" fill="#4f8a5b" text-anchor="middle">Bluetooth — no cloud, no account, no subscription</text>
+<path d="M360.5,920.7 L402.9,921.1 Q413.3,921.5 413.7,932.0 L414.2,1004.4 Q414.6,1014.8 405.0,1015.2 L363.4,1015.6 Q353.8,1016.0 354.2,1006.4 L349.5,929.7 Q349.9,920.1 360.3,920.5" fill="#ffffff" stroke="#2f2b28" stroke-width="2.4"/>
+<path d="M363.6,935.8 L406.0,936.2 Q410.4,931.4 405.6,935.8 L406.1,996.3 Q406.5,1000.7 402.9,1001.1 L361.3,1001.5 Q357.7,1001.9 358.1,998.3 L358.5,938.8 Q359.0,935.2 363.4,935.6" fill="#3d7ea6" fill-opacity="0.13" stroke="#3d7ea6" stroke-width="1.6"/>
+<line x1="376.0" y1="928" x2="390.0" y2="928.6" stroke="#2f2b28" stroke-width="2" stroke-linecap="round"/>
+<text x="383.0" y="1036" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="15" fill="#7c736a" text-anchor="middle">parent’s phone</text>
+<path d="M576.5,922.8 L619.0,923.2 Q629.4,923.6 629.8,934.0 L630.2,1006.4 Q625.4,1011.6 615.8,1012.0 L574.2,1012.5 Q564.7,1012.9 565.1,1003.3 L565.5,931.7 Q565.9,922.1 576.3,922.5" fill="#ffffff" stroke="#2f2b28" stroke-width="2.4"/>
+<path d="M574.4,932.6 L616.9,933.1 Q621.3,933.5 621.7,937.9 L622.1,998.3 Q622.5,1002.7 618.9,1003.1 L577.3,1003.5 Q573.8,1004.0 574.2,1000.4 L574.6,935.6 Q569.8,932.0 574.2,932.4" fill="#4f8a5b" fill-opacity="0.13" stroke="#4f8a5b" stroke-width="1.6"/>
+<line x1="590.0" y1="928" x2="604.0" y2="928.6" stroke="#2f2b28" stroke-width="2" stroke-linecap="round"/>
+<text x="597.0" y="1036" font-family="Comic Sans MS, Comic Neue, Segoe Print, Bradley Hand, Chalkboard SE, cursive" font-size="15" fill="#7c736a" text-anchor="middle">child’s phone</text>
+<path d="M420,956 Q490,916 560,956" fill="none" stroke="#4f8a5b" stroke-width="2.4" stroke-dasharray="7 8" stroke-linecap="round"/>
 </svg>

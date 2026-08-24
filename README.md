@@ -190,9 +190,10 @@ confirmation says plainly before you do it.
 
 ### Setting up a child's phone
 
-Three ways to get the child's phone online for the download — your home Wi-Fi, the
-parent's phone acting as a hotspot so no existing network is needed, or a plain
-link if you would rather host the APK yourself.
+The child's phone needs to reach yours just long enough to fetch the app, and
+there are three ways to arrange that: your home Wi-Fi, the parent's phone acting
+as a hotspot so no existing network is needed at all, or a plain link if you would
+rather serve the file yourself. Any of them does the same job.
 
 <div align="center">
 <img src="docs/images/enrolment.svg" width="720" alt="Setting up a child's phone in six steps: wipe it, pick the network, show the code, tap the welcome screen six times, scan, and the two phones pair over Bluetooth">
