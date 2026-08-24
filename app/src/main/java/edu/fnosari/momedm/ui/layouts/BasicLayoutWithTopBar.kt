@@ -29,6 +29,8 @@ import edu.fnosari.momedm.ui.common.pronoteTopBarColors
 fun BasicLayoutWithTopBar(
     title: String,
     leftActionIcon: ImageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+    /** Describes what the left icon does, for screen readers; defaults to "Back". */
+    leftActionLabel: String? = null,
     leftAction: (() -> Unit)? = null,
     rightActions: @Composable RowScope.() -> Unit = {},
     content: @Composable () -> Unit = {},
@@ -56,7 +58,7 @@ fun BasicLayoutWithTopBar(
                 navigationIcon = {
                     if (leftAction != null) {
                         IconButton(onClick = leftAction) {
-                            Icon(leftActionIcon, contentDescription = stringResource(R.string.back))
+                            Icon(leftActionIcon, contentDescription = leftActionLabel ?: stringResource(R.string.back))
                         }
                     }
                 },

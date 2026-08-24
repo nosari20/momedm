@@ -45,26 +45,28 @@ class CommandExecutorTest {
 
     @Test fun kioskOnReturnsResultThenStatus() = runTest {
         val p = FakePolicy(); val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("1", CmdType.KIOSK_ON, apps = listOf("com.k", "com.j"), pinned = "com.j"))
-        assertEquals(Message.Result("1", true, "kiosk on (2 apps, pinned com.j)"), out[0]); assertTrue(out[1] is Message.Status)
+        val r0 = out[0] as Message.Result
+        assertTrue(r0.ok); assertEquals(Message.Result.KIOSK_ON, r0.code); assertEquals(2, r0.arg)
+        assertTrue(out[1] is Message.Status)
         assertEquals(listOf("com.k", "com.j"), p.kiosk); assertEquals("com.j", p.pinned)
     }
     @Test fun kioskOnDropsPinnedNotInApps() = runTest {
         val p = FakePolicy(); val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("1b", CmdType.KIOSK_ON, apps = listOf("com.k"), pinned = "com.zzz"))
-        assertEquals(Message.Result("1b", true, "kiosk on (1 apps, pinned ignored: not in apps)"), out[0]); assertEquals(null, p.pinned)
+        assertOk(out[0], Message.Result.KIOSK_ON, 1); assertEquals(null, p.pinned)
     }
     @Test fun kioskOnFailure() = runTest {
         val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("2", CmdType.KIOSK_ON, apps = listOf("bad")))
         val result = out[0] as Message.Result
-        assertFalse(result.ok); assertEquals(1, out.size); assertEquals("no allowed app installed", result.msg)
+        assertFalse(result.ok); assertEquals(1, out.size); assertEquals(Message.Result.FAILED, result.code)
     }
     @Test fun kioskOnWithoutAppsFails() = runTest {
         val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("3", CmdType.KIOSK_ON))
-        val r = out[0] as Message.Result; assertFalse(r.ok); assertEquals("no apps", r.msg)
+        val r = out[0] as Message.Result; assertFalse(r.ok); assertEquals(Message.Result.BAD_REQUEST, r.code)
     }
     @Test fun searchAppOpensPlaySearch() = runTest {
         val p = FakePolicy()
         val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("30", CmdType.SEARCH_APP, pkg = "  Firefox  "))
-        assertEquals(Message.Result("30", true, "play search opened"), out[0])
+        assertOk(out[0], Message.Result.PLAY_OPENED)
         assertEquals("Firefox", p.searched)   // trimmed before it reaches the policy
         assertEquals(null, p.played)          // and never treated as a package id
     }
@@ -73,7 +75,7 @@ class CommandExecutorTest {
         val p = FakePolicy()
         for (cmd in listOf(Message.Cmd("31", CmdType.SEARCH_APP), Message.Cmd("32", CmdType.SEARCH_APP, pkg = "   "))) {
             val r = CommandExecutor(p, FakeStatus()).execute(cmd)[0] as Message.Result
-            assertFalse(r.ok); assertEquals("missing search term", r.msg)
+            assertFalse(r.ok); assertEquals(Message.Result.BAD_REQUEST, r.code)
         }
         assertEquals(null, p.searched)
     }
@@ -82,7 +84,7 @@ class CommandExecutorTest {
         val p = FakePolicy()
         val cfg = SafetyConfig.of(SafetyLevel.STRICT, SafetyConfig.DNS_CLEANBROWSING)
         val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("40", CmdType.SET_SAFETY, safety = cfg))
-        assertEquals(Message.Result("40", true, "safety strict"), out[0]); assertTrue(out[1] is Message.Status)
+        assertOk(out[0], Message.Result.SAFETY); assertTrue(out[1] is Message.Status)
         assertEquals(SafetyLevel.STRICT, p.safety?.level)
         assertEquals(SafetyConfig.DNS_CLEANBROWSING, p.safety?.dnsHost)
     }
@@ -98,7 +100,7 @@ class CommandExecutorTest {
 
     @Test fun setSafetyWithoutPayloadFails() = runTest {
         val r = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("42", CmdType.SET_SAFETY))[0] as Message.Result
-        assertFalse(r.ok); assertEquals("missing safety", r.msg)
+        assertFalse(r.ok); assertEquals(Message.Result.BAD_REQUEST, r.code)
     }
 
     @Test fun appSchemaIsReturnedForTheRequestedPackage() = runTest {
@@ -108,7 +110,7 @@ class CommandExecutorTest {
             SchemaEntry("URLBlocklist", EntryType.MULTI_SELECT, "Blocked sites", listOf("A"), listOf("a")),
         )
         val out = CommandExecutor(FakePolicy(), st).execute(Message.Cmd("50", CmdType.GET_APP_SCHEMA, pkg = "com.android.chrome"))
-        assertEquals(Message.Result("50", true, "2 setting(s)"), out[0])
+        assertOk(out[0], Message.Result.SCHEMA, 2)
         assertEquals(Message.Schema("com.android.chrome", st.schemaToReturn), out[1])
         assertEquals("com.android.chrome", st.schemaFor)
     }
@@ -117,25 +119,25 @@ class CommandExecutorTest {
         // "declares nothing" and "could not be read" must not look the same to the parent.
         val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("51", CmdType.GET_APP_SCHEMA, pkg = "com.duolingo"))
         val r = out[0] as Message.Result
-        assertTrue(r.ok); assertEquals("0 setting(s)", r.msg)
+        assertTrue(r.ok); assertEquals(Message.Result.SCHEMA, r.code); assertEquals(0, r.arg)
         assertEquals(Message.Schema("com.duolingo", emptyList()), out[1])
     }
 
     @Test fun appSchemaWithoutAPackageFails() = runTest {
         val r = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("52", CmdType.GET_APP_SCHEMA))[0] as Message.Result
-        assertFalse(r.ok); assertEquals("missing pkg", r.msg)
+        assertFalse(r.ok); assertEquals(Message.Result.BAD_REQUEST, r.code)
     }
 
     @Test fun setPrefs() = runTest {
         val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
         val out = ex.execute(Message.Cmd("11", CmdType.SET_PREFS, prefs = ChildPrefs(language = "fr", theme = "weird")))
-        assertEquals(Message.Result("11", true, "prefs applied"), out[0]); assertEquals("fr", p.prefs?.language); assertEquals("system", p.prefs?.theme)
+        assertOk(out[0], Message.Result.PREFS); assertEquals("fr", p.prefs?.language); assertEquals("system", p.prefs?.theme)
         assertFalse((ex.execute(Message.Cmd("12", CmdType.SET_PREFS))[0] as Message.Result).ok)
     }
     @Test fun kioskOffReturnsResultThenStatus() = runTest {
         val p = FakePolicy(); p.kiosk = listOf("com.k")
         val out = CommandExecutor(p, FakeStatus()).execute(Message.Cmd("8", CmdType.KIOSK_OFF))
-        assertEquals(Message.Result("8", true, "kiosk off"), out[0]); assertTrue(out[1] is Message.Status); assertEquals(null, p.kiosk)
+        assertOk(out[0], Message.Result.KIOSK_OFF); assertTrue(out[1] is Message.Status); assertEquals(null, p.kiosk)
     }
     @Test fun listAppsAndStatus() = runTest {
         val ex = CommandExecutor(FakePolicy(), FakeStatus())
@@ -152,28 +154,35 @@ class CommandExecutorTest {
         ex.execute(Message.Cmd("9", CmdType.KIOSK_ON, apps = listOf("com.k")))
         val out = ex.execute(Message.Cmd("10", CmdType.ADD_ACCOUNT))
         val result = out[0] as Message.Result
-        assertFalse(result.ok); assertEquals("kiosk is on; turn it off first", result.msg); assertFalse(p.accountOpened)
+        assertFalse(result.ok); assertEquals(Message.Result.FAILED, result.code); assertFalse(p.accountOpened)
     }
     @Test fun setScheduleSanitizesAndReturnsStatus() = runTest {
         val p = FakePolicy()
         val out = CommandExecutor(p, FakeStatus()).execute(
             Message.Cmd("20", CmdType.SET_SCHEDULE, schedule = LockSchedule(enabled = true, weekdayStart = 9999)))
-        assertEquals(Message.Result("20", true, "schedule set"), out[0]); assertTrue(out[1] is Message.Status)
+        assertOk(out[0], Message.Result.SCHEDULE); assertTrue(out[1] is Message.Status)
         assertEquals(21 * 60, p.schedule?.weekdayStart)   // clamped by sanitized()
         assertEquals(true, p.schedule?.enabled)
     }
 
     @Test fun setScheduleWithoutPayloadFails() = runTest {
         val out = CommandExecutor(FakePolicy(), FakeStatus()).execute(Message.Cmd("21", CmdType.SET_SCHEDULE))
-        val r = out[0] as Message.Result; assertFalse(r.ok); assertEquals("missing schedule", r.msg)
+        val r = out[0] as Message.Result; assertFalse(r.ok); assertEquals(Message.Result.BAD_REQUEST, r.code)
     }
 
     @Test fun lockNowAndUnlockSetTheFlag() = runTest {
         val p = FakePolicy(); val ex = CommandExecutor(p, FakeStatus())
         val locked = ex.execute(Message.Cmd("22", CmdType.LOCK_NOW))
-        assertEquals(Message.Result("22", true, "locked"), locked[0]); assertTrue(locked[1] is Message.Status)
+        assertOk(locked[0], Message.Result.LOCKED); assertTrue(locked[1] is Message.Status)
         assertEquals(true, p.manual)
         val unlocked = ex.execute(Message.Cmd("23", CmdType.UNLOCK))
-        assertEquals(Message.Result("23", true, "unlocked"), unlocked[0]); assertEquals(false, p.manual)
+        assertOk(unlocked[0], Message.Result.UNLOCKED); assertEquals(false, p.manual)
+    }
+
+    /** A successful result carrying [code] (and [arg] where one is expected). */
+    private fun assertOk(m: Message, code: String, arg: Int? = null) {
+        val r = m as Message.Result
+        assertTrue(r.ok); assertEquals(code, r.code)
+        if (arg != null) assertEquals(arg, r.arg)
     }
 }

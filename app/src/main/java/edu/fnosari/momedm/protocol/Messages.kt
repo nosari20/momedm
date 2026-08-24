@@ -90,7 +90,31 @@ sealed class Message {
     @Serializable @SerialName("APPS")      data class Apps(val apps: List<AppInfo>) : Message()
     /** Reply to [CmdType.GET_APP_SCHEMA]: the managed-configuration settings [pkg] declares, empty when it declares none. */
     @Serializable @SerialName("SCHEMA")    data class Schema(val pkg: String, val entries: List<SchemaEntry>) : Message()
-    @Serializable @SerialName("RESULT")    data class Result(val cmdId: String, val ok: Boolean, val msg: String) : Message()
+    /**
+     * The outcome of one command.
+     *
+     * [msg] is diagnostic text for a log and is never shown to anyone: it is written on the child, in
+     * whatever words the child's code happens to use, and the parent may well be reading in another
+     * language. [code] is what the parent's UI actually renders — a stable identifier it maps to its
+     * own translated string, with [arg] filling the one number some of them carry. Defaults keep the
+     * field optional on the wire, so a peer that predates it still parses.
+     */
+    @Serializable @SerialName("RESULT")    data class Result(
+        val cmdId: String, val ok: Boolean, val msg: String,
+        val code: String? = null, val arg: Int? = null,
+    ) : Message() {
+        companion object {
+            const val KIOSK_ON = "kiosk_on"; const val KIOSK_OFF = "kiosk_off"
+            const val PLAY_OPENED = "play_opened"; const val ACCOUNT = "account"
+            const val APPS = "apps"; const val STATUS = "status"; const val SCHEMA = "schema"
+            const val PREFS = "prefs"; const val SAFETY = "safety"; const val SCHEDULE = "schedule"
+            const val LOCKED = "locked"; const val UNLOCKED = "unlocked"
+            /** The parent asked for something incomplete — a bug on their side, not the child's. */
+            const val BAD_REQUEST = "bad_request"
+            /** The child tried and the platform refused. */
+            const val FAILED = "failed"
+        }
+    }
     @Serializable @SerialName("CMD")       data class Cmd(
         val id: String, val type: CmdType, val pkg: String? = null,
         /** KIOSK_ON: allowed apps (non-empty). */ val apps: List<String> = emptyList(),

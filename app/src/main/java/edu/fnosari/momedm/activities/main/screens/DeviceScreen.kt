@@ -63,6 +63,7 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
     var renaming by remember { mutableStateOf(false) }
     var editingSafety by remember { mutableStateOf(false) }
     var pickingConfigApp by remember { mutableStateOf(false) }
+    var confirmStop by remember { mutableStateOf(false) }
     // Captured when the app is chosen: the picker's list is cleared before the form opens, so the
     // label has to be remembered here or the form can only show a package name.
     var configAppLabel by remember { mutableStateOf("") }
@@ -163,7 +164,13 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
             }
         }
 
-        Button(onClick = { if (s?.kiosk == true) viewModel.kioskOff(deviceId) else viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
+        // Stopping is confirmed, starting is not: one of them hands a child back an unrestricted
+        // phone, and it is the most prominent button on the page. The app already confirms removing
+        // the PIN and regenerating the key; this belongs in the same company.
+        Button(
+            onClick = { if (s?.kiosk == true) confirmStop = true else viewModel.requestApps(deviceId) },
+            Modifier.fillMaxWidth(),
+        ) {
             Text(stringResource(if (s?.kiosk == true) R.string.child_stop else R.string.child_start))
         }
         if (s?.kioskPaused == true) OutlinedButton(onClick = { viewModel.relock(deviceId) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_relock)) }
@@ -216,6 +223,17 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         current = s?.safety ?: SafetyConfig.of(s?.safetyLevel ?: SafetyLevel.OFF, null),
         onConfirm = { level, dns -> viewModel.setSafety(deviceId, s?.safety, level, dns); editingSafety = false },
         onDismiss = { editingSafety = false },
+    )
+    if (confirmStop) AlertDialog(
+        onDismissRequest = { confirmStop = false },
+        title = { Text(stringResource(R.string.child_stop)) },
+        text = { Text(stringResource(R.string.child_stop_confirm)) },
+        confirmButton = {
+            TextButton(onClick = { viewModel.kioskOff(deviceId); confirmStop = false }) {
+                Text(stringResource(R.string.child_stop))
+            }
+        },
+        dismissButton = { TextButton(onClick = { confirmStop = false }) { Text(stringResource(R.string.settings_dialog_dismiss)) } },
     )
     if (renaming) {
         var name by remember { mutableStateOf(d?.nickname ?: "") }

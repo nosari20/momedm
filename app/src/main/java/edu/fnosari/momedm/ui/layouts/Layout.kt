@@ -19,6 +19,8 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import edu.fnosari.momedm.R
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -82,6 +84,7 @@ class Layout {
                     rightActions = rightActions,
                     content = content,
                     leftActionIcon = Icons.Filled.Menu,
+                    leftActionLabel = stringResource(R.string.nav_open_menu),
                     leftAction = {
                         scope.launch {
                             if (drawerState.isClosed) drawerState.open() else drawerState.close()

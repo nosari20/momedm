@@ -65,7 +65,7 @@
     <string name="bedtime_manual">A parent locked this phone</string>
 
     <!-- Controller UI (MainActivity) -->
-    <string name="main_drawer_name">Controller</string>
+    <string name="main_drawer_name">My family</string>
     <string name="main_settings_button">Settings</string>
     <string name="apps_title">Allowed apps</string>
     <string name="apps_loading">Getting the app list…</string>
@@ -87,6 +87,7 @@
     <!-- Core / shared -->
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
+    <string name="nav_open_menu">Open the menu</string>
     <string name="back">Back</string>
     <string name="search">Search</string>
 
@@ -160,6 +161,7 @@
     <string name="child_paused_until">Paused until %1$s</string>
     <string name="child_choose_apps">Choose allowed apps…</string>
     <string name="child_start">Start child mode</string>
+    <string name="child_stop_confirm">This gives the phone back with no restrictions: every app returns, and the bedtime lock stops. You can turn child mode on again at any time.</string>
     <string name="child_stop">Stop child mode</string>
     <string name="child_relock">Lock again</string>
     <string name="child_night_section">Night lock</string>
@@ -180,6 +182,19 @@
     <string name="child_offline_msg">This device is offline</string>
     <string name="child_sent">Done</string>
     <string name="child_result">%1$s</string>
+    <string name="res_kiosk_on">Child mode is on — %1$d apps allowed</string>
+    <string name="res_kiosk_off">Child mode is off</string>
+    <string name="res_play_opened">The Play Store is open on their phone</string>
+    <string name="res_account">The account screen is open on their phone</string>
+    <string name="res_prefs">Appearance and language updated</string>
+    <string name="res_safety">Content settings applied</string>
+    <string name="res_schedule">Bedtime updated</string>
+    <string name="res_locked">Phone locked</string>
+    <string name="res_unlocked">Phone unlocked</string>
+    <string name="res_schema">%1$d settings available</string>
+    <string name="res_failed">Their phone could not do that</string>
+    <string name="res_bad_request">Something was missing from that request</string>
+    <string name="res_done">Done</string>
     <string name="result_ok">OK</string>
     <string name="result_err">Error</string>
 

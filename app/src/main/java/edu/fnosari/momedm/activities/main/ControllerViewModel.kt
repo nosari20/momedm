@@ -69,8 +69,10 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         val app = application
         viewModelScope.launch {
             ControllerLink.results.collect { (_, r) ->
-                if (pendingIds.remove(r.cmdId)) _events.emit(app.getString(R.string.child_result, "${app.getString(if (r.ok) R.string.result_ok else R.string.result_err)}: ${r.msg}"))
-                else Log.d(LOG_TAG, "Ignoring result for foreign cmd ${r.cmdId}")
+                if (pendingIds.remove(r.cmdId)) {
+                    Log.d(LOG_TAG, "Result ${r.cmdId}: ok=${r.ok} code=${r.code} (${r.msg})")
+                    _events.emit(app.resultText(r))
+                } else Log.d(LOG_TAG, "Ignoring result for foreign cmd ${r.cmdId}")
             }
         }
         viewModelScope.launch { ControllerLink.apps.collect { (id, a) -> if (_appsFor.value?.first == id) _appsFor.value = id to a.apps } }
@@ -205,4 +207,27 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         }
         viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.child_offline_msg) else app.getString(R.string.child_sent)) }
     }
+}
+
+/**
+ * The sentence a parent reads after a command.
+ *
+ * Driven by [Message.Result.code], never by `msg` — that text is written on the child, in whatever
+ * words its code happens to use, and would reach a French parent in English. An unrecognised code
+ * (an older or newer child) falls back to a plain outcome rather than leaking wire text.
+ */
+private fun Application.resultText(r: Message.Result): String = when (r.code) {
+    Message.Result.KIOSK_ON -> getString(R.string.res_kiosk_on, r.arg ?: 0)
+    Message.Result.KIOSK_OFF -> getString(R.string.res_kiosk_off)
+    Message.Result.PLAY_OPENED -> getString(R.string.res_play_opened)
+    Message.Result.ACCOUNT -> getString(R.string.res_account)
+    Message.Result.PREFS -> getString(R.string.res_prefs)
+    Message.Result.SAFETY -> getString(R.string.res_safety)
+    Message.Result.SCHEDULE -> getString(R.string.res_schedule)
+    Message.Result.LOCKED -> getString(R.string.res_locked)
+    Message.Result.UNLOCKED -> getString(R.string.res_unlocked)
+    Message.Result.SCHEMA -> getString(R.string.res_schema, r.arg ?: 0)
+    Message.Result.BAD_REQUEST -> getString(R.string.res_bad_request)
+    Message.Result.FAILED -> getString(R.string.res_failed)
+    else -> getString(if (r.ok) R.string.res_done else R.string.res_failed)
 }
