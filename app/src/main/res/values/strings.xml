@@ -62,6 +62,10 @@
     <string name="launcher_offline">Parent not in range</string>
     <string name="bedtime_title">Good night!</string>
     <string name="bedtime_until">Unlocks at %1$s</string>
+    <string name="bedtime_in_hm">in %1$dh %2$dmin</string>
+    <string name="bedtime_in_h">in %1$d hours</string>
+    <string name="bedtime_in_m">in %1$d minutes</string>
+    <string name="bedtime_until_relative">Your phone wakes up %1$s, at %2$s</string>
     <string name="bedtime_manual">A parent locked this phone</string>
 
     <!-- Controller UI (MainActivity) -->

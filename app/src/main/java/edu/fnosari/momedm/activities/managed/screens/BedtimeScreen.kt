@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import edu.fnosari.momedm.R
+import edu.fnosari.momedm.ui.components.NightSky
+import edu.fnosari.momedm.ui.components.moonPhaseAt
 import edu.fnosari.momedm.activities.managed.ManagedViewModel
 import edu.fnosari.momedm.activities.managed.components.PinDialog
 import edu.fnosari.momedm.protocol.LockState
@@ -59,9 +61,21 @@ fun BedtimeScreen(vm: ManagedViewModel) {
 
     val night = lock?.reason == LockState.REASON_NIGHT
     val until = lock?.until
-    val subtitle = if (night && until != null)
-        stringResource(R.string.bedtime_until, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(until)))
-    else stringResource(R.string.bedtime_manual)
+    // "in 7 hours" answers the question a child actually has; the clock time answers a different one.
+    // Both are shown — the duration first, because that is the reassurance — and the duration is
+    // recomputed on the same slow tick as the clock above.
+    val subtitle = if (night && until != null) {
+        val left = remember(tick, until) { (until - System.currentTimeMillis()).coerceAtLeast(0L) }
+        val h = (left / 3_600_000L).toInt()
+        val m = ((left % 3_600_000L) / 60_000L).toInt()
+        val relative = when {
+            h > 0 && m > 0 -> stringResource(R.string.bedtime_in_hm, h, m)
+            h > 0 -> stringResource(R.string.bedtime_in_h, h)
+            else -> stringResource(R.string.bedtime_in_m, m.coerceAtLeast(1))
+        }
+        stringResource(R.string.bedtime_until_relative, relative,
+            DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(until)))
+    } else stringResource(R.string.bedtime_manual)
 
     val a11y = stringResource(R.string.launcher_lock_cd)
     Box(
@@ -92,6 +106,15 @@ fun BedtimeScreen(vm: ManagedViewModel) {
             // LocalContentColor falls back to black and the clock renders nearly invisible against the
             // dark gradient. The subtitle below already sets its own colour, which is why it was the
             // only legible line before this was fixed.
+            // The sky only appears for a scheduled night lock. A manual "lock now" in the middle of a
+            // Tuesday afternoon is not bedtime, and drawing a moon over it would be nonsense.
+            if (night) {
+                NightSky(
+                    phase = remember(tick) { moonPhaseAt(System.currentTimeMillis()) },
+                    moonColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
+                    starColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                )
+            }
             Text(clock, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface)
             Text(stringResource(R.string.bedtime_title), style = MaterialTheme.typography.headlineSmall,

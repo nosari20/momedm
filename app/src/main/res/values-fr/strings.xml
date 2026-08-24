@@ -62,6 +62,10 @@
     <string name="launcher_offline">Parent hors de portée</string>
     <string name="bedtime_title">Bonne nuit&#160;!</string>
     <string name="bedtime_until">Déverrouillage à %1$s</string>
+    <string name="bedtime_in_hm">dans %1$dh %2$dmin</string>
+    <string name="bedtime_in_h">dans %1$d heures</string>
+    <string name="bedtime_in_m">dans %1$d minutes</string>
+    <string name="bedtime_until_relative">Ton téléphone se réveille %1$s, à %2$s</string>
     <string name="bedtime_manual">Un parent a verrouillé ce téléphone</string>
 
     <!-- Controller UI (MainActivity) -->

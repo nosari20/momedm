@@ -27,6 +27,13 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = Color(0xFFEAEFEC),
     onSurfaceVariant = Color(0xFF49544F),
     outline = Color(0xFFC2CCC7),
+    // Set explicitly, and warm rather than pink: the only thing built on tertiary is the pause
+    // banner. Left to Material's baseline it rendered as an alarm-like maroon in an app that is
+    // otherwise green, so "a parent gave you ten minutes" looked like a warning.
+    tertiary = Color(0xFF7A5A2E),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFF6E7CE),
+    onTertiaryContainer = Color(0xFF4A3612),
     error = Color(0xFFC0392B),
     errorContainer = Color(0xFFF7DAD5),
     onErrorContainer = Color(0xFF7B241C),
@@ -47,6 +54,11 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = Color(0xFF2A322E),
     onSurfaceVariant = Color(0xFFB6C0BA),
     outline = Color(0xFF56605B),
+    // Same reasoning as the light scheme: the pause banner, not a warning.
+    tertiary = Color(0xFFE8C88C),
+    onTertiary = Color(0xFF3E2D0C),
+    tertiaryContainer = Color(0xFF4A3A1C),
+    onTertiaryContainer = Color(0xFFF6E7CE),
 )
 
 private val PronoteShapes = Shapes(
