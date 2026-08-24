@@ -36,7 +36,14 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!--
+        Deliberately NOT USE_EXACT_ALARM: Google Play restricts it to alarm-clock and calendar apps,
+        and a bedtime lock is neither. SCHEDULE_EXACT_ALARM is requestable instead, and LockAlarms
+        already degrades to an inexact alarm when it is not held. Nothing depends on an alarm being
+        punctual: the lock is recomputed from the schedule on every trigger, so a late alarm delays a
+        transition, it does not lose one.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <queries>
         <intent>
@@ -53,6 +60,15 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MomeDM">
+
+        <!--
+            Declares this app as a monitoring tool under Google Play's stalkerware policy. It has to
+            be present on every version code on every track. Declaring it is how a transparent,
+            consensual family app distinguishes itself from covert surveillance: the app is visible
+            on the child's phone, is its launcher, and says on the child's own screen what is being
+            enforced and by whom.
+        -->
+        <meta-data android:name="isMonitoringTool" android:value="child_monitoring" />
 
         <activity
             android:name=".activities.main.MainActivity"
