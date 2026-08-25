@@ -53,7 +53,6 @@ import edu.fnosari.momedm.activities.settings.SettingsActivity
 import edu.fnosari.momedm.ui.ControllerThemed
 import edu.fnosari.momedm.ui.components.ButtonRequestPermissions
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
-import edu.fnosari.momedm.ui.layouts.Layout
 
 /**
  * Launcher entry. Device owner → managed home; otherwise the controller UI.
@@ -113,14 +112,16 @@ class MainActivity : ComponentActivity() {
                     val online by vm.online.collectAsState()
                     LaunchedEffect(Unit) { vm.events.collect { snackbar.showSnackbar(it) } }
                     LaunchedEffect(Unit) { vm.startServiceIfWanted() }
-                    Layout.BasicLayoutWithTopBarAndDrawer(
+                    // P3: no drawer. It held exactly two items — the screen you are already on,
+                    // and "Pair a device", which is the FAB a centimetre away — and cost a top-bar
+                    // slot, a gesture, and a TalkBack stop for it. Layout.kt stays for any future
+                    // consumer that earns a drawer.
+                    BasicLayoutWithTopBar(
                         title = context.getString(R.string.children_title),
                         rightActions = {
                             OnlineIndicator(advertising, online.size)
                             IconButton(onClick = { context.startActivity(Intent(context, SettingsActivity::class.java)) }) { Icon(Icons.Filled.Settings, contentDescription = context.getString(R.string.main_settings_button)) }
                         },
-                        drawerItems = Routes.entries.map { r -> Layout.DrawerItem(context.getString(r.label), r.icon) { navController.navigate(r.name) } },
-                        drawerName = context.getString(R.string.main_drawer_name),
                     ) {
                         Column(Modifier.fillMaxSize()) {
                             ServiceBanner(advertising)

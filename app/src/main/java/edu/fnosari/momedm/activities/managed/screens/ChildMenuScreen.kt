@@ -76,6 +76,14 @@ fun ChildMenuScreen(vm: ManagedViewModel, onPause: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.menu_title), style = MaterialTheme.typography.headlineSmall)
+        // S4: the no-PIN path deliberately lets a child in to read this screen, and its stated
+        // job is answering "why is this phone behaving like this?" — one sentence in the child's
+        // own register before the adult-shaped cards, so both readers are served.
+        Text(
+            stringResource(R.string.menu_child_intro),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.delay
@@ -44,6 +45,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,6 +61,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -71,12 +77,12 @@ import edu.fnosari.momedm.R
 import edu.fnosari.momedm.ui.components.NightSky
 import edu.fnosari.momedm.ui.components.MoonStyle
 import edu.fnosari.momedm.activities.managed.ManagedViewModel
+import edu.fnosari.momedm.persistence.KioskConfig
 import edu.fnosari.momedm.activities.managed.RepairScanActivity
 import edu.fnosari.momedm.activities.managed.components.AppTile
 import edu.fnosari.momedm.activities.managed.components.PinDialog
 import edu.fnosari.momedm.managed.ManagedLinkState.LinkState
 import java.util.Calendar
-import java.util.Locale
 
 /**
  * The child device's home screen — designed to be friendly for kids up to ~14, not toddler-cartoonish.
@@ -291,10 +297,20 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                 ) {
                     // A Column, not one packed Row: at large font scales the single row
                     // clipped its buttons, and the text line deserves the full width anyway.
-                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)) {
-                        val m = pauseLeft / 60_000L
-                        val s = (pauseLeft / 1_000L) % 60L
-                        Text(stringResource(R.string.launcher_paused, String.format(Locale.US, "%02d:%02d", m, s)), style = MaterialTheme.typography.bodyMedium)
+                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 4.dp)) {
+                        // S3: minutes and a gentle bar, not a per-second countdown — MM:SS is the
+                        // visual grammar of exams and bombs, and "roughly how much break is left"
+                        // never needed that resolution for either audience. The glyph (S2) gives a
+                        // pre-reader the state without the sentence.
+                        val minutesLeft = (pauseLeft + 59_999L) / 60_000L
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            PauseGlyph(MaterialTheme.colorScheme.onTertiaryContainer)
+                            Text(stringResource(R.string.launcher_paused, "$minutesLeft min"), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        LinearProgressIndicator(
+                            progress = { (1f - pauseLeft.toFloat() / KioskConfig.PAUSE_MS).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = 12.dp),
+                        )
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             // Only reachable while paused, which took the parent PIN: a child cannot
                             // re-point their own phone at a different parent.
@@ -317,12 +333,21 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier.padding(32.dp),
                     ) {
-                        Text(
-                            stringResource(emptyText),
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center,
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
-                        )
+                        ) {
+                            // S2: a picture lane for pre-readers — an outlined, empty tile grid says
+                            // "nothing here yet, and the place is fine" to a six-year-old the text
+                            // cannot reach. Canvas, like the moon: no new assets, no new icons dep.
+                            EmptyTilesGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                stringResource(emptyText),
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             } else {
@@ -477,3 +502,37 @@ private fun moonName(style: MoonStyle): String = stringResource(
         MoonStyle.CRATERS -> R.string.moon_craters
     },
 )
+
+/**
+ * Four outlined, empty tiles — the app grid with nothing in it yet, drawn rather than written, for
+ * the child who reads haltingly or not at all (S2). Fixed geometry, no motion.
+ */
+@Composable
+private fun EmptyTilesGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.size(48.dp)) {
+        val gap = size.width * 0.14f
+        val cell = (size.width - gap) / 2f
+        val corner = CornerRadius(cell * 0.3f, cell * 0.3f)
+        val stroke = Stroke(width = size.width * 0.055f)
+        for (ix in 0..1) for (iy in 0..1) {
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(ix * (cell + gap), iy * (cell + gap)),
+                size = Size(cell, cell),
+                cornerRadius = corner,
+                style = stroke,
+            )
+        }
+    }
+}
+
+/** The universal pause mark, for the banner's picture lane (S2). */
+@Composable
+private fun PauseGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.size(18.dp)) {
+        val barW = size.width * 0.3f
+        val corner = CornerRadius(barW / 2f, barW / 2f)
+        drawRoundRect(color, topLeft = Offset(size.width * 0.1f, 0f), size = Size(barW, size.height), cornerRadius = corner)
+        drawRoundRect(color, topLeft = Offset(size.width * 0.6f, 0f), size = Size(barW, size.height), cornerRadius = corner)
+    }
+}

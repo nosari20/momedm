@@ -274,6 +274,8 @@
     <string name="pair_err_server">The download could not be started on this phone. Try again.</string>
     <string name="pair_err_checksum">Could not prepare the app for download. Try again.</string>
     <string name="pair_err_missing_url">Enter the full app link first.</string>
+    <string name="pair_open_device">Open their page</string>
+    <string name="pair_again">Pair another device</string>
 
     <!-- Child launcher (managed) -->
     <string name="managed_pin_title">Parent PIN</string>
@@ -344,6 +346,7 @@
 
     <!-- Parent menu on the child device -->
     <string name="menu_title">Parent menu</string>
+    <string name="menu_child_intro">This phone follows rules your parent set. Everything below shows what they are.</string>
     <string name="menu_open">Menu</string>
     <string name="menu_actions_need_pin">Enter the parent PIN to pause child mode or re-pair this phone.</string>
     <string name="menu_actions_need_pin_unset">Child mode is on, so pausing and re-pairing need a parent PIN. Ask a parent to set one.</string>

@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -94,12 +96,19 @@ fun BedtimeScreen(vm: ManagedViewModel) {
         val left = remember(tick, until) { (until - System.currentTimeMillis()).coerceAtLeast(0L) }
         ((DAWN_WINDOW_MS - left).coerceAtLeast(0L).toFloat() / DAWN_WINDOW_MS).coerceIn(0f, 1f)
     } else 0f
-    val skyTop = lerp(MaterialTheme.colorScheme.surfaceVariant, DawnWarm, dawn * 0.22f)
+    // S1: this screen commits to night regardless of the pushed theme. Built from surface roles
+    // it inverted its own metaphor in light mode — a pale grey "sky" with a near-black moon and
+    // dark specks for stars. The parent's accent still tints the fixed navy, so their choice shows
+    // through where it matters, and the dawn blend finally has a dark ground to warm up.
+    val accent = MaterialTheme.colorScheme.primary
+    val skyHigh = lerp(Color(0xFF151C30), accent, 0.10f)
+    val skyLow = lerp(Color(0xFF0A0F1D), accent, 0.05f)
+    val skyTop = lerp(skyHigh, DawnWarm, dawn * 0.25f)
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(skyTop, MaterialTheme.colorScheme.surface))),
+            .background(Brush.verticalGradient(listOf(skyTop, skyLow))),
         contentAlignment = Alignment.Center,
     ) {
         // Long-press is scoped to the clock/title column (spec §1.7: "long-press the header"), not the
@@ -139,19 +148,19 @@ fun BedtimeScreen(vm: ManagedViewModel) {
             if (night) {
                 NightSky(
                     phase = remember(tick) { moonPhaseAt(System.currentTimeMillis()) },
-                    moonColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
+                    moonColor = MoonLight.copy(alpha = 0.92f),
                     // The stars fade as dawn comes up, the way they actually do.
-                    starColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f * (1f - dawn * 0.8f)),
+                    starColor = StarLight.copy(alpha = 0.55f * (1f - dawn * 0.8f)),
                     style = moon,
                 )
             }
             Text(clock, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface)
+                color = NightInk)
             Text(stringResource(if (night) R.string.bedtime_title else R.string.bedtime_break_title),
                 style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface)
+                color = NightInk)
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 32.dp))
+                color = NightInkDim, modifier = Modifier.padding(horizontal = 32.dp))
         }
 
         // A completely locked phone must still be able to call for help, and the power-menu route the
@@ -162,6 +171,11 @@ fun BedtimeScreen(vm: ManagedViewModel) {
         // parent PIN pad by accident.
         OutlinedButton(
             onClick = { vm.openEmergencyDialer() },
+            // Explicit light content: the theme's own outline and primary can vanish against the
+            // fixed dark sky in light mode, and this is the one button that must never be the
+            // hard-to-see thing on the screen.
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = NightInk),
+            border = BorderStroke(1.dp, NightInk.copy(alpha = 0.5f)),
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp),
         ) { Text(stringResource(R.string.bedtime_emergency)) }
     }
@@ -179,3 +193,9 @@ private const val DAWN_WINDOW_MS = 45 * 60_000L
 
 /** The warmth dawn blends in. Fixed rather than themed: sunrise is not an accent colour. */
 private val DawnWarm = Color(0xFFE9A15C)
+
+/** The fixed night palette (S1): the sky is night in any theme; only the accent tint varies. */
+private val NightInk = Color(0xFFEDEFF5)
+private val NightInkDim = Color(0xFFB6BDD2)
+private val MoonLight = Color(0xFFF0EAD8)
+private val StarLight = Color(0xFFC7D0E8)

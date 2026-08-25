@@ -274,6 +274,8 @@
     <string name="pair_err_server">Le téléchargement n\'a pas pu démarrer sur ce téléphone. Réessayez.</string>
     <string name="pair_err_checksum">Impossible de préparer l\'application pour le téléchargement. Réessayez.</string>
     <string name="pair_err_missing_url">Saisissez d\'abord le lien complet de l\'application.</string>
+    <string name="pair_open_device">Ouvrir sa page</string>
+    <string name="pair_again">Associer un autre appareil</string>
 
     <!-- Child launcher (managed) -->
     <string name="managed_pin_title">Code PIN parental</string>
@@ -344,6 +346,7 @@
 
     <!-- Parent menu on the child device -->
     <string name="menu_title">Menu parent</string>
+    <string name="menu_child_intro">Ce téléphone suit des règles choisies par tes parents. Tout ce qui suit les montre.</string>
     <string name="menu_open">Menu</string>
     <string name="menu_actions_need_pin">Saisissez le code PIN parental pour suspendre le mode enfant ou ré-associer ce téléphone.</string>
     <string name="menu_actions_need_pin_unset">Le mode enfant est actif : suspendre ou ré-associer demande un code PIN parental. Demandez à un parent d’en créer un.</string>

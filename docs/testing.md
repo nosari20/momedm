@@ -401,3 +401,43 @@ not the leaked 9-package allowlist — and the same `am start -n
 com.android.chrome/…Main` probe that launched Chrome successfully on the
 pre-fix build now fails with `unknown error code 101` and leaves
 `topResumedActivity` on `ManagedHomeActivity`. Both scenarios: **PASS**.
+
+## 2026-08-25 — structural UX round (S1–S4, P1–P4) on the two-emulator rig
+
+Build `ff04a5d`+structural changes. 170 unit tests green; APK installed on both
+emulators; link re-authenticated after reinstall.
+
+Verified by driving the UI and reading screenshots:
+
+- **P3** — parent home has no drawer: centered title, online indicator, settings, FAB only.
+- **P2** — device page: Start/Stop lives in the header beside the online pill; Status card
+  has the refresh icon and relative "0 minutes ago"; Apps card consolidates choose/advanced/
+  install; "Single app" row absent when nothing is pinned.
+- **P4** — "Lock now" produced the inline "Phone locked" line under the header (no snackbar
+  pair) and it auto-cleared ~4 s later.
+- **Complete lock held**: `am start` Chrome → error 101, `topResumedActivity` stayed
+  `ManagedHomeActivity`, `mLockTaskModeState=LOCKED`.
+- **S1 + kid H3** — manual lock at 17:47 rendered the fixed night palette (navy sky, light
+  ink) with **no moon** and the title "Pause d'écran", not "Bonne nuit !".
+- **P1** — wizard stages: form (prereq card, per-mode help, 5-minute note, Stop disabled) →
+  QR stage owning the screen with live countdown ("Code valid for 4:57"), keep-open line →
+  Stop returns to the form. Success stage not exercised (needs a real enrolment; see below).
+- **Kid M1/M2/L7** — "Fais-le à ton goût": moon selection has border + radio state, name
+  field shows "3/20", greeting is its own labelled target (pencil affordance visible).
+- **S4** — parent menu leads with the child-register line; footer switched from "ask a
+  parent to create a PIN" to "enter the PIN" after the parent set one — SET_PREFS push
+  confirmed end to end (PIN 1234, the documented rig PIN, is now set on the rig).
+- **PIN flow** — wrong-free path: dialog opened by long-press, 1234 accepted, menu opened
+  authed with the pause action visible.
+- **S2 + S3** — pause banner: pause glyph, "Mode enfant en pause · 10 min" (minutes, not
+  MM:SS), slim progress bar, buttons on their own row. Full grid returned during pause.
+- **Kid M3** — "Reverrouiller" asked "Reverrouiller le téléphone maintenant ?" before
+  acting; confirming resumed the kiosk: `mFlags=13`, allowlist = the five apps + self +
+  dialer, **Play/GMS absent at rest**.
+- **No relaunch loop** after the lock changes: app absent from `top`, `Displayed` count flat (18).
+
+Not verifiable on the rig (unchanged): QR/Setup-Wizard enrolment end-to-end (so the
+wizard's "downloading…" and success stages ran only in code review), the local hotspot,
+TalkBack passes (custom actions don't appear in uiautomator dumps), and the emergency-call
+button under lock task on a real handset.
+

@@ -2,7 +2,9 @@ package edu.fnosari.momedm.activities.main.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -51,6 +53,7 @@ import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.LockState
 import edu.fnosari.momedm.ui.common.AccentPill
 import edu.fnosari.momedm.ui.common.SectionLabel
+import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 
@@ -60,6 +63,7 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
     val devices by viewModel.devices.collectAsState()
     val online by viewModel.online.collectAsState()
     val appsFor by viewModel.appsFor.collectAsState()
+    val lastCmd by viewModel.lastCommand.collectAsState()
     val d = devices.firstOrNull { it.deviceId == deviceId }
     val isOnline = deviceId in online
     val yes = stringResource(R.string.yes); val no = stringResource(R.string.no)
@@ -80,10 +84,38 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
             Text(d?.nickname ?: d?.model ?: deviceId, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
             IconButton(onClick = { renaming = true }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.child_rename)) }
         }
-        AccentPill(
-            text = stringResource(if (isOnline) R.string.child_online else R.string.child_offline),
-            accent = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            AccentPill(
+                text = stringResource(if (isOnline) R.string.child_online else R.string.child_offline),
+                accent = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.weight(1f))
+            // The page-defining state change lives up here beside the state it changes, not buried
+            // mid-scroll (P2). Stopping is confirmed, starting is not: only one of them hands a
+            // child back an unrestricted phone — same company as the PIN-removal confirm.
+            Button(
+                onClick = { if (s?.kiosk == true) confirmStop = true else viewModel.requestApps(deviceId) },
+                enabled = isOnline,
+            ) { Text(stringResource(if (s?.kiosk == true) R.string.child_stop else R.string.child_start)) }
+        }
+        // P4: one stateful line instead of paired snackbars — "Sent — waiting" is replaced in
+        // place by the outcome; a failure stays until tapped away.
+        lastCmd?.takeIf { it.deviceId == deviceId }?.let { cmd ->
+            LaunchedEffect(cmd) {
+                if (cmd.phase == ControllerViewModel.CmdPhase.OK) { delay(4_000L); viewModel.clearCommand() }
+            }
+            Text(
+                cmd.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = when (cmd.phase) {
+                    ControllerViewModel.CmdPhase.FAILED -> MaterialTheme.colorScheme.error
+                    ControllerViewModel.CmdPhase.OK -> MaterialTheme.colorScheme.primary
+                    ControllerViewModel.CmdPhase.SENT -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.clickable { viewModel.clearCommand() },
+            )
+        }
+        if (s?.kioskPaused == true) OutlinedButton(onClick = { viewModel.relock(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_relock)) }
         // Offline, every control below is dead: commands go out over BLE and are not queued, so a tap
         // produces one snackbar and nothing else. A parent working through several changes on a phone
         // that has gone out of range would otherwise collect a string of them, or miss them entirely
@@ -120,6 +152,21 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 if (s?.kioskPaused == true) Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                     Text(stringResource(R.string.child_paused_until, s.pauseEndsAt?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) } ?: "—"))
                 }
+            }
+        }
+        // P2: everything about apps in one card — which are allowed, per-app settings, and
+        // installing a new one — right after the status a parent reads first.
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(R.string.child_apps_section))
+                OutlinedButton(onClick = { viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) {
+                    Text(stringResource(R.string.child_choose_apps))
+                }
+                OutlinedButton(onClick = { pickingConfigApp = true; viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) {
+                    Text(stringResource(R.string.appcfg_open))
+                }
+                OutlinedTextField(value = pkg, onValueChange = { pkg = it }, label = { Text(stringResource(R.string.child_install_hint)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Button(onClick = { viewModel.install(deviceId, pkg.trim()) }, enabled = isOnline && pkg.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_install)) }
             }
         }
         val schedule = s?.schedule ?: LockSchedule()
@@ -189,38 +236,9 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 OutlinedButton(onClick = { editingSafety = true }, Modifier.fillMaxWidth(), enabled = isOnline) {
                     Text(stringResource(R.string.safety_change))
                 }
-                // Which apps a child may open is the same question as what they can reach, so it sits
-                // here beside the level and the per-app settings rather than adrift below the card.
-                OutlinedButton(onClick = { viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) {
-                    Text(stringResource(R.string.child_choose_apps))
-                }
-                OutlinedButton(onClick = { pickingConfigApp = true; viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) {
-                    Text(stringResource(R.string.appcfg_open))
-                }
             }
         }
 
-        // Stopping is confirmed, starting is not: one of them hands a child back an unrestricted
-        // phone, and it is the most prominent button on the page. The app already confirms removing
-        // the PIN and regenerating the key; this belongs in the same company.
-        Button(
-            onClick = { if (s?.kiosk == true) confirmStop = true else viewModel.requestApps(deviceId) },
-            Modifier.fillMaxWidth(),
-            enabled = isOnline,
-        ) {
-            Text(stringResource(if (s?.kiosk == true) R.string.child_stop else R.string.child_start))
-        }
-        if (s?.kioskPaused == true) OutlinedButton(onClick = { viewModel.relock(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_relock)) }
-        // The tail used to be six unrelated loose controls after three labelled cards; the page's
-        // own grammar — a card per topic — now holds all the way down. Refresh moved up beside the
-        // status it refreshes.
-        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel(stringResource(R.string.child_apps_section))
-                OutlinedTextField(value = pkg, onValueChange = { pkg = it }, label = { Text(stringResource(R.string.child_install_hint)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Button(onClick = { viewModel.install(deviceId, pkg.trim()) }, enabled = isOnline && pkg.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_install)) }
-            }
-        }
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel(stringResource(R.string.child_phone_section))

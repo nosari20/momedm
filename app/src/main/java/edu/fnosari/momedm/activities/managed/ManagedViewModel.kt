@@ -245,7 +245,11 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
             while (isActive) {
                 val left = c.pauseUntil - System.currentTimeMillis()
                 if (left <= 0L) { _pauseRemaining.value = 0L; LockController(getApplication(), prefs, policy).reevaluate(); break }
-                _pauseRemaining.value = left; delay(1_000L)
+                // Published at 15 s granularity: the banner shows minutes and a progress bar, so
+                // recomposing the child's home screen every second bought nothing. The loop still
+                // checks every second, keeping the re-lock at lapse prompt.
+                _pauseRemaining.value = ((left + 14_999L) / 15_000L) * 15_000L
+                delay(1_000L)
             }
         }
     }

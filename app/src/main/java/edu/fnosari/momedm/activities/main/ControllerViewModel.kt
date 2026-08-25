@@ -54,6 +54,22 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     private val _appsFor = MutableStateFlow<Pair<String, List<AppInfo>?>?>(null)
     /** (deviceId, apps) while the picker is open; apps == null while loading. */
     val appsFor: StateFlow<Pair<String, List<AppInfo>?>?> = _appsFor
+
+    /** Where the parent's most recent command is in its life. */
+    enum class CmdPhase { SENT, OK, FAILED }
+
+    /** One line for the device page: what was asked of [deviceId] and how far it got. */
+    data class CommandUi(val deviceId: String, val text: String, val phase: CmdPhase)
+
+    private val _lastCommand = MutableStateFlow<CommandUi?>(null)
+    /**
+     * The last command's lifecycle, shown inline on the device page instead of a pair of
+     * snackbars (P4): "Sent — waiting" is *replaced* by the outcome rather than followed by a
+     * second toast, and a failure stays put until dismissed instead of vanishing in four seconds
+     * while the parent looked away. Successes are auto-cleared by the UI.
+     */
+    val lastCommand: StateFlow<CommandUi?> = _lastCommand
+    fun clearCommand() { _lastCommand.value = null }
     /**
      * Ids of commands *this* view model sent, awaiting their RESULT.
      *
@@ -68,10 +84,10 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     init {
         val app = application
         viewModelScope.launch {
-            ControllerLink.results.collect { (_, r) ->
+            ControllerLink.results.collect { (devId, r) ->
                 if (pendingIds.remove(r.cmdId)) {
                     Log.d(LOG_TAG, "Result ${r.cmdId}: ok=${r.ok} code=${r.code} (${r.msg})")
-                    _events.emit(app.resultText(r))
+                    _lastCommand.value = CommandUi(devId, app.resultText(r), if (r.ok) CmdPhase.OK else CmdPhase.FAILED)
                 } else Log.d(LOG_TAG, "Ignoring result for foreign cmd ${r.cmdId}")
             }
         }
@@ -104,14 +120,14 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     private fun send(deviceId: String, type: CmdType, pkg: String? = null): String? {
         val id = ControllerLink.sendCommand(deviceId, type, pkg)
         Log.d(LOG_TAG, "send $type -> $deviceId: ${if (id == null) "offline" else "sent (id=$id)"}")
-        announce(id)
+        announce(deviceId, id)
         return id
     }
     fun kioskOn(deviceId: String, apps: List<String>, pinned: String?) {
         _appsFor.value = null
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.KIOSK_ON, apps = apps, pinned = pinned) }
         Log.d(LOG_TAG, "kioskOn -> $deviceId: ${apps.size} apps, pinned=$pinned: ${if (id == null) "offline" else "sent (id=$id)"}")
-        announce(id)
+        announce(deviceId, id)
     }
     /** Re-locks a paused child by re-sending its current config. */
     fun relock(deviceId: String) {
@@ -119,7 +135,7 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         if (s.kioskApps.isEmpty()) return
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.KIOSK_ON, apps = s.kioskApps, pinned = s.kioskPkg) }
         Log.d(LOG_TAG, "relock -> $deviceId: ${if (id == null) "offline" else "sent (id=$id)"}")
-        announce(id)
+        announce(deviceId, id)
     }
     fun rename(deviceId: String, nickname: String?) { viewModelScope.launch { registry.rename(deviceId, nickname) } }
 
@@ -127,7 +143,7 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     fun setSchedule(deviceId: String, schedule: LockSchedule) {
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SCHEDULE, schedule = schedule) }
         Log.d(LOG_TAG, "setSchedule -> $deviceId: enabled=${schedule.enabled}: ${if (id == null) "offline" else "sent (id=$id)"}")
-        announce(id)
+        announce(deviceId, id)
     }
     /**
      * Pushes a content-restriction preset (and the filtering resolver) to [deviceId].
@@ -140,7 +156,7 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         val cfg = (current ?: SafetyConfig()).withPreset(level, dnsHost)
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SAFETY, safety = cfg) }
         Log.d(LOG_TAG, "setSafety -> $deviceId: level=$level dns=${dnsHost != null}: ${if (id == null) "offline" else "sent (id=$id)"}")
-        announce(id)
+        announce(deviceId, id)
     }
 
     /** Asks [deviceId] which managed-configuration settings [pkg] declares. */
@@ -162,7 +178,7 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         val merged = base.copy(appConfigs = base.appConfigs + (pkg to values))
         val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SAFETY, safety = merged) }
         Log.d(LOG_TAG, "setAppConfig -> $deviceId: $pkg (${values.size} value(s)): ${if (id == null) "offline" else "sent (id=$id)"}")
-        announce(id)
+        announce(deviceId, id)
     }
 
     fun lockNow(deviceId: String) { send(deviceId, CmdType.LOCK_NOW) }
@@ -201,17 +217,21 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
     fun clearApps() { _appsFor.value = null }
 
     /**
-     * Tells the parent whether the command went out, and remembers [id] so its RESULT is announced
-     * too (see [pendingIds]). A command whose RESULT never arrives (device went offline mid-flight)
-     * would leak an id, so the set is trimmed oldest-first — it is a `LinkedHashSet`.
+     * Starts the command's visible lifecycle: an inline "Sent — waiting" on the device page, which
+     * the RESULT later replaces (see the collector above). [pendingIds] remembers [id] so only our
+     * own results are surfaced; a RESULT that never arrives (device dropped mid-flight) would leak
+     * an id, so the set is trimmed oldest-first — it is a `LinkedHashSet`. Offline stays a
+     * snackbar: it can happen from anywhere, and there is no page line to own it.
      */
-    private fun announce(id: String?) {
+    private fun announce(deviceId: String, id: String?) {
         val app = getApplication<Application>()
-        if (id != null) {
-            pendingIds += id
-            while (pendingIds.size > MAX_PENDING) pendingIds.iterator().let { it.next(); it.remove() }
+        if (id == null) {
+            viewModelScope.launch { _events.emit(app.getString(R.string.child_offline_msg)) }
+            return
         }
-        viewModelScope.launch { _events.emit(if (id == null) app.getString(R.string.child_offline_msg) else app.getString(R.string.child_sent)) }
+        pendingIds += id
+        while (pendingIds.size > MAX_PENDING) pendingIds.iterator().let { it.next(); it.remove() }
+        _lastCommand.value = CommandUi(deviceId, app.getString(R.string.child_sent), CmdPhase.SENT)
     }
 }
 

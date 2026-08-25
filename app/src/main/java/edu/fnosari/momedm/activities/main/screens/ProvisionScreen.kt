@@ -45,6 +45,7 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavHostController
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.activities.main.ControllerViewModel
+import edu.fnosari.momedm.activities.main.navigation.Routes
 import edu.fnosari.momedm.controller.provisioning.ProvisionError
 import edu.fnosari.momedm.controller.provisioning.QrBitmap
 import edu.fnosari.momedm.persistence.ControllerPrefs
@@ -62,7 +63,13 @@ import java.util.Locale
 private const val ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 private const val SDK_LOCAL_NETWORK = 37
 
-/** "Pair a device" flow: three numbered steps — how it connects, generate the code, scan it. */
+/**
+ * "Pair a device" as a staged wizard (P1): the form (prerequisites, network choice, create the
+ * code), then the code owning the screen while it is live, then a success stage naming the new
+ * device. The stage is derived from [edu.fnosari.momedm.controller.provisioning.ProvisioningController.State]
+ * plus the registry — no new plumbing, the state machine already existed; only the screen now
+ * follows it. Each stage shows what matters *now*: a parent mid-scan no longer scrolls a form.
+ */
 @Composable
 fun ProvisionScreen(navController: NavHostController, viewModel: ControllerViewModel) {
     val pc = viewModel.provisioning
@@ -70,17 +77,18 @@ fun ProvisionScreen(navController: NavHostController, viewModel: ControllerViewM
     val context = LocalContext.current
     DisposableEffect(Unit) { onDispose { pc.stop() } }
 
-    // The enrolment's missing "step 4": success used to be discoverable only by leaving the screen
-    // — which tears the hotspot and the APK server down (the DisposableEffect above), killing a
-    // download in progress. Baseline the known devices when a code appears; any new id after that
-    // is the phone being enrolled right now.
+    // The enrolment's "step 4": know when a new device authenticates — success used to be
+    // discoverable only by leaving the screen, which tears the hotspot and APK server down (the
+    // DisposableEffect above) and killed downloads in progress. Baseline the known devices when a
+    // code appears; any new id after that is the phone being enrolled right now.
     val devices by viewModel.devices.collectAsState()
     var baselineIds by remember { mutableStateOf<Set<String>?>(null) }
     var pairedName by remember { mutableStateOf<String?>(null) }
+    var pairedId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(s.qrPayload) { if (s.qrPayload != null && baselineIds == null) baselineIds = devices.map { it.deviceId }.toSet() }
     LaunchedEffect(devices) {
         val base = baselineIds ?: return@LaunchedEffect
-        devices.firstOrNull { it.deviceId !in base }?.let { pairedName = it.nickname ?: it.model }
+        devices.firstOrNull { it.deviceId !in base }?.let { pairedName = it.nickname ?: it.model; pairedId = it.deviceId }
     }
     // The QR must survive a display timeout: a screen going dark mid-scan is a dead end.
     val view = LocalView.current
@@ -107,147 +115,173 @@ fun ProvisionScreen(navController: NavHostController, viewModel: ControllerViewM
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // The two facts a parent must know before anything else — reset the child's phone first,
-        // and the code is short-lived — used to appear only after they had stopped being actionable.
-        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.pair_help), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
-        }
-        SectionLabel(stringResource(R.string.pair_step1), modifier = Modifier.fillMaxWidth())
-        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(
-                    ControllerPrefs.MODE_HOTSPOT to R.string.pair_wifi_hotspot,
-                    ControllerPrefs.MODE_MANUAL to R.string.pair_wifi_manual,
-                    ControllerPrefs.MODE_CUSTOM_URL to R.string.pair_wifi_custom,
-                ).forEach { (mode, label) ->
-                    // The whole row is the target, not just the little circle: tapping the label and
-                    // having nothing happen reads as "I chose Shared Wi-Fi" while the app is still in
-                    // hotspot mode, which then shows hotspot credentials the parent did not expect.
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .selectable(selected = s.mode == mode, role = Role.RadioButton, onClick = { pc.setMode(mode) }),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = s.mode == mode, onClick = null)
-                        Text(stringResource(label))
+        when {
+            // ---- Stage: paired. The one fact that matters, and the two ways onward. ----
+            pairedName != null -> {
+                Text(
+                    stringResource(R.string.pair_paired, pairedName ?: ""),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Button(
+                    onClick = { pairedId?.let { navController.navigate(Routes.device(it)) } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.pair_open_device)) }
+                OutlinedButton(
+                    onClick = { pc.stop(); pairedName = null; pairedId = null; baselineIds = null },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.pair_again)) }
+            }
+
+            // ---- Stage: the code is live and owns the screen. No form to scroll mid-scan. ----
+            s.qrPayload != null -> {
+                val payload = s.qrPayload ?: return@Column
+                SectionLabel(stringResource(R.string.pair_step3), modifier = Modifier.fillMaxWidth())
+                // zxing throws (WriterException) when the payload exceeds what a QR code can hold —
+                // e.g. a long custom URL plus credentials. Surface it instead of crashing the screen.
+                val bmp = remember(payload) { runCatching { QrBitmap.render(payload, 800) }.getOrNull() }
+                if (bmp == null) {
+                    Text(stringResource(R.string.pair_qr_error), color = MaterialTheme.colorScheme.error)
+                } else {
+                    Image(bmp.asImageBitmap(), contentDescription = stringResource(R.string.pair_title), modifier = Modifier.size(320.dp))
+                    // A live countdown: the five-minute life was invisible until the code had
+                    // already died — and a factory reset takes longer than five minutes.
+                    s.expiresAt?.let { deadline ->
+                        var now by remember { mutableStateOf(System.currentTimeMillis()) }
+                        LaunchedEffect(payload) { while (true) { now = System.currentTimeMillis(); delay(1_000L) } }
+                        val left = (deadline - now).coerceAtLeast(0L)
+                        Text(
+                            stringResource(R.string.pair_countdown, String.format(Locale.US, "%d:%02d", left / 60_000L, (left / 1_000L) % 60L)),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
+                    Text(stringResource(R.string.pair_keep_open), style = MaterialTheme.typography.bodySmall)
+                    if (s.mode == ControllerPrefs.MODE_HOTSPOT) {
+                        // Samsung and friends interrupt the join with a "no internet" warning; put
+                        // the answer where the parent is standing when it appears (docs/architecture.md).
+                        Text(stringResource(R.string.pair_hotspot_warning), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (s.apkServed) Text(stringResource(R.string.pair_downloading), style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = { pc.stop() }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pair_stop)) }
+            }
+
+            // ---- Stage: the form — prerequisites, network choice, create the code. ----
+            else -> {
+                // The two facts a parent must know before anything else — reset the child's phone
+                // first, and the code is short-lived — lead the screen instead of trailing the QR.
+                Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.pair_help), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
+                }
+                SectionLabel(stringResource(R.string.pair_step1), modifier = Modifier.fillMaxWidth())
+                Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            ControllerPrefs.MODE_HOTSPOT to R.string.pair_wifi_hotspot,
+                            ControllerPrefs.MODE_MANUAL to R.string.pair_wifi_manual,
+                            ControllerPrefs.MODE_CUSTOM_URL to R.string.pair_wifi_custom,
+                        ).forEach { (mode, label) ->
+                            // The whole row is the target, not just the little circle: tapping the
+                            // label and having nothing happen reads as "I chose Shared Wi-Fi" while
+                            // the app is still in hotspot mode, which then shows hotspot credentials
+                            // the parent did not expect.
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .selectable(selected = s.mode == mode, role = Role.RadioButton, onClick = { pc.setMode(mode) }),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(selected = s.mode == mode, onClick = null)
+                                Text(stringResource(label))
+                            }
+                            Text(
+                                stringResource(
+                                    when (mode) {
+                                        ControllerPrefs.MODE_HOTSPOT -> R.string.pair_wifi_hotspot_help
+                                        ControllerPrefs.MODE_MANUAL -> R.string.pair_wifi_manual_help
+                                        else -> R.string.pair_wifi_custom_help
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 48.dp),
+                            )
+                        }
+                        if (s.mode == ControllerPrefs.MODE_HOTSPOT) {
+                            // Hotspot credentials are transient and generated by the platform; show
+                            // them read-only once available.
+                            if (s.hotspotSsid.isNotBlank()) {
+                                Text(stringResource(R.string.pair_ssid_value, stringResource(R.string.pair_ssid), s.hotspotSsid), style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.pair_password_value, stringResource(R.string.pair_password), s.hotspotPassword), style = MaterialTheme.typography.bodyMedium)
+                            }
+                        } else {
+                            OutlinedTextField(s.ssid, { pc.setManual(it, s.password) }, label = { Text(stringResource(R.string.pair_ssid)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            // Masked by default: this is typed with a child, and often a neighbour, in
+                            // the room. The toggle is a text button because the eye glyph lives in
+                            // material-icons-extended, which this project does not ship.
+                            var showPassword by remember { mutableStateOf(false) }
+                            OutlinedTextField(
+                                s.password,
+                                { pc.setManual(s.ssid, it) },
+                                label = { Text(stringResource(R.string.pair_password)) },
+                                singleLine = true,
+                                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                trailingIcon = {
+                                    TextButton(onClick = { showPassword = !showPassword }) {
+                                        Text(stringResource(if (showPassword) R.string.pair_password_hide else R.string.pair_password_show))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (s.mode == ControllerPrefs.MODE_CUSTOM_URL) OutlinedTextField(s.customUrl, { pc.setCustomUrl(it) }, label = { Text(stringResource(R.string.pair_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+
+                SectionLabel(stringResource(R.string.pair_step2), modifier = Modifier.fillMaxWidth())
+                if (!localNetworkGranted) {
+                    Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(stringResource(R.string.pair_local_network_why), style = MaterialTheme.typography.bodyMedium)
+                            ButtonRequestPermission(
+                                context = context,
+                                permission = ACCESS_LOCAL_NETWORK,
+                                granted = { localNetworkGranted = true },
+                                denied = { },
+                            )
+                        }
+                    }
+                }
+                // In this stage no code is live (the previous stage owns that), but the hotspot may
+                // briefly be coming up between start() and the QR appearing — keep the guard.
+                val live = s.serverRunning || s.hotspotSsid.isNotBlank()
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { pc.start() }, enabled = localNetworkGranted && !live) { Text(stringResource(R.string.pair_generate)) }
+                    OutlinedButton(onClick = { pc.stop() }, enabled = live) { Text(stringResource(R.string.pair_stop)) }
+                }
+                if (!live) Text(stringResource(R.string.pair_code_life), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (s.serverRunning) Text(stringResource(R.string.pair_ready), style = MaterialTheme.typography.bodySmall)
+                // Stable codes mapped to plain sentences with a next step — "no IPv4 address" fired
+                // at the least recoverable audience at the most fragile moment, in English only.
+                s.error?.let {
                     Text(
                         stringResource(
-                            when (mode) {
-                                ControllerPrefs.MODE_HOTSPOT -> R.string.pair_wifi_hotspot_help
-                                ControllerPrefs.MODE_MANUAL -> R.string.pair_wifi_manual_help
-                                else -> R.string.pair_wifi_custom_help
+                            when (it) {
+                                ProvisionError.HOTSPOT -> R.string.pair_err_hotspot
+                                ProvisionError.NO_ADDRESS -> R.string.pair_err_no_address
+                                ProvisionError.SERVER -> R.string.pair_err_server
+                                ProvisionError.CHECKSUM -> R.string.pair_err_checksum
+                                ProvisionError.MISSING_URL -> R.string.pair_err_missing_url
                             },
                         ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 48.dp),
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
-                if (s.mode == ControllerPrefs.MODE_HOTSPOT) {
-                    // Hotspot credentials are transient and generated by the platform; show them read-only once available.
-                    if (s.hotspotSsid.isNotBlank()) {
-                        Text(stringResource(R.string.pair_ssid_value, stringResource(R.string.pair_ssid), s.hotspotSsid), style = MaterialTheme.typography.bodyMedium)
-                        Text(stringResource(R.string.pair_password_value, stringResource(R.string.pair_password), s.hotspotPassword), style = MaterialTheme.typography.bodyMedium)
-                    }
-                } else {
-                    OutlinedTextField(s.ssid, { pc.setManual(it, s.password) }, label = { Text(stringResource(R.string.pair_ssid)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    // Masked by default: this is typed with a child, and often a neighbour, in the room.
-                    // The toggle is a text button because the eye glyph lives in material-icons-extended,
-                    // which this project does not ship.
-                    var showPassword by remember { mutableStateOf(false) }
-                    OutlinedTextField(
-                        s.password,
-                        { pc.setManual(s.ssid, it) },
-                        label = { Text(stringResource(R.string.pair_password)) },
-                        singleLine = true,
-                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        trailingIcon = {
-                            TextButton(onClick = { showPassword = !showPassword }) {
-                                Text(stringResource(if (showPassword) R.string.pair_password_hide else R.string.pair_password_show))
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                if (s.mode == ControllerPrefs.MODE_CUSTOM_URL) OutlinedTextField(s.customUrl, { pc.setCustomUrl(it) }, label = { Text(stringResource(R.string.pair_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                // Says why the code went away, rather than leaving the parent staring at a form
+                // that silently reset itself.
+                if (s.expired) Text(stringResource(R.string.pair_expired), style = MaterialTheme.typography.bodyMedium)
             }
         }
-
-        SectionLabel(stringResource(R.string.pair_step2), modifier = Modifier.fillMaxWidth())
-        if (!localNetworkGranted) {
-            Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.pair_local_network_why), style = MaterialTheme.typography.bodyMedium)
-                    ButtonRequestPermission(
-                        context = context,
-                        permission = ACCESS_LOCAL_NETWORK,
-                        granted = { localNetworkGranted = true },
-                        denied = { },
-                    )
-                }
-            }
-        }
-        // Disabled while a code is live: tapping again was a silent no-op (the controller refuses
-        // re-entrant starts), which read as a broken button.
-        val live = s.serverRunning || s.hotspotSsid.isNotBlank() || s.qrPayload != null
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { pc.start() }, enabled = localNetworkGranted && !live) { Text(stringResource(R.string.pair_generate)) }
-            OutlinedButton(onClick = { pc.stop() }, enabled = live) { Text(stringResource(R.string.pair_stop)) }
-        }
-        if (!live) Text(stringResource(R.string.pair_code_life), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (s.serverRunning) Text(stringResource(R.string.pair_ready), style = MaterialTheme.typography.bodySmall)
-        // H2: stable codes mapped to plain sentences with a next step — "no IPv4 address" fired at
-        // the least recoverable audience at the most fragile moment, in English only.
-        s.error?.let {
-            Text(
-                stringResource(
-                    when (it) {
-                        ProvisionError.HOTSPOT -> R.string.pair_err_hotspot
-                        ProvisionError.NO_ADDRESS -> R.string.pair_err_no_address
-                        ProvisionError.SERVER -> R.string.pair_err_server
-                        ProvisionError.CHECKSUM -> R.string.pair_err_checksum
-                        ProvisionError.MISSING_URL -> R.string.pair_err_missing_url
-                    },
-                ),
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        // Says why the code went away, rather than leaving the parent staring at an empty step 3.
-        if (s.expired) Text(stringResource(R.string.pair_expired), style = MaterialTheme.typography.bodyMedium)
-
-        s.qrPayload?.let { payload ->
-            SectionLabel(stringResource(R.string.pair_step3), modifier = Modifier.fillMaxWidth())
-            // zxing throws (WriterException) when the payload exceeds what a QR code can hold — e.g. a
-            // long custom URL plus credentials. Surface it instead of crashing the whole screen.
-            val bmp = remember(payload) { runCatching { QrBitmap.render(payload, 800) }.getOrNull() }
-            if (bmp == null) {
-                Text(stringResource(R.string.pair_qr_error), color = MaterialTheme.colorScheme.error)
-            } else {
-                Image(bmp.asImageBitmap(), contentDescription = stringResource(R.string.pair_title), modifier = Modifier.size(320.dp))
-                // A live countdown: the five-minute life was invisible until the code had already
-                // died — and a factory reset takes longer than five minutes.
-                s.expiresAt?.let { deadline ->
-                    var now by remember { mutableStateOf(System.currentTimeMillis()) }
-                    LaunchedEffect(payload) { while (true) { now = System.currentTimeMillis(); delay(1_000L) } }
-                    val left = (deadline - now).coerceAtLeast(0L)
-                    Text(
-                        stringResource(R.string.pair_countdown, String.format(Locale.US, "%d:%02d", left / 60_000L, (left / 1_000L) % 60L)),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Text(stringResource(R.string.pair_keep_open), style = MaterialTheme.typography.bodySmall)
-                if (s.mode == ControllerPrefs.MODE_HOTSPOT) {
-                    // Samsung and friends interrupt the join with a "no internet" warning; put the
-                    // answer where the parent is standing when it appears (docs/architecture.md).
-                    Text(stringResource(R.string.pair_hotspot_warning), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-
-        if (pairedName == null && s.apkServed) Text(stringResource(R.string.pair_downloading), style = MaterialTheme.typography.bodyMedium)
-        pairedName?.let { Text(stringResource(R.string.pair_paired, it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary) }
     }
 }
