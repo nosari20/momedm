@@ -67,6 +67,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -190,14 +191,44 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     var confirmRelock by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(gradient)) {
-        // After dusk a few fixed stars come out at the top of the sky — the same celestial language
-        // as the icon and the bedtime screen, tied to the clock and nothing else (like the mood
-        // tint: identical whatever the child did today). Static and faint; scenery, not a feature.
+        // After dusk the launcher's sky becomes a quiet galaxy: a full-screen field of fixed
+        // stars over a faint milky-way band — the same celestial language as the icon and the
+        // bedtime screen, tied to the clock and nothing else (like the mood tint: identical
+        // whatever the child did today). Deliberately NOT an all-day background: this is the
+        // daytime screen, and painting ten in the morning as night would be the app lying —
+        // the same rule that keeps the moon off a Tuesday-afternoon lock. Static; scenery,
+        // not a feature, and faint enough that tiles and text sit on it untouched.
         if (hour >= 19 || hour < 6) {
-            Canvas(Modifier.fillMaxWidth().height(170.dp).alpha(0.35f)) {
-                for ((fx, fy, sr) in HEADER_STARS) {
+            Canvas(Modifier.fillMaxSize()) {
+                // The band first, behind the stars: one soft diagonal smear of light.
+                rotate(degrees = -28f) {
+                    // A radial fade, not a solid oval: a hard ellipse edge read as a rendering
+                    // artifact against the dark lower half of the evening gradient.
+                    val bandTopLeft = Offset(-size.width * 0.3f, size.height * 0.30f)
+                    val bandSize = Size(size.width * 1.6f, size.height * 0.34f)
+                    drawOval(
+                        brush = Brush.radialGradient(
+                            // Alpha reaches zero at 40% of the radius: the oval's vertical edge sits
+                            // near 46%, so a plain two-stop fade was still visibly clipped there.
+                            colorStops = arrayOf(
+                                0f to StarDim.copy(alpha = 0.07f),
+                                0.4f to StarDim.copy(alpha = 0f),
+                                1f to StarDim.copy(alpha = 0f),
+                            ),
+                            center = bandTopLeft + Offset(bandSize.width / 2f, bandSize.height / 2f),
+                            radius = bandSize.width / 2f,
+                        ),
+                        topLeft = bandTopLeft,
+                        size = bandSize,
+                    )
+                }
+                for ((fx, fy, sr) in GALAXY_STARS) {
                     val x = size.width * fx; val y = size.height * fy; val r = sr.dp.toPx()
-                    drawPath(Path().apply { moveTo(x, y - r); lineTo(x + r, y); lineTo(x, y + r); lineTo(x - r, y); close() }, StarDim)
+                    drawPath(
+                        Path().apply { moveTo(x, y - r); lineTo(x + r, y); lineTo(x, y + r); lineTo(x - r, y); close() },
+                        // The larger stars shine a little harder; none of them compete with text.
+                        StarDim.copy(alpha = if (sr >= 2f) 0.38f else 0.25f),
+                    )
                 }
             }
         }
@@ -567,8 +598,22 @@ private val MoonCream = Color(0xFFF0EAD8)
 private val MoonCrater = Color(0xFFD8CDAE)
 private val StarDim = Color(0xFFC7D0E8)
 
-/** Fixed star positions for the evening header, as fractions of the star field. Fixed: no flicker. */
-private val HEADER_STARS = listOf(
-    Triple(0.12f, 0.55f, 2.2f), Triple(0.30f, 0.28f, 1.6f), Triple(0.55f, 0.62f, 1.8f),
-    Triple(0.72f, 0.20f, 1.5f), Triple(0.90f, 0.48f, 2.0f),
+/**
+ * The night galaxy: fixed star positions as fractions of the whole screen, with a radius in dp.
+ * Fixed rather than random so the sky never flickers between recompositions — the same reason
+ * NightSky's stars are fixed. Sparser near the vertical middle, where the app grid lives.
+ */
+private val GALAXY_STARS = listOf(
+    // High sky, around the clock and greeting
+    Triple(0.08f, 0.030f, 1.6f), Triple(0.22f, 0.075f, 2.2f), Triple(0.38f, 0.025f, 1.4f),
+    Triple(0.55f, 0.060f, 1.8f), Triple(0.70f, 0.020f, 1.5f), Triple(0.86f, 0.055f, 2.4f),
+    Triple(0.14f, 0.115f, 1.3f), Triple(0.47f, 0.105f, 1.6f), Triple(0.93f, 0.110f, 1.4f),
+    Triple(0.30f, 0.150f, 2.0f), Triple(0.64f, 0.140f, 1.3f), Triple(0.80f, 0.165f, 1.7f),
+    // Mid sky, between the caption and the grid — few and small
+    Triple(0.05f, 0.30f, 1.3f), Triple(0.95f, 0.26f, 1.5f), Triple(0.50f, 0.34f, 1.2f),
+    Triple(0.10f, 0.48f, 1.4f), Triple(0.91f, 0.52f, 1.3f),
+    // Low sky, under the grid
+    Triple(0.18f, 0.68f, 1.8f), Triple(0.42f, 0.74f, 1.4f), Triple(0.66f, 0.70f, 2.1f),
+    Triple(0.86f, 0.78f, 1.5f), Triple(0.08f, 0.84f, 2.3f), Triple(0.33f, 0.88f, 1.4f),
+    Triple(0.57f, 0.92f, 1.7f), Triple(0.78f, 0.86f, 1.3f), Triple(0.94f, 0.94f, 2.0f),
 )

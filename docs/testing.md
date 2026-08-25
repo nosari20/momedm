@@ -451,3 +451,15 @@ button under lock task on a real handset.
 - Empty-state CelestialGlyph verified in code only (needs a zero-app allowlist, which the
   picker deliberately refuses).
 
+## 2026-08-25 — night galaxy, and a real bug it flushed out (rig)
+
+- After 19:00 the launcher sky is a full-screen fixed star field with a soft milky-way
+  band; verified at 22:4x that tiles, caption and greeting sit on it untouched. Daytime
+  is deliberately unchanged.
+- Reinstalling the app over itself made PackageManager briefly answer the launcher query
+  with an empty list: the child saw "no apps allowed yet" on a phone holding five, until
+  the next resume re-ran the query. refreshApps now retries (up to 4 × 1.5 s) before
+  believing an empty answer that contradicts a non-empty allowlist; after this fix the
+  grid was present immediately after install -r + HOME. A genuinely empty result still
+  shows at once.
+

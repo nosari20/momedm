@@ -213,16 +213,30 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
     fun refreshApps() {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
-            val c = kioskConfig.value ?: return@launch
-            val locked = c.isLocked(System.currentTimeMillis())
-            _apps.value = withContext(Dispatchers.IO) {
-                val pm = getApplication<Application>().packageManager
-                val all = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), PackageManager.ResolveInfoFlags.of(0))
-                    .filter { it.activityInfo.packageName != getApplication<Application>().packageName }
-                    .map { LauncherApp(it.activityInfo.packageName, it.loadLabel(pm).toString(), runCatching { it.loadIcon(pm) }.getOrNull()) }
-                    .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }
-                if (locked) all.filter { it.pkg in c.apps }.also { _hiddenApps.value = all.size - it.size }
-                else all.also { _hiddenApps.value = 0 }
+            // Right after this app updates itself (adb install -r, or a future in-app update),
+            // PackageManager can briefly answer the launcher query with an empty list. Shown as-is,
+            // the child gets "no apps allowed yet" on a phone that has five — indistinguishable
+            // from broken, until the next resume happened to re-run this. Retry a few times before
+            // believing an empty answer that contradicts a non-empty allowlist; a genuinely empty
+            // result (child mode off on an empty profile, or a truly empty allowlist) shows at once.
+            var attempt = 0
+            while (isActive) {
+                val c = kioskConfig.value ?: return@launch
+                val locked = c.isLocked(System.currentTimeMillis())
+                val pmEmptyButExpected: Boolean
+                val list = withContext(Dispatchers.IO) {
+                    val pm = getApplication<Application>().packageManager
+                    val all = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), PackageManager.ResolveInfoFlags.of(0))
+                        .filter { it.activityInfo.packageName != getApplication<Application>().packageName }
+                        .map { LauncherApp(it.activityInfo.packageName, it.loadLabel(pm).toString(), runCatching { it.loadIcon(pm) }.getOrNull()) }
+                        .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }
+                    if (locked) all.filter { it.pkg in c.apps }.also { _hiddenApps.value = all.size - it.size }
+                    else all.also { _hiddenApps.value = 0 }
+                }
+                pmEmptyButExpected = list.isEmpty() && locked && c.apps.isNotEmpty()
+                if (!pmEmptyButExpected || attempt >= 4) { _apps.value = list; return@launch }
+                attempt++
+                delay(1_500L)
             }
         }
     }
