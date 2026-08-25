@@ -117,8 +117,14 @@ system dialog on top is a failed check, not a pass.
 ```
 
 `mFlags` in the lock-task policy tells you *which* lock you are in:
-`1` = `SYSTEM_INFO` (ordinary child mode), `17` = `SYSTEM_INFO|GLOBAL_ACTIONS`
-(a complete lock — `GLOBAL_ACTIONS` is what keeps the emergency path reachable).
+`13` = `SYSTEM_INFO|HOME|OVERVIEW` (ordinary child mode — home and recents work,
+and lead back to the allowed apps), `17` = `SYSTEM_INFO|GLOBAL_ACTIONS` (a
+complete lock — no home, no recents, and `GLOBAL_ACTIONS` is what keeps the
+emergency path reachable).
+
+`mPackages` in the same dump is worth reading beside it: `com.android.vending`
+and `com.google.android.gms` should be **absent** at rest and appear only for ten
+minutes after the parent asks for an install.
 
 ## Proving a lock actually holds
 

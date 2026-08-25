@@ -43,7 +43,13 @@ needed. This exact bug shipped once.
 
 **4. `GLOBAL_ACTIONS` survives every path that runs while locked.** It is what
 keeps the system emergency dialer reachable. `SYSTEM_INFO` alone disables the
-power menu. A locked child's phone must still be able to call for help.
+power menu. A locked child's phone must still be able to call for help — and the
+dialer it allowlists is resolved `MATCH_SYSTEM_ONLY`, because whatever comes back
+becomes launchable from a completely locked phone.
+
+**4b. A child mode kiosk adds `HOME|OVERVIEW`, a complete lock does not.** Home
+and recents are deliberate in child mode and deliberately absent at bedtime. Any
+change to `setLockTaskFeatures` has to keep both halves of that.
 
 **5. Cancellation is always rethrown.** The idiom is
 `try { … } catch (c: CancellationException) { throw c } catch (t: Throwable) { Result.failure(t) }`.

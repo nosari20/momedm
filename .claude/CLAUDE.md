@@ -1,0 +1,384 @@
+# CLAUDE.md
+
+Guidance for working in this repository.
+
+## What this is
+
+**Môme DM** is a single Android app (Kotlin + Jetpack Compose), package
+`edu.fnosari.momedm`, with two runtime roles chosen at launch by
+`DevicePolicyManager.isDeviceOwnerApp(packageName)` — no role picker:
+
+- **Managed** — the app is **device owner** on a fully managed device (work
+  profile is refused). It connects over BLE to a controller and executes
+  management commands (kiosk, install, add account, status).
+- **Controller** — the same app on another phone. It provisions managed
+  devices via QR code (embedding a shared HMAC secret + a self-hosted APK
+  download), advertises a BLE GATT server, and drives connected managed
+  devices.
+
+Transport is BLE only — no cloud, no Play EMM. Design spec:
+`docs/superpowers/specs/2026-08-22-momedm-design.md`. Implementation plan:
+`docs/superpowers/plans/2026-08-22-momedm-implementation.md`.
+
+## Build & run
+
+```bash
+./gradlew assembleDebug              # build debug APK
+./gradlew installDebug               # build + install on a connected device
+./gradlew :app:testDebugUnitTest     # JVM unit tests (protocol, controller, persistence, managed)
+./gradlew clean :app:assembleDebug :app:testDebugUnitTest  # full verification
+```
+
+On Windows, `./gradlew` runs through Git Bash; `gradlew.bat` is the native
+equivalent. `local.properties` must point `sdk.dir` at the Android SDK. BLE
+and device-owner behavior CAN be exercised between two API 33+ emulators
+(the emulator's rootcanal Bluetooth stack links all emulators on one host) —
+see "Emulator test rig" in `docs/testing.md`; real hardware still needed for
+the QR/Setup-Wizard provisioning path and hotspot.
+
+**Windows Gradle quirk:** a stray Gradle daemon can hold a file lock on
+`app/build` between runs. If a build fails with a lock/access error: `./gradlew
+--stop`, delete `app/build`, then retry.
+
+**Toolchain:** AGP 9.3.1 with built-in Kotlin 2.2.10, Gradle 9.5, Compose BOM
+2024.09.00 + Material3, navigation-compose, lifecycle-viewmodel-compose,
+DataStore preferences, kotlinx-serialization-json 1.9.0, zxing-core 3.5.3
+(QR), nanohttpd 2.3.1 (APK hosting), JUnit 4. `minSdk 34` / `compileSdk 37` /
+`targetSdk 37`, Java 11. Dependencies are managed through the version catalog
+at `gradle/libs.versions.toml` — add libraries there, never inline in
+`app/build.gradle.kts`. Build must stay a single universal APK (no
+`splits {}`) because the controller serves its own
+`applicationInfo.sourceDir`.
+
+## Architecture
+
+```
+app/src/main/java/edu/fnosari/momedm/
+├── connectivity/ble/              # Reusable, app-agnostic BLE framework (copied from BLEController + extended)
+│   ├── BLEClient.kt               #   Scan-by-name/UUID, connect, discover, notify, read/write
+│   ├── BLEServer.kt               #   GATT server + advertising, per-device notify queue
+│   ├── BLEOperationQueue.kt       #   Serializes GATT ops (one in flight at a time)
+│   ├── BLEOperation.kt            #   Sealed Read/Write/WriteDescriptor op types
+│   ├── BLEException.kt, BLEDevice.kt
+│   ├── characteristics/BLECharacteristic.kt  #   Abstract base + Permission enum (READ/WRITE/READ_WRITE/NOTIFY)
+│   ├── services/BLEService.kt     #   Abstract base
+│   └── README.md                  #   Framework-level docs; keep in sync with extensions
+│
+├── protocol/                      # Pure Kotlin — no Android imports; JVM-tested
+│   ├── Encoding.kt                #   Hex, Base64Url, Base64Std
+│   ├── Crypto.kt                  #   HMAC-SHA256, nonces, constant-time compare
+│   ├── Framer.kt                  #   Framer (chunking) + Reassembler (10 s idle timeout, 16 concurrent partials)
+│   ├── Messages.kt                #   Message sealed hierarchy, Envelope, MessageCodec, CmdType, AppInfo
+│   ├── Handshake.kt                #   ManagedHandshake, ControllerHandshake
+│   ├── SecureChannel.kt           #   SecureChannel (seal/open), ProtocolException
+│   ├── Endpoints.kt               #   FrameSink, ManagedEndpoint, ControllerEndpoint (session state machines)
+│   ├── PinHash.kt                 #   Parent-PIN hashing: PBKDF2-HMAC-SHA256, 20k iters, 32-byte out, 16-byte salt
+│   └── ProvisioningExtras.kt      #   Admin-extras bundle keys (controller_id, secret)
+│
+├── link/MdmGatt.kt                # Service/characteristic UUIDs (permanent) + MdmService/Cmd/RspCharacteristic
+│
+├── persistence/
+│   ├── preferences/               # Preference<T>, PreferencesProvider, DataStore impl (copied from BLEController)
+│   ├── ManagedPrefs.kt            #   controllerId, secret, deviceId, kioskConfig, childPrefs, PIN lockout
+│   ├── KioskConfig.kt             #   on/apps/pinned/pauseUntil + isPaused/isLocked, PAUSE_MS (pure Kotlin)
+│   ├── ControllerPrefs.kt         #   controllerId, secret (identity), parent PIN (hash+salt), pinSet
+│   └── DeviceRegistry.kt          #   DeviceRecord, codec, registry (DataStore JSON), nickname
+│
+├── managed/                       # Non-UI, device-owner side
+│   ├── AdminReceiver.kt           #   DeviceAdminReceiver
+│   ├── BootReceiver.kt            #   Restarts ManagedLinkService on BOOT_COMPLETED
+│   ├── ManagedSetup.kt            #   Post-provisioning setup (preferred HOME, start link)
+│   ├── PolicyManager.kt           #   DevicePolicyManager wrapper: multi-app kiosk on/off/pause/resume,
+│   │                              #     restoreKiosk (reboot), verifyPin, install, add account
+│   ├── StatusCollector.kt         #   Battery, account, foreground app, launchable apps
+│   ├── CommandExecutor.kt         #   Dispatches Cmd -> PolicyManager/StatusCollector, builds Result
+│   ├── ManagedLinkState.kt        #   Link state enum/data exposed to UI
+│   └── ManagedLinkService.kt      #   Foreground service: owns BLEClient + ManagedEndpoint, reconnect w/ backoff
+│
+├── controller/                    # Non-UI, controller side
+│   ├── ControllerLink.kt          #   Advertising state bus consumed by UI/settings
+│   ├── ControllerService.kt       #   Foreground service: owns BLEServer + SessionManager
+│   ├── SessionManager.kt          #   BluetoothDevice -> ControllerEndpoint session map
+│   └── provisioning/              #   ControllerIdentity, QrPayloadBuilder, SignatureChecksum, ApkHttpServer,
+│                                  #     HotspotManager, NetUtils, QrBitmap, ProvisioningController
+│
+├── activities/
+│   ├── main/                      # Controller UI: MainActivity (LAUNCHER; redirects to ManagedHomeActivity if
+│   │   │                          #   isDeviceOwnerApp), ControllerViewModel, navigation/Routes {DEVICES, PROVISION},
+│   │   │                          #   screens/{DevicesScreen,DeviceScreen,ProvisionScreen},
+│   │   └── components/{ServiceBanner,OnlineIndicator,AppPickerDialog}
+│   ├── managed/                   # Managed UI: ManagedHomeActivity (HOME/DEFAULT; itself a launcher screen — all
+│   │   │                          #   apps when child mode is off), ManagedViewModel, screens/ChildLauncherScreen
+│   │   │                          #   (app grid, pinned-app bounce, PIN pause banner), components/PinDialog
+│   │   │                          #   (masked numeric PIN, lockout countdown)
+│   │   └── provisioning/          #   GetProvisioningModeActivity, PolicyComplianceActivity (setup wizard steps)
+│   └── settings/                  # SettingsActivity (copied), navigation/Routes, screens/{SettingsCategories,
+│                                  #   SettingsScreen, SettingsEasterEgg, SettingsAppearanceScreen (language/theme/
+│                                  #   accent pickers), SettingsPinScreen (parent PIN, own screen), SettingsAdvancedScreen
+│                                  #   (parent id + pairing-key fingerprint + regenerate)}, components/ColorDialogs.kt
+│                                  #   (AccentDialog preset grid + CustomColorDialog hex/HSV picker)
+│
+├── ui/{layouts,theme}/            # Layout.BasicLayoutWithTopBarAndDrawer, BasicLayoutWithTopBar, MomeDMTheme (copied)
+│   ├── theme/Palette.kt           #   Seed-accent maths (blend/lighten/darken, WCAG luminance, hex parse) — pure
+│   │                              #   Kotlin, unit-tested, usable outside Compose (e.g. MainActivity system bars)
+│   └── common/Pronote.kt          #   stripeEdge, AccentPill, SectionLabel, pronoteTopBarColors — shared Pronote-
+│                                  #   style Compose bits used by both roles' screens
+├── ui/components/ButtonRequestPermission.kt  # Permission-gate button used by activity onCreate flows
+├── ui/AppLocale.kt                # Applies a ChildPrefs language override (per-app locale) at runtime
+├── ui/UiPrefsState.kt             # UiPrefs(language,theme,accent) + ControllerPrefs/ManagedPrefs.uiPrefs(),
+│                                  #   SystemBars, ControllerThemed/ManagedThemed (theme wrapper per role)
+└── utils/AppVersion.kt            # Copied
+
+app/src/test/java/edu/fnosari/momedm/
+├── protocol/                      # Framer/Reassembler, Crypto, Encoding, Handshake, Messages, SecureChannel,
+│                                  #   PinHashTest, EndpointLoopbackTest (full controller<->managed session over an in-memory sink)
+├── controller/                    # SessionManagerTest, provisioning/{ControllerIdentityTest,NetUtilsTest,QrPayloadBuilderTest}
+├── persistence/                   # ManagedPrefsTest, ControllerPrefsTest, DeviceRegistryCodecTest, KioskConfigTest, InMemoryPreferencesProvider
+└── managed/                       # CommandExecutorTest
+```
+
+Data flow: **Controller BLEServer (GATT peripheral) ⇄ BLE link ⇄ Managed
+BLEClient (GATT central)**, both sides driving a `ControllerEndpoint` /
+`ManagedEndpoint` state machine over `protocol/` (frames → envelope →
+messages) before reaching `managed/CommandExecutor` or the controller
+screens.
+
+### Key conventions
+
+- **`connectivity/ble` is app-agnostic** — no MDM terms, no app-specific
+  UUIDs or classes live there; it is the same reusable framework as
+  BLEController's, copied and extended (see its own
+  `connectivity/ble/README.md`).
+- **`protocol/` is pure Kotlin** — no Android imports, only Kotlin stdlib,
+  kotlinx-serialization and `javax.crypto`; it is fully covered by JVM unit
+  tests and must stay that way for anything added to it.
+- **Role switch, not a role picker.** `MainActivity.onCreate` checks
+  `isDeviceOwnerApp` and redirects to `ManagedHomeActivity` when true; there
+  is no user-facing toggle.
+- **Routes enum / Layout pattern**, copied from BLEController: each
+  activity's `navigation/Routes` enum (`label: Int` string res, `icon:
+  ImageVector`) drives a `NavHost` inside
+  `Layout.BasicLayoutWithTopBarAndDrawer`.
+- **Version catalog only.** All dependencies go through
+  `gradle/libs.versions.toml`; never add inline coordinates in
+  `app/build.gradle.kts`.
+- **Private `LOG_TAG` companion + verbose `android.util.Log`** on every
+  class, KDoc on public API — matches BLEController's style.
+- BLE system callbacks run on binder threads: they log-and-return on a
+  missing permission, never throw.
+
+## Gotchas
+
+- **BLE works between two emulators** (API 33+ images expose emulated
+  Bluetooth via rootcanal; advertising, scanning, GATT, MTU 517 all work).
+  `docs/testing.md` has the exact rig (two AVDs, `dpm set-device-owner`,
+  the debug-only `DebugProvisionReceiver` to inject the controller secret).
+  CI can still only compile-check and run the JVM unit tests.
+- **The DPC (device-owner) path is only testable two ways:** a factory-reset
+  device run through Setup Wizard QR provisioning, or on a device with **no
+  accounts added**, via
+  `adb shell dpm set-device-owner edu.fnosari.momedm/.managed.AdminReceiver`.
+  Device owner cannot be set on a device that already has a user account.
+- **ATT MTU falls back to 23** if `requestMtu(517)` fails or the peer
+  negotiates lower — `Framer.maxChunk` and the protocol's chunking must
+  tolerate the resulting ~5-byte-per-frame payload; `Endpoints.kt` clamps a
+  peer-reported `Hello.mtu` to `23..517` before trusting it.
+- **`allowBackup="false"` is intentional** — the shared secret (`controllerId`
+  + `secret` in `ManagedPrefs`/`ControllerPrefs`) must never be restored onto
+  a different device via Auto Backup.
+- **GATT UUIDs in `link/MdmGatt.kt` are permanent** — `SERVICE_UUID`,
+  `CMD_UUID`, `RSP_UUID` are fixed forever once generated; do not regenerate
+  them, or already-provisioned devices lose discovery.
+- **Every handshake HMAC is domain-separated** — challenge proof =
+  `HMAC(secret, "momedm/challenge|$nonceC")`, auth proof =
+  `HMAC(secret, "momedm/auth|$nonceS")`, session key =
+  `HMAC(secret, "momedm/session|$nonceC|$nonceS")`. Never collapse these onto a
+  shared input space: the CHALLENGE proof is an oracle over an attacker-chosen
+  `nonceC`, so without the tags a forged HELLO with `nonceC = realNonceC+nonceS`
+  gets the session key handed straight back. Both endpoints also reject any
+  peer nonce that isn't exactly 32 lower-case hex chars, *before* hashing it.
+- **Never log string preference values or BLE payloads** —
+  `DataStorePreferencesProvider` logs string writes as key + length only (the
+  shared secret and the Wi-Fi passphrase go through it), and `BLEClient`/
+  `BLEServer` log characteristic traffic as UUID + byte length only (payloads
+  are protocol frames).
+- **Protocol errors reset the whole session** (handshake + channel), on
+  either side — a bad MAC, non-increasing seq, or unexpected message before
+  auth never leaves a half-valid state that a replayed frame could exploit.
+- **`ManagedEndpoint.authenticated` is only `true` after `AUTH_OK`** lands
+  from the controller, not merely after the managed side sends `AUTH` —
+  `AUTH_OK` is an addition beyond the spec so the managed side has a
+  positive signal that the session is actually live.
+- **Reassembler** discards a partial after 10 s of inactivity, tracks at most 16
+  concurrent partials (oldest evicted first), **and caps each partial at 256 KB**
+  — the count alone bounded how many messages were held, not how large they could
+  grow, so a peer that never completed one could still consume memory freely.
+- **Kiosk allowlist** is `[...apps, self, emergency dialer]`, plus
+  `com.android.vending` + `com.google.android.gms` **only inside a ten-minute
+  window** opened by `INSTALL`/`SEARCH_APP` (`PolicyManager.openPlayWindow`,
+  deadline persisted in `ManagedPrefs.playUntil`). Permanently allowlisted, the
+  store undid the allowlist beside it: a `market://` link from any allowed app
+  put a child in Play. Opening the window calls `LockController.invalidate()` —
+  the apply cache is keyed on (LockState, KioskConfig), and neither changes here,
+  so without it the allowlist is never rewritten and lock task refuses the launch.
+- **`setLockTaskFeatures`** enables `SYSTEM_INFO or HOME or OVERVIEW` for a
+  kiosk, so home and recents work and the phone feels ordinary — neither widens
+  what can launch. It is `SYSTEM_INFO or GLOBAL_ACTIONS` for a complete lock (no
+  home, no recents, deliberately). `NOTIFICATIONS` still requires `HOME`, and
+  `applyKiosk` claims persistent HOME first: enabling the home button while some
+  other launcher is HOME would hand the child the app grid child mode replaces.
+- **`KIOSK_ON` carries `apps` (non-empty allowlist) + optional `pinned`**
+  (single app kept in front, must be `in apps`) — v1's single-`pkg` kiosk is
+  gone. `PolicyManager.kioskOn` persists both into `KioskConfig` and always
+  re-derives the lock-task allowlist (see above — Play only inside its window); a
+  `pinned` app that isn't installed/allowed is silently dropped (logged),
+  never rejected outright.
+- **`Message.Result` carries a stable `code`, and the parent renders that.**
+  `msg` is diagnostic text written on the child, in its own words, and must never
+  reach a person — the parent may be reading in another language. An unknown code
+  falls back to a plain outcome rather than leaking wire text. Tests assert on the
+  code, not on `msg`.
+- **`LockController.reevaluate()` is serialised on a companion `Mutex`.** Seven
+  triggers on three dispatchers share one process-wide apply cache; interleaved,
+  it could record a policy the device was not in and then skip every correction.
+- **`SafetyConfig.sanitized()` is the choke point for peer input** and runs on
+  both sides: on the child for an inbound `Cmd`, and on the parent for an inbound
+  `Status`. It validates package names and bounds apps/keys, because the platform
+  writes managed configuration to disk and re-applies it on every boot.
+- **Notify characteristics are notify-only.** `Permission.NOTIFY` maps to
+  `PROPERTY_NOTIFY` with no read permission, and `BLEServer` refuses reads on
+  them: a notify characteristic stages the last frame sent, so advertising a read
+  let any central connect and poll for traffic — including the PIN's salt and hash.
+- **The child owns a little of its own phone.** `KEY_CHILD_NAME` and
+  `KEY_MOON_STYLE` live in `ManagedPrefs` and are deliberately **not** in
+  `ChildPrefs`: they never cross the link and never appear in the parent's app.
+  Anything added there must keep that property, or it stops being the child's.
+- **One shared secret and one PIN for the whole family — settled, not pending.**
+  Per-device secrets were considered and rejected (see `docs/architecture.md`).
+  Do not "fix" the consequences: a child can claim a sibling's `deviceId`, and any
+  child that can read its own storage can impersonate another.
+
+- **Parent PIN is PBKDF2, never plaintext, and pushed as prefs, not a
+  command.** `PinHash` (PBKDF2-HMAC-SHA256, 20k iterations, 32-byte output,
+  16-byte random salt) hashes the PIN on the **controller**; only the salt +
+  hash travel inside `ChildPrefs` on `SET_PREFS`. `ChildPrefs.sanitized()`
+  keeps the pair only when both halves are lower-case hex of exactly the
+  lengths `PinHash` emits (32 / 64 chars); anything else nulls both, because
+  `PinHash.verify` would otherwise raise inside `Hex.decode` on the child's PIN
+  dialog. `PolicyManager.verifyPin` is belt-and-braces on top: it never throws
+  (a malformed pair may already sit in `ManagedPrefs` from before that check)
+  and runs the 20k iterations on `Dispatchers.Default`. The launcher's
+  wrong-PIN backoff is persisted (`ManagedPrefs.pinFailures` /
+  `pinLockUntil`), so force-stopping the launcher does not reset it. A correct
+  PIN starts a 10-minute pause (`KioskConfig.PAUSE_MS`) that the launcher
+  `Activity` itself releases by calling `stopLockTask()` —
+  `PolicyManager.pause()` only persists the deadline, it does not touch
+  lock-task state. The pause is **not honoured across reboot**:
+  `restoreKiosk()` unconditionally re-locks with the stored `apps`/`pinned` on
+  `BOOT_COMPLETED`, ignoring any prior `pauseUntil`.
+- **Ending a pause is the *service's* job, not the launcher's.**
+  `ManagedLinkService` runs a `collectLatest` watchdog over
+  `ManagedPrefs.kioskConfig` that waits out `pauseUntil`, re-reads the deadline
+  and then calls `PolicyManager.resume()`. `ManagedViewModel` keeps its own
+  countdown, but only to drive the launcher's banner — it dies with the
+  Activity, so it can never be the durable guarantee.
+- **`SET_PREFS` is pushed after every successful auth and after every prefs
+  change** (PIN set/changed/cleared, language/theme/accent), so a managed
+  device that reconnects always gets the parent's current PIN hash — never
+  rely on it being pushed only once. Those service-originated pushes produce
+  `RESULT`s on the process-wide `ControllerLink.results`, so
+  `ControllerViewModel` announces only results whose `cmdId` it sent itself —
+  otherwise the parent gets a snackbar every time a child reconnects.
+- **Both roles are themed from the same `UiPrefs(language, theme, accent)`
+  shape** (`ui/UiPrefsState.kt`), just sourced differently: the parent's
+  `ControllerThemed` reads live from `ControllerPrefs.{language,theme,accent}`;
+  the child's `ManagedThemed` reads from the pushed `ManagedPrefs.childPrefs`
+  (i.e. whatever the parent last sent via `SET_PREFS`). `MomeDMTheme(darkTheme,
+  seed)` recolours the Material scheme around `seed` (an ARGB int, `Palette.
+  primaryFor`/`withSeed`); `theme` resolves through `isDarkTheme(pref,
+  systemDark)` (`THEME_SYSTEM`/`LIGHT`/`DARK`); only `language` goes through
+  `ui/AppLocale` separately (per-app locale, not part of `MomeDMTheme`). A
+  parent-side change immediately emits `ControllerLink.prefsChanged` → pushes
+  `SET_PREFS` → the child's `ManagedThemed`/`AppLocale` pick it up live via the
+  DataStore flow, no recreate needed on API 34's `LocaleManager` path.
+  `Palette.DEFAULT == ChildPrefs.DEFAULT_ACCENT == 0xFF16866F` (both roles
+  default to the same green before any parent customization).
+- **`ManagedHomeActivity` is a launcher for both modes**: with child mode
+  off it shows every launchable app (`ChildLauncherScreen`, header "All
+  apps"); with child mode on it shows only the allowed apps (header "Child
+  mode", lock icon when a PIN is set) — there is no separate "off" screen to
+  maintain. `ManagedViewModel.kioskConfig` is a `StateFlow<KioskConfig?>`
+  seeded **null**, meaning "not loaded yet": a `KioskConfig()` seed would claim
+  child mode is off for the first frames of a cold start and flash every
+  installed app on a locked-down device. Screen, `refreshApps` and the
+  pinned-app bounce all render/do nothing while it is null.
+- **`ADD_ACCOUNT` is refused while kiosk is on** — Settings would be
+  escapable from inside lock task, so the controller must send `KIOSK_OFF`
+  first; this is on purpose, not a bug.
+- **`STATUS` push cadence** is: on auth, after every command, on a battery
+  change of ≥5 percentage points, and at least every 5 minutes — *not* on
+  foreground-app or account change (no cheap signal exists for those; the
+  5-minute timer covers them). A sealed `PING` goes out every minute in
+  between. Acceptable for v1.
+- **Session-loss recovery is write-driven.** `BluetoothGattServer.cancelConnection`
+  does not reliably drop a central-initiated link and notifications do not
+  reach a client after the server re-registers (verified on the emulator's
+  rootcanal stack). So `SessionManager.onFrame` returns `false` for a key it
+  has no session for, `ControllerService` answers that write with
+  `GATT_FAILURE`, `BLEClient` surfaces it as `onWriteFailed`, and
+  `ManagedLinkService` disconnects + rescans. `REHELLO` (plain) is the
+  notify-side complement (sealed frame before auth / silent session probe)
+  and `PING` bounds detection latency to ~60 s.
+- **`BLEServerCallBack.onCharacteristicWriteRequest` takes a 4th `value:
+  String` parameter** — use it, not `characteristic.value`, since the latter
+  is a single field shared across all connected centrals and can be
+  overwritten by a second concurrent write before the first write's callback
+  runs.
+- **`BLEClient.stopScan()` is public**, idempotent, and never throws — safe
+  to call defensively from service lifecycle code.
+- **Controller secret rotation** goes through
+  `ControllerService.reloadIdentity(context)` (via a
+  `startForegroundService` extra), which reloads identity **in place**
+  without tearing down and rebuilding the running service.
+- **Hotspot IP selection** prefers an interface address ending in `.1` (the
+  local-only-hotspot gateway convention), polling briefly for it to appear
+  rather than failing immediately if the interface isn't up yet.
+- **A newer Compose-foundation overload can compile clean and still crash at
+  runtime** against the pinned BOM (2024.09.00). Found on the emulator:
+  `AccentDialog` used `androidx.compose.foundation.layout.FlowRow` (carried
+  over from MaClasse) and threw `NoSuchMethodError` the first time the dialog
+  opened, despite building without error — the artifact on the classpath at
+  runtime didn't have the symbol the compiled call site expected. Fixed by
+  dropping `FlowRow` for a plain `list.chunked(n)` → `Column`/`Row` grid
+  (commit `d794a09`). When adding a layout composable, prefer the well-worn
+  `Column`/`Row`/`LazyColumn` primitives over newer `foundation.layout`
+  additions unless you've exercised them on-device against this BOM.
+
+## House rules for changes
+
+- Keep `connectivity/ble` free of MDM-specific concepts — it's meant to stay
+  reusable and is documented independently in
+  `connectivity/ble/README.md`.
+- Keep `protocol/` free of Android imports.
+- Add dependencies via `gradle/libs.versions.toml`.
+- Match the existing doc-comment style (KDoc on public classes/members) and
+  logging style (`LOG_TAG` + `android.util.Log`).
+- Don't reformat or churn unrelated files.
+- BLE/DPM behavior can't be verified in CI; use the two-emulator rig in
+  `docs/testing.md` (or real devices) and say which you used. Update
+  `docs/testing.md` if a change alters the manual checklist.
+- **`values/strings.xml` (EN) and `values-fr/strings.xml` (FR) change
+  together, in the same commit** (MaClasse's rule) — add/remove/rename a key
+  in both files, never just one. `edu.fnosari.momedm.res.StringsParityTest`
+  (a plain JVM test, runs with the rest of `testDebugUnitTest`) parses both
+  files and fails the build if the key sets ever diverge; run it directly
+  with `./gradlew :app:testDebugUnitTest --tests "edu.fnosari.momedm.res.*"`
+  after touching either file.
+- **No kiosk/provision/MDM/GATT jargon in parent-facing strings.** The parent
+  UI speaks in plain-language child/device vocabulary, not device-management
+  terms: "My children"/"Mes enfants" (not "Devices"), "Child mode"/"Mode
+  enfant" (not "Kiosk"), "Allowed apps"/"Apps autorisées" (not "Lock task
+  allowlist"), "Pair a device"/"Associer un appareil" (not "Provision"),
+  "Visible to children"/"Visible par les enfants" (not "Advertising"). Code
+  identifiers (`KioskConfig`, `ControllerLink`, GATT UUIDs, etc.) keep the
+  precise technical names — only user-facing strings get de-jargoned.

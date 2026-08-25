@@ -12,7 +12,7 @@ find it useful — the skills describe real workflows.
 
 | Path | What it is |
 |---|---|
-| `../CLAUDE.md` | Always-loaded project brief: architecture, conventions, gotchas |
+| `CLAUDE.md` | The project brief: architecture, conventions, gotchas. The repo root holds a one-line `CLAUDE.md` that imports it, so Claude Code still picks it up automatically. |
 | `skills/emulator-rig/` | Bring up two emulators and drive a full parent↔child session |
 | `skills/adding-a-command/` | Add a management command end-to-end, in dependency order |
 | `skills/localized-strings/` | Add user-facing copy without breaking FR/EN parity |
