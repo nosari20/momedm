@@ -1,19 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The parent as a warm sun, the child as a small cratered planet on its orbit (the craters are
-     NightSky.kt's own offsets, scaled). Everything fits the 66dp adaptive safe zone: the orbit's
-     extremes stay within r=33 of centre, and the planet grazes it at 32.9. -->
+<!-- The parent as a warm sun, the child as a small cratered planet beside it (the craters are
+     NightSky.kt's own offsets, scaled). The orbit is implied, not drawn — the planet still sits
+     on the invisible ellipse, grazing the 66dp safe zone at 32.9 of r=33. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Orbit ring -->
-    <path
-        android:strokeColor="#C7D0E8"
-        android:strokeWidth="2"
-        android:strokeAlpha="0.45"
-        android:fillColor="#00000000"
-        android:pathData="M28,52 a26,22 0 1,0 52,0 a26,22 0 1,0 -52,0" />
     <!-- The sun's soft halo, then the sun -->
     <path
         android:fillColor="#E9A15C"
@@ -25,7 +18,7 @@
     <path
         android:fillColor="#F2BE85"
         android:pathData="M45,47 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 Z" />
-    <!-- The child's planet, on the ring, moon-cream with its craters -->
+    <!-- The child's planet, moon-cream with its craters -->
     <path
         android:fillColor="#F0EAD8"
         android:pathData="M68.5,62 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0 Z" />
