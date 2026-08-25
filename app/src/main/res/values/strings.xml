@@ -153,11 +153,14 @@
     <string name="children_title">My children</string>
     <string name="children_empty">No child device yet. Tap + to pair one.</string>
     <string name="child_online">Connected</string>
+    <string name="child_offline_banner">This phone is out of range. Changes cannot be sent until it is back, and they are not saved up to send later.</string>
     <string name="child_offline">Offline</string>
     <string name="child_mode_on">Child mode on</string>
     <string name="child_mode_paused">Paused</string>
     <string name="child_mode_off">Child mode off</string>
     <string name="children_visible">Visible to children</string>
+    <string name="conn_indicator_on">Visible to children</string>
+    <string name="conn_indicator_off">Not visible to children</string>
     <string name="children_online_count">%1$d connected</string>
     <string name="children_not_visible">Children can\'t connect while this is off</string>
 

@@ -153,11 +153,14 @@
     <string name="children_title">Mes enfants</string>
     <string name="children_empty">Aucun appareil enfant. Appuyez sur + pour en associer un.</string>
     <string name="child_online">Connecté</string>
+    <string name="child_offline_banner">Ce téléphone est hors de portée. Les changements ne peuvent pas être envoyés avant son retour, et ils ne sont pas mis de côté pour plus tard.</string>
     <string name="child_offline">Hors ligne</string>
     <string name="child_mode_on">Mode enfant actif</string>
     <string name="child_mode_paused">En pause</string>
     <string name="child_mode_off">Mode enfant inactif</string>
     <string name="children_visible">Visible par les enfants</string>
+    <string name="conn_indicator_on">Visible par les enfants</string>
+    <string name="conn_indicator_off">Non visible par les enfants</string>
     <string name="children_online_count">%1$d connecté(s)</string>
     <string name="children_not_visible">Les enfants ne peuvent pas se connecter tant que c\'est désactivé</string>
 

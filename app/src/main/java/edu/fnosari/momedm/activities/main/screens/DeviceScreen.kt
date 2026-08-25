@@ -18,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -77,6 +78,23 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
             text = stringResource(if (isOnline) R.string.child_online else R.string.child_offline),
             accent = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // Offline, every control below is dead: commands go out over BLE and are not queued, so a tap
+        // produces one snackbar and nothing else. A parent working through several changes on a phone
+        // that has gone out of range would otherwise collect a string of them, or miss them entirely
+        // while scrolling. Say it once, here, and disable what cannot work.
+        if (!isOnline) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    stringResource(R.string.child_offline_banner),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
+        }
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel(stringResource(R.string.child_page_status))
@@ -97,7 +115,7 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 SectionLabel(stringResource(R.string.child_night_section))
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.child_night_enable), modifier = Modifier.weight(1f))
-                    Switch(checked = schedule.enabled, onCheckedChange = { viewModel.setSchedule(deviceId, schedule.copy(enabled = it)) })
+                    Switch(checked = schedule.enabled, enabled = isOnline, onCheckedChange = { viewModel.setSchedule(deviceId, schedule.copy(enabled = it)) })
                 }
                 TimeRangeRow(stringResource(R.string.child_night_school), schedule.weekdayStart, schedule.weekdayEnd) { st, en ->
                     viewModel.setSchedule(deviceId, schedule.copy(weekdayStart = st, weekdayEnd = en))
@@ -122,10 +140,12 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 when {
                     s?.lockReason == LockState.REASON_MANUAL -> OutlinedButton(
                         onClick = { viewModel.unlock(deviceId) },
+                        enabled = isOnline,
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.child_unlock)) }
                     s?.locked != true -> OutlinedButton(
                         onClick = { viewModel.lockNow(deviceId) },
+                        enabled = isOnline,
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.child_lock_now)) }
                 }
@@ -150,15 +170,15 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                         textAlign = TextAlign.End,
                     )
                 }
-                OutlinedButton(onClick = { editingSafety = true }, Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { editingSafety = true }, Modifier.fillMaxWidth(), enabled = isOnline) {
                     Text(stringResource(R.string.safety_change))
                 }
                 // Which apps a child may open is the same question as what they can reach, so it sits
                 // here beside the level and the per-app settings rather than adrift below the card.
-                OutlinedButton(onClick = { viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) {
                     Text(stringResource(R.string.child_choose_apps))
                 }
-                OutlinedButton(onClick = { pickingConfigApp = true; viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { pickingConfigApp = true; viewModel.requestApps(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) {
                     Text(stringResource(R.string.appcfg_open))
                 }
             }
@@ -170,14 +190,15 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         Button(
             onClick = { if (s?.kiosk == true) confirmStop = true else viewModel.requestApps(deviceId) },
             Modifier.fillMaxWidth(),
+            enabled = isOnline,
         ) {
             Text(stringResource(if (s?.kiosk == true) R.string.child_stop else R.string.child_start))
         }
-        if (s?.kioskPaused == true) OutlinedButton(onClick = { viewModel.relock(deviceId) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_relock)) }
+        if (s?.kioskPaused == true) OutlinedButton(onClick = { viewModel.relock(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_relock)) }
         OutlinedTextField(value = pkg, onValueChange = { pkg = it }, label = { Text(stringResource(R.string.child_install_hint)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { viewModel.install(deviceId, pkg.trim()) }, enabled = pkg.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_install)) }
-        OutlinedButton(onClick = { viewModel.addAccount(deviceId) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_add_account)) }
-        OutlinedButton(onClick = { viewModel.refresh(deviceId) }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_refresh)) }
+        Button(onClick = { viewModel.install(deviceId, pkg.trim()) }, enabled = isOnline && pkg.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_install)) }
+        OutlinedButton(onClick = { viewModel.addAccount(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_add_account)) }
+        OutlinedButton(onClick = { viewModel.refresh(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_refresh)) }
     }
     appsFor?.let { (id, apps) ->
         // Both pickers are driven by the same app list the child reports, so this one stands aside
