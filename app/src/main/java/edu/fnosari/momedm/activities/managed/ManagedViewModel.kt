@@ -147,6 +147,9 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
      */
     val hiddenApps: StateFlow<Int> = _hiddenApps
 
+    /** Bumped when a tile tap could not launch its app; the launcher shows a soft "can't open" note. */
+    val openFailedTick = MutableStateFlow(0)
+
     private val _apps = MutableStateFlow<List<LauncherApp>>(emptyList())
     val launcherApps: StateFlow<List<LauncherApp>> = _apps
     private val _pauseRemaining = MutableStateFlow(0L)
@@ -195,6 +198,10 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
      */
     fun onResumed() {
         resumeTick.value++
+        // A parent's INSTALL command does not touch KioskConfig, so nothing else re-reads the app
+        // list: a promised game must not need a relaunch to appear, and an uninstall must not
+        // leave a dead tile. Cheap — refreshApps cancels prior runs and works on Dispatchers.IO.
+        refreshApps()
         viewModelScope.launch { LockController(getApplication(), prefs, policy).reevaluate() }
     }
 
@@ -251,7 +258,13 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
         // kiosk-mode flag has no idea a complete lock could apply with child mode off.
         val locked = lockState.value?.locked == true
         val ok = policy.launchAllowed(pkg, locked)
-        if (!ok) Log.w(LOG_TAG, "Could not open $pkg")
+        if (!ok) {
+            Log.w(LOG_TAG, "Could not open $pkg")
+            // Say so, and re-derive the grid: the most likely cause is a tile for an app that is
+            // no longer there, and nothing else removes a stale tile.
+            openFailedTick.value++
+            refreshApps()
+        }
     }
 
     /**

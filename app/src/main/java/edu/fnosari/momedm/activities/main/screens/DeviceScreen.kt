@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -22,7 +23,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +72,9 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
     // label has to be remembered here or the form can only show a package name.
     var configAppLabel by remember { mutableStateOf("") }
     val s = d?.lastStatus
+    // Self-freshening (silently): the stored status can be minutes old, or from yesterday after
+    // an app restart with the pill still showing green. No snackbar — the parent didn't ask.
+    LaunchedEffect(deviceId, isOnline) { if (isOnline) viewModel.refreshSilent(deviceId) }
     Column(Modifier.fillMaxWidth().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(d?.nickname ?: d?.model ?: deviceId, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
@@ -97,30 +103,40 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         }
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel(stringResource(R.string.child_page_status))
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    SectionLabel(stringResource(R.string.child_page_status))
+                    // Beside the data it refreshes, not exiled to the bottom of the scroll.
+                    IconButton(onClick = { viewModel.refresh(deviceId) }, enabled = isOnline) {
+                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.child_refresh))
+                    }
+                }
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_allowed_apps)); Text(s?.let { stringResource(R.string.child_allowed_count, it.kioskApps.size) } ?: "—") }
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_single_app)); Text(s?.kioskPkg ?: "—") }
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_current_app)); Text(s?.currentApp ?: "—") }
+                // "Single app" is "—" almost always; show the row only when it says something.
+                s?.kioskPkg?.let { one -> Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_single_app)); Text(prettyAppName(one)) } }
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_current_app)); Text(s?.currentApp?.let(::prettyAppName) ?: "—") }
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_battery)); Text(s?.let { "${it.battery}%" } ?: "—") }
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_google)); Text(s?.let { if (it.account) yes else no } ?: "—") }
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_last_seen)); Text(d?.let { DateFormat.getDateTimeInstance().format(Date(it.lastSeen)) } ?: "—") }
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(stringResource(R.string.child_last_seen)); Text(d?.let { DateUtils.getRelativeTimeSpanString(it.lastSeen).toString() } ?: "—") }
                 if (s?.kioskPaused == true) Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                     Text(stringResource(R.string.child_paused_until, s.pauseEndsAt?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) } ?: "—"))
                 }
             }
         }
         val schedule = s?.schedule ?: LockSchedule()
+        // With no status yet, these times would be rendering defaults, not facts about the
+        // child's phone — show "—" and disable, rather than teach the parent to distrust the page.
+        val scheduleKnown = s?.schedule != null
         Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel(stringResource(R.string.child_night_section))
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.child_night_enable), modifier = Modifier.weight(1f))
-                    Switch(checked = schedule.enabled, enabled = isOnline, onCheckedChange = { viewModel.setSchedule(deviceId, schedule.copy(enabled = it)) })
+                    Switch(checked = schedule.enabled, enabled = isOnline && scheduleKnown, onCheckedChange = { viewModel.setSchedule(deviceId, schedule.copy(enabled = it)) })
                 }
-                TimeRangeRow(stringResource(R.string.child_night_school), schedule.weekdayStart, schedule.weekdayEnd) { st, en ->
+                TimeRangeRow(stringResource(R.string.child_night_school), schedule.weekdayStart, schedule.weekdayEnd, enabled = isOnline && scheduleKnown, known = scheduleKnown) { st, en ->
                     viewModel.setSchedule(deviceId, schedule.copy(weekdayStart = st, weekdayEnd = en))
                 }
-                TimeRangeRow(stringResource(R.string.child_night_weekend), schedule.weekendStart, schedule.weekendEnd) { st, en ->
+                TimeRangeRow(stringResource(R.string.child_night_weekend), schedule.weekendStart, schedule.weekendEnd, enabled = isOnline && scheduleKnown, known = scheduleKnown) { st, en ->
                     viewModel.setSchedule(deviceId, schedule.copy(weekendStart = st, weekendEnd = en))
                 }
                 Text(
@@ -195,16 +211,31 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
             Text(stringResource(if (s?.kiosk == true) R.string.child_stop else R.string.child_start))
         }
         if (s?.kioskPaused == true) OutlinedButton(onClick = { viewModel.relock(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_relock)) }
-        OutlinedTextField(value = pkg, onValueChange = { pkg = it }, label = { Text(stringResource(R.string.child_install_hint)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { viewModel.install(deviceId, pkg.trim()) }, enabled = isOnline && pkg.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_install)) }
-        OutlinedButton(onClick = { viewModel.addAccount(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_add_account)) }
-        OutlinedButton(onClick = { viewModel.refresh(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_refresh)) }
+        // The tail used to be six unrelated loose controls after three labelled cards; the page's
+        // own grammar — a card per topic — now holds all the way down. Refresh moved up beside the
+        // status it refreshes.
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(R.string.child_apps_section))
+                OutlinedTextField(value = pkg, onValueChange = { pkg = it }, label = { Text(stringResource(R.string.child_install_hint)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Button(onClick = { viewModel.install(deviceId, pkg.trim()) }, enabled = isOnline && pkg.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.child_install)) }
+            }
+        }
+        Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(R.string.child_phone_section))
+                OutlinedButton(onClick = { viewModel.addAccount(deviceId) }, Modifier.fillMaxWidth(), enabled = isOnline) { Text(stringResource(R.string.child_add_account)) }
+            }
+        }
     }
     appsFor?.let { (id, apps) ->
         // Both pickers are driven by the same app list the child reports, so this one stands aside
         // when the list was requested in order to choose an app to configure — otherwise asking for
         // advanced settings opens the allowed-apps picker instead.
         if (id == deviceId && !pickingConfigApp) AppPickerDialog(apps, initiallySelected = s?.kioskApps?.toSet() ?: emptySet(), initiallyPinned = s?.kioskPkg,
+            // "Start child mode" opens this picker rather than flipping a switch; when it does,
+            // say what confirming the ticks actually means for the child's phone.
+            supportingText = if (s?.kiosk == true) null else stringResource(R.string.apps_start_hint),
             onConfirm = { selectedApps, pinned -> viewModel.kioskOn(deviceId, selectedApps, pinned) }, onDismiss = { viewModel.clearApps() })
     }
     val schema by viewModel.schemaFor.collectAsState()
@@ -261,7 +292,15 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
         AlertDialog(onDismissRequest = { renaming = false },
             title = { Text(stringResource(R.string.child_rename)) },
             text = { OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.child_rename_hint)) }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
-            confirmButton = { TextButton(onClick = { viewModel.rename(deviceId, name); renaming = false }) { Text(stringResource(R.string.settings_dialog_confirm)) } },
+            confirmButton = { TextButton(onClick = { viewModel.rename(deviceId, name.trim().ifEmpty { null }); renaming = false }) { Text(stringResource(R.string.settings_dialog_confirm)) } },
             dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.settings_dialog_dismiss)) } })
     }
 }
+
+/**
+ * Fallback prettifier for a package id ("com.google.android.youtube" -> "Youtube"): the status card
+ * must never answer "what is my child doing?" with a raw package id. Labels the child reports stay
+ * the better source where a list has been fetched; this covers the card between fetches.
+ */
+private fun prettyAppName(pkg: String): String =
+    pkg.substringAfterLast('.').replaceFirstChar { it.uppercase() }

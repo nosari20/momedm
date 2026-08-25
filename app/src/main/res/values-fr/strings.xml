@@ -21,8 +21,8 @@
 
     <!-- Controller service -->
     <string name="controller_notif_channel">Contrôleur</string>
-    <string name="controller_notif_title">Contrôleur Môme DM</string>
-    <string name="controller_notif_text">Diffusion vers les appareils gérés (%1$d en ligne)</string>
+    <string name="controller_notif_title">Môme DM</string>
+    <string name="controller_notif_text">Visible par les enfants — %1$d connecté(s)</string>
 
     <!-- Managed link service -->
     <string name="managed_notif_channel">Lien avec le contrôleur</string>
@@ -34,10 +34,10 @@
     <!-- Provisioning setup wizard -->
     <string name="setup_title">Configurer Môme DM</string>
     <string name="setup_account_title">Compte Google</string>
-    <string name="setup_account_text">Ajoutez un compte Google pour que les installations depuis le Play Store demandées par le contrôleur fonctionnent. Vous pouvez passer cette étape et le faire plus tard.</string>
+    <string name="setup_account_text">Ajoutez un compte Google pour que les installations Play Store demandées depuis le téléphone du parent fonctionnent. Vous pouvez passer cette étape et le faire plus tard.</string>
     <string name="setup_account_button">Ajouter un compte Google</string>
     <string name="setup_usage_title">Accès à l\'usage</string>
-    <string name="setup_usage_text">Autorisez l\'accès à l\'usage pour que le contrôleur puisse voir l\'application en cours. Facultatif.</string>
+    <string name="setup_usage_text">Autorisez l\'accès à l\'usage pour que le téléphone du parent puisse voir quelle app est ouverte. Facultatif.</string>
     <string name="setup_usage_button">Ouvrir les réglages d\'accès à l\'usage</string>
     <string name="setup_skip">Passer</string>
     <string name="setup_next">Suivant</string>
@@ -69,17 +69,27 @@
     <string name="launcher_lock_cd">Déverrouillage parent</string>
     <string name="launcher_parent_menu_action">Ouvrir le menu parent</string>
     <string name="launcher_some_hidden">%1$d autres apps sont sur ce téléphone. Un parent a choisi celles qui s’affichent.</string>
-    <string name="launcher_no_apps">Aucune app autorisée. Demandez à un parent.</string>
+    <string name="launcher_no_apps">Aucune app autorisée pour l\'instant. Demande à un parent.</string>
     <string name="launcher_no_apps_installed">Aucune app trouvée</string>
     <string name="launcher_online">Connecté au parent</string>
     <string name="launcher_offline">Parent hors de portée</string>
     <string name="bedtime_title">Bonne nuit&#160;!</string>
     <string name="bedtime_until">Déverrouillage à %1$s</string>
     <string name="bedtime_in_hm">dans %1$dh %2$dmin</string>
-    <string name="bedtime_in_h">dans %1$d heures</string>
-    <string name="bedtime_in_m">dans %1$d minutes</string>
+    <plurals name="bedtime_in_h">
+        <item quantity="one">dans %1$d heure</item>
+        <item quantity="other">dans %1$d heures</item>
+    </plurals>
+    <plurals name="bedtime_in_m">
+        <item quantity="one">dans %1$d minute</item>
+        <item quantity="other">dans %1$d minutes</item>
+    </plurals>
     <string name="bedtime_until_relative">Ton téléphone se réveille %1$s, à %2$s</string>
     <string name="bedtime_manual">Un parent a verrouillé ce téléphone</string>
+    <string name="bedtime_break_title">Pause d\'écran</string>
+    <string name="launcher_cant_open">Celle-là ne peut pas s\'ouvrir pour l\'instant</string>
+    <string name="launcher_relock_confirm">Reverrouiller le téléphone maintenant ?</string>
+    <string name="launcher_menu_cd">Menu parent</string>
 
     <!-- Controller UI (MainActivity) -->
     <string name="main_drawer_name">Ma famille</string>
@@ -89,6 +99,7 @@
     <string name="apps_cancel">Annuler</string>
     <string name="apps_pin_one">N\'autoriser qu\'une seule app</string>
     <string name="apps_confirm">Valider</string>
+    <string name="apps_start_hint">Cochez les apps que votre enfant peut utiliser. Tout le reste disparaît de son téléphone jusqu\'à ce que vous désactiviez le mode enfant.</string>
     <string name="yes">Oui</string>
     <string name="no">Non</string>
 
@@ -195,17 +206,21 @@
     <string name="child_locked_manual">Verrouillé par vous</string>
     <string name="child_unlocked">Déverrouillé</string>
     <string name="child_install">Chercher sur le Play Store</string>
-    <string name="child_install_hint">Nom de l\'app, ou identifiant</string>
+    <string name="child_install_hint">Nom de l\'app (ex. Minecraft)</string>
     <string name="child_add_account">Ajouter un compte Google</string>
     <string name="child_refresh">Actualiser</string>
+    <string name="child_apps_section">Apps</string>
+    <string name="child_phone_section">Ce téléphone</string>
+    <string name="child_state_unknown">Vérification…</string>
+    <string name="conn_no_answer">Le téléphone n\'a pas répondu. Rapprochez-vous et réessayez.</string>
     <string name="child_rename">Renommer</string>
     <string name="child_rename_hint">Nom (ex. tablette de Léa)</string>
     <string name="child_offline_msg">Cet appareil est hors ligne</string>
-    <string name="child_sent">C\'est fait</string>
+    <string name="child_sent">Envoyé — en attente du téléphone…</string>
     <string name="child_result">%1$s</string>
     <string name="res_kiosk_on">Mode enfant activé — %1$d apps autorisées</string>
     <string name="res_kiosk_off">Mode enfant désactivé</string>
-    <string name="res_play_opened">Le Play Store est ouvert sur son téléphone</string>
+    <string name="res_play_opened">Le Play Store est ouvert sur son téléphone — quelqu\'un doit y appuyer sur Installer dans les 10 minutes.</string>
     <string name="res_account">L’écran de compte est ouvert sur son téléphone</string>
     <string name="res_prefs">Apparence et langue mises à jour</string>
     <string name="res_safety">Réglages de contenu appliqués</string>
@@ -238,13 +253,27 @@
     <string name="pair_generate">Afficher le code</string>
     <string name="pair_expired">Le code d’association a expiré et le téléchargement a été coupé. Affichez-le de nouveau quand vous êtes prêt.</string>
     <string name="pair_stop">Arrêter</string>
-    <string name="pair_serving">Prêt — point d\'accès %1$s</string>
     <string name="pair_qr_error">Code trop grand à afficher</string>
-    <string name="pair_help">L\'appareil enfant doit d\'abord être réinitialisé.</string>
+    <string name="pair_help">Avant de commencer : réinitialisez le téléphone de l\'enfant (Paramètres → Système → Réinitialisation → Effacer toutes les données) et amenez-le à son premier écran d\'accueil. Revenez ici avec les deux téléphones en main.</string>
     <string name="pair_ssid_value">%1$s : %2$s</string>
     <string name="pair_password_show">Afficher</string>
     <string name="pair_password_hide">Masquer</string>
     <string name="pair_password_value">%1$s : %2$s</string>
+    <string name="pair_ready">Prêt — montrez ce code au téléphone de l\'enfant</string>
+    <string name="pair_code_life">Le code fonctionne 5 minutes — ayez le téléphone de l\'enfant sur son écran d\'accueil avant de le créer.</string>
+    <string name="pair_countdown">Code valable encore %1$s</string>
+    <string name="pair_keep_open">Gardez cet écran ouvert. Quand le téléphone de l\'enfant a terminé, il apparaît dans Mes enfants.</string>
+    <string name="pair_hotspot_warning">Si le téléphone de l\'enfant signale que le réseau n\'a pas d\'internet, choisissez Garder la connexion (ou Se connecter quand même).</string>
+    <string name="pair_downloading">Le téléphone de l\'enfant télécharge l\'application…</string>
+    <string name="pair_paired">%1$s est associé. Retrouvez-le dans Mes enfants.</string>
+    <string name="pair_wifi_hotspot_help">Ce téléphone crée son propre Wi-Fi juste pour le téléchargement — pas besoin du Wi-Fi de la maison.</string>
+    <string name="pair_wifi_manual_help">Le téléphone de l\'enfant rejoint le même Wi-Fi que celui-ci.</string>
+    <string name="pair_wifi_custom_help">Pour les installations avancées : l\'application est téléchargée depuis un lien que vous hébergez vous-même.</string>
+    <string name="pair_err_hotspot">Ce téléphone n\'a pas pu créer de point d\'accès. Essayez plutôt l\'option Wi-Fi partagé.</string>
+    <string name="pair_err_no_address">Ce téléphone n\'a pas d\'adresse réseau pour partager l\'application. Vérifiez le Wi-Fi et réessayez.</string>
+    <string name="pair_err_server">Le téléchargement n\'a pas pu démarrer sur ce téléphone. Réessayez.</string>
+    <string name="pair_err_checksum">Impossible de préparer l\'application pour le téléchargement. Réessayez.</string>
+    <string name="pair_err_missing_url">Saisissez d\'abord le lien complet de l\'application.</string>
 
     <!-- Child launcher (managed) -->
     <string name="managed_pin_title">Code PIN parental</string>
@@ -260,6 +289,8 @@
     <string name="perm_notifications">Notifications</string>
     <string name="perm_nearby">Appareils à proximité</string>
     <string name="perm_local_network">l\'accès au réseau local</string>
+    <string name="perm_intro">Môme DM communique avec le téléphone de votre enfant en Bluetooth — sans internet, sans compte. Accordez ces autorisations pour que les deux téléphones puissent se trouver.</string>
+    <string name="perm_gate_button">Commencer</string>
 
     <!-- Parent connection screen (Settings > Connection) -->
     <string name="settings_connection">Connexion</string>

@@ -4,7 +4,6 @@ import android.content.Intent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -16,7 +15,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -96,9 +104,14 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     val context = LocalContext.current
     val connected = link == LinkState.AUTHENTICATED
 
-    // Config still loading (null): draw a bare surface rather than guessing. Rendering every installed
-    // tile for what turns out to be a locked-down device would be a real escape hatch, however briefly.
-    val config = loadedConfig ?: run { Box(Modifier.fillMaxSize()); return }
+    // Config still loading (null): no tiles rather than guessing — rendering every installed tile
+    // for what turns out to be a locked-down device would be a real escape hatch, however briefly.
+    // But paint the same calm ground the real screen uses: a raw empty Box let the bare window
+    // through, and a slow DataStore read looked like a dead phone instead of an app settling.
+    val loadingGradient = Brush.verticalGradient(
+        listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f), MaterialTheme.colorScheme.background),
+    )
+    val config = loadedConfig ?: run { Box(Modifier.fillMaxSize().background(loadingGradient)); return }
 
     // A slow clock: recompute the current minute periodically. `tick` just forces recomposition.
     var tick by remember { mutableStateOf(0) }
@@ -110,7 +123,10 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     }
     val cal = remember(tick) { Calendar.getInstance() }
     val hour = cal.get(Calendar.HOUR_OF_DAY)
-    val clock = remember(tick) { String.format(Locale.getDefault(), "%02d:%02d", hour, cal.get(Calendar.MINUTE)) }
+    // The device's own 12/24-hour setting, not a hard-coded 24h clock — a US-set phone showed a
+    // giant "21:30" over a bedtime subtitle that said "9:30 PM".
+    val timeFmt = remember { android.text.format.DateFormat.getTimeFormat(context) }
+    val clock = remember(tick) { timeFmt.format(cal.time) }
     // The name goes inside the time-of-day greeting rather than replacing it: a bare "Hi Max!" at
     // eleven at night reads oddly, and the hour is half of what makes the greeting feel like a person
     // rather than a label.
@@ -153,11 +169,23 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
         listOf(top.copy(alpha = 0.45f), MaterialTheme.colorScheme.background),
     )
     val canUnlock = config.on && pinSet
+    // H2: the launcher's one primary action must never fail silently — a child reads a dead tap as
+    // "my phone is broken" and taps harder. Shown briefly, in the launcher's own soft register.
+    val openFailTick by vm.openFailedTick.collectAsState()
+    var showOpenFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(openFailTick) {
+        if (openFailTick == 0) return@LaunchedEffect
+        showOpenFailed = true
+        delay(3_000L)
+        showOpenFailed = false
+    }
+    var confirmRelock by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(gradient)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
             // Header — long-press anywhere on it reveals the parent PIN pad (kids can't discover it by sight).
             val headerA11y = stringResource(R.string.launcher_lock_cd)
+            val menuCd = stringResource(R.string.launcher_menu_cd)
             val parentMenuAction = stringResource(R.string.launcher_parent_menu_action)
             Row(
                 Modifier
@@ -185,7 +213,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                             }
                         else if (config.on) Modifier
                             .semantics {
-                                contentDescription = headerA11y
+                                contentDescription = menuCd
                                 customActions = listOf(
                                     CustomAccessibilityAction(parentMenuAction) { vm.menuOpen.value = true; true },
                                 )
@@ -207,20 +235,39 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                     // A plain tap belongs to the child (choose your name); the long-press stays the
                     // parent's. Crossfade so the greeting changing at an hour boundary, or the moment a
                     // name is saved, is a soft change rather than a flicker.
+                    val customiseLabel = stringResource(R.string.launcher_customise_title)
                     Crossfade(targetState = greetingText, label = "greeting") { g ->
-                        Text(
-                            g,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.clickable { vm.namingOpen.value = true },
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                g,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    // A named action on a full-size target: TalkBack says what the
+                                    // tap does, and a slow tap no longer drifts past the timeout
+                                    // into the parent long-press by way of an undersized target.
+                                    .minimumInteractiveComponentSize()
+                                    .clickable(onClickLabel = customiseLabel) { vm.namingOpen.value = true },
+                            )
+                            // A quiet pencil: the child's own feature should be findable by sight —
+                            // unlike the parent's gesture, this one was never meant to be hidden.
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                                modifier = Modifier.padding(start = 6.dp).size(16.dp),
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.weight(1f))
                 // A single bounce when the link changes — the register of a chat app's presence dot,
                 // not a pulse that runs forever on a phone that sits on a table.
                 val dotScale = remember { Animatable(1f) }
+                var firstDot by remember { mutableStateOf(true) }
                 LaunchedEffect(connected) {
+                    // Skip the initial composition: firing on entry diluted the one-shot signal.
+                    if (firstDot) { firstDot = false; return@LaunchedEffect }
                     dotScale.animateTo(1.35f, tween(140)); dotScale.animateTo(1f, tween(220))
                 }
                 val dotColor = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -242,15 +289,20 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 ) {
-                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // A Column, not one packed Row: at large font scales the single row
+                    // clipped its buttons, and the text line deserves the full width anyway.
+                    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)) {
                         val m = pauseLeft / 60_000L
                         val s = (pauseLeft / 1_000L) % 60L
                         Text(stringResource(R.string.launcher_paused, String.format(Locale.US, "%02d:%02d", m, s)), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.weight(1f))
-                        // Only reachable while paused, which took the parent PIN: a child cannot
-                        // re-point their own phone at a different parent.
-                        TextButton(onClick = { vm.menuOpen.value = true }) { Text(stringResource(R.string.menu_open)) }
-                        TextButton(onClick = { vm.relock() }) { Text(stringResource(R.string.launcher_relock)) }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            // Only reachable while paused, which took the parent PIN: a child cannot
+                            // re-point their own phone at a different parent.
+                            TextButton(onClick = { vm.menuOpen.value = true }) { Text(stringResource(R.string.menu_open)) }
+                            // Confirmed: ending the pause is one stray child tap, but undoing it
+                            // costs the parent a full PIN entry.
+                            TextButton(onClick = { confirmRelock = true }) { Text(stringResource(R.string.launcher_relock)) }
+                        }
                     }
                 }
             }
@@ -288,7 +340,9 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                             Text(
                                 stringResource(R.string.launcher_some_hidden, hidden),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                // onSurfaceVariant is contrast-managed per scheme; 70% alpha over
+                                // the mood-tinted gradient could dip below 4.5:1 on light accents.
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                             )
@@ -315,7 +369,30 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                 }
             }
         }
+
+        if (showOpenFailed) {
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+            ) {
+                Text(
+                    stringResource(R.string.launcher_cant_open),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                )
+            }
+        }
     }
+
+    if (confirmRelock) AlertDialog(
+        onDismissRequest = { confirmRelock = false },
+        title = { Text(stringResource(R.string.launcher_relock)) },
+        text = { Text(stringResource(R.string.launcher_relock_confirm)) },
+        confirmButton = { TextButton(onClick = { confirmRelock = false; vm.relock() }) { Text(stringResource(R.string.launcher_relock)) } },
+        dismissButton = { TextButton(onClick = { confirmRelock = false }) { Text(stringResource(R.string.settings_dialog_dismiss)) } },
+    )
 
     if (naming) {
         var draft by remember { mutableStateOf(childName) }
@@ -331,6 +408,9 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                         onValueChange = { draft = it.take(20) },
                         singleLine = true,
                         label = { Text(stringResource(R.string.launcher_name_label)) },
+                        // The cap used to be silent — "the keyboard stopped working" is a child's
+                        // read of a truncating field.
+                        supportingText = { Text(draft.length.toString() + "/20") },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(stringResource(R.string.launcher_moon_label), style = MaterialTheme.typography.bodyMedium)
@@ -343,11 +423,16 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                             // Resolved out here: semantics {} is not a composable scope.
                             val name = moonName(option)
                             Surface(
-                                onClick = { draftMoon = option },
                                 shape = RoundedCornerShape(16.dp),
                                 color = if (selected) MaterialTheme.colorScheme.primaryContainer
                                         else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.semantics { contentDescription = name },
+                                // Selection is announced (radio semantics) and drawn (border), not
+                                // colour-only: the two container tones can sit very close under
+                                // some parent-picked accents, and TalkBack heard no state at all.
+                                border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                                modifier = Modifier
+                                    .selectable(selected = selected, role = Role.RadioButton) { draftMoon = option }
+                                    .semantics { contentDescription = name },
                             ) {
                                 NightSky(
                                     // Shown full, not at tonight's phase: the three styles are only

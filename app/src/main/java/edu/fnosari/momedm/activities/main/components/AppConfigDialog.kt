@@ -20,7 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import edu.fnosari.momedm.R
 import edu.fnosari.momedm.protocol.EntryType
 import edu.fnosari.momedm.protocol.SchemaEntry
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -103,7 +107,11 @@ fun AppConfigLoadingDialog(label: String, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(label) },
         text = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Same reasoning as the app picker's timeout: a dropped child must not spin forever.
+            var timedOut by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { delay(15_000L); timedOut = true }
+            if (timedOut) Text(stringResource(R.string.conn_no_answer), style = MaterialTheme.typography.bodyMedium)
+            else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 CircularProgressIndicator()
                 Text(stringResource(R.string.appcfg_loading), style = MaterialTheme.typography.bodyMedium)
             }

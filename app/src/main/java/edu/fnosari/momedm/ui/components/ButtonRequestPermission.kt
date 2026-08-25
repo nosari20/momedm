@@ -24,6 +24,18 @@ private fun friendlyPermissionName(context: Context, permission: String): String
     else -> permission
 }
 
+/**
+ * One button asking for every missing permission at once — the platform groups related grants (the
+ * three Bluetooth ones become a single dialog), so the parent answers once or twice instead of
+ * five times. [onResult] fires when the system flow ends, whatever was granted; the caller
+ * re-checks and keeps the gate up for anything still missing.
+ */
+@Composable
+fun ButtonRequestPermissions(permissions: List<String>, onResult: () -> Unit) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { onResult() }
+    Button(onClick = { launcher.launch(permissions.toTypedArray()) }) { Text(stringResource(R.string.perm_gate_button)) }
+}
+
 /** Runtime-permission request button, shared by both role activities. Label reads "Allow <friendly name>". */
 @Composable
 fun ButtonRequestPermission(context: Context, permission: String, granted: () -> Unit, denied: () -> Unit) {

@@ -187,6 +187,12 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         PACKAGE_ID.matches(s)
     fun addAccount(deviceId: String) { send(deviceId, CmdType.ADD_ACCOUNT) }
     fun refresh(deviceId: String) { send(deviceId, CmdType.GET_STATUS) }
+    /**
+     * GET_STATUS with no snackbar: page-entry freshening the parent did not ask for should not
+     * toast at them. The status lands in the registry like any other push; the RESULT is
+     * ignored as a foreign command id because it never enters [pendingIds].
+     */
+    fun refreshSilent(deviceId: String) { ControllerLink.sendCommand(deviceId, CmdType.GET_STATUS, null) }
     fun requestApps(deviceId: String) {
         _appsFor.value = deviceId to null
         // Offline device: no picker to keep open, so clear it back out instead of hanging on "loading".

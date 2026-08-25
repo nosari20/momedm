@@ -13,13 +13,16 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Text
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.ActivityCompat
@@ -47,7 +51,7 @@ import edu.fnosari.momedm.activities.main.screens.ProvisionScreen
 import edu.fnosari.momedm.activities.managed.ManagedHomeActivity
 import edu.fnosari.momedm.activities.settings.SettingsActivity
 import edu.fnosari.momedm.ui.ControllerThemed
-import edu.fnosari.momedm.ui.components.ButtonRequestPermission
+import edu.fnosari.momedm.ui.components.ButtonRequestPermissions
 import edu.fnosari.momedm.ui.layouts.BasicLayoutWithTopBar
 import edu.fnosari.momedm.ui.layouts.Layout
 
@@ -92,7 +96,17 @@ class MainActivity : ComponentActivity() {
                 Log.d(LOG_TAG, "Missing permissions: $missing")
                 if (missing.isNotEmpty()) {
                     BasicLayoutWithTopBar(title = context.getString(R.string.children_title)) {
-                        Column { for (p in missing) ButtonRequestPermission(context, p, granted = { required.remove(p) }, denied = { Log.d(LOG_TAG, "$p denied") }) }
+                        // One explained request, not a wall of identical "Allow Bluetooth" buttons:
+                        // the three Bluetooth grants are a single system dialog anyway, and a parent
+                        // told the why first is far less likely to tap "Don't allow" their way into
+                        // a never-ask-again dead end on the app's very first screen.
+                        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(context.getString(R.string.perm_intro))
+                            ButtonRequestPermissions(
+                                permissions = missing,
+                                onResult = { required.removeAll { ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED } },
+                            )
+                        }
                     }
                 } else {
                     val advertising by vm.advertising.collectAsState()

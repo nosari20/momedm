@@ -114,6 +114,9 @@ fun ChildStateChip(record: DeviceRecord, online: Boolean) {
         !online -> stringResource(R.string.child_offline) to MaterialTheme.colorScheme.onSurfaceVariant
         record.lastStatus?.kioskPaused == true -> stringResource(R.string.child_mode_paused) to PausedAmber
         record.lastStatus?.kiosk == true -> stringResource(R.string.child_mode_on) to OnlineGreen
+        // Online but no status yet is an unknown, not "child mode off" — which read as "my child's
+        // phone is unrestricted?" while the first status was still in flight.
+        record.lastStatus == null -> stringResource(R.string.child_state_unknown) to MaterialTheme.colorScheme.onSurfaceVariant
         else -> stringResource(R.string.child_mode_off) to MaterialTheme.colorScheme.onSurfaceVariant
     }
     AccentPill(text = label, accent = accent)

@@ -21,8 +21,8 @@
 
     <!-- Controller service -->
     <string name="controller_notif_channel">Controller</string>
-    <string name="controller_notif_title">Môme DM controller</string>
-    <string name="controller_notif_text">Advertising to managed devices (%1$d online)</string>
+    <string name="controller_notif_title">Môme DM</string>
+    <string name="controller_notif_text">Visible to children — %1$d connected</string>
 
     <!-- Managed link service -->
     <string name="managed_notif_channel">Controller link</string>
@@ -34,10 +34,10 @@
     <!-- Provisioning setup wizard -->
     <string name="setup_title">Set up Môme DM</string>
     <string name="setup_account_title">Google account</string>
-    <string name="setup_account_text">Add a Google account so Play Store installs requested by the controller can work. You can skip and do it later.</string>
+    <string name="setup_account_text">Add a Google account so Play Store installs requested from the parent\'s phone can work. You can skip and do it later.</string>
     <string name="setup_account_button">Add Google account</string>
     <string name="setup_usage_title">Usage access</string>
-    <string name="setup_usage_text">Allow usage access so the controller can see the current app. Optional.</string>
+    <string name="setup_usage_text">Allow usage access so the parent\'s phone can see which app is open. Optional.</string>
     <string name="setup_usage_button">Open usage access settings</string>
     <string name="setup_skip">Skip</string>
     <string name="setup_next">Next</string>
@@ -76,10 +76,20 @@
     <string name="bedtime_title">Good night!</string>
     <string name="bedtime_until">Unlocks at %1$s</string>
     <string name="bedtime_in_hm">in %1$dh %2$dmin</string>
-    <string name="bedtime_in_h">in %1$d hours</string>
-    <string name="bedtime_in_m">in %1$d minutes</string>
+    <plurals name="bedtime_in_h">
+        <item quantity="one">in %1$d hour</item>
+        <item quantity="other">in %1$d hours</item>
+    </plurals>
+    <plurals name="bedtime_in_m">
+        <item quantity="one">in %1$d minute</item>
+        <item quantity="other">in %1$d minutes</item>
+    </plurals>
     <string name="bedtime_until_relative">Your phone wakes up %1$s, at %2$s</string>
     <string name="bedtime_manual">A parent locked this phone</string>
+    <string name="bedtime_break_title">Screen break</string>
+    <string name="launcher_cant_open">That one can\'t open right now</string>
+    <string name="launcher_relock_confirm">Lock the phone again now?</string>
+    <string name="launcher_menu_cd">Parent menu</string>
 
     <!-- Controller UI (MainActivity) -->
     <string name="main_drawer_name">My family</string>
@@ -89,6 +99,7 @@
     <string name="apps_cancel">Cancel</string>
     <string name="apps_pin_one">Keep to a single app</string>
     <string name="apps_confirm">Confirm</string>
+    <string name="apps_start_hint">Tick the apps your child may use. Everything else disappears from their phone until you stop child mode.</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
 
@@ -195,17 +206,21 @@
     <string name="child_locked_manual">Locked by you</string>
     <string name="child_unlocked">Unlocked</string>
     <string name="child_install">Find it on the Play Store</string>
-    <string name="child_install_hint">App name, or package id</string>
+    <string name="child_install_hint">App name (e.g. Minecraft)</string>
     <string name="child_add_account">Add a Google account</string>
     <string name="child_refresh">Refresh</string>
+    <string name="child_apps_section">Apps</string>
+    <string name="child_phone_section">This phone</string>
+    <string name="child_state_unknown">Checking…</string>
+    <string name="conn_no_answer">The phone did not answer. Move closer and try again.</string>
     <string name="child_rename">Rename</string>
     <string name="child_rename_hint">Name (e.g. Léa\'s tablet)</string>
     <string name="child_offline_msg">This device is offline</string>
-    <string name="child_sent">Done</string>
+    <string name="child_sent">Sent — waiting for the phone…</string>
     <string name="child_result">%1$s</string>
     <string name="res_kiosk_on">Child mode is on — %1$d apps allowed</string>
     <string name="res_kiosk_off">Child mode is off</string>
-    <string name="res_play_opened">The Play Store is open on their phone</string>
+    <string name="res_play_opened">The Play Store is open on their phone — someone must tap Install there within 10 minutes.</string>
     <string name="res_account">The account screen is open on their phone</string>
     <string name="res_prefs">Appearance and language updated</string>
     <string name="res_safety">Content settings applied</string>
@@ -238,13 +253,27 @@
     <string name="pair_generate">Show the code</string>
     <string name="pair_expired">The pairing code expired and the download was switched off. Show it again when you are ready.</string>
     <string name="pair_stop">Stop</string>
-    <string name="pair_serving">Ready — hotspot %1$s</string>
     <string name="pair_qr_error">Code too large to display</string>
-    <string name="pair_help">The child device must be factory-reset first.</string>
+    <string name="pair_help">Before you start: factory-reset the child\'s phone (Settings → System → Reset options → Erase all data) and bring it to its first welcome screen. Come back here with both phones in hand.</string>
     <string name="pair_ssid_value">%1$s: %2$s</string>
     <string name="pair_password_show">Show</string>
     <string name="pair_password_hide">Hide</string>
     <string name="pair_password_value">%1$s: %2$s</string>
+    <string name="pair_ready">Ready — show this code to the child\'s phone</string>
+    <string name="pair_code_life">The code works for 5 minutes — have the child\'s phone at its welcome screen before you create it.</string>
+    <string name="pair_countdown">Code valid for %1$s</string>
+    <string name="pair_keep_open">Keep this screen open. When the child\'s phone finishes, it appears under My children.</string>
+    <string name="pair_hotspot_warning">If the child\'s phone warns that the network has no internet, choose Keep connection (or Connect anyway).</string>
+    <string name="pair_downloading">The child\'s phone is downloading the app…</string>
+    <string name="pair_paired">%1$s is paired. You can find it under My children.</string>
+    <string name="pair_wifi_hotspot_help">This phone creates its own Wi-Fi just for the download — no home Wi-Fi needed.</string>
+    <string name="pair_wifi_manual_help">The child\'s phone joins the same Wi-Fi as this one.</string>
+    <string name="pair_wifi_custom_help">For advanced setups: the app is downloaded from a link you host yourself.</string>
+    <string name="pair_err_hotspot">This phone could not start a hotspot. Try the Shared Wi-Fi option instead.</string>
+    <string name="pair_err_no_address">This phone has no network address to share the app from. Check Wi-Fi and try again.</string>
+    <string name="pair_err_server">The download could not be started on this phone. Try again.</string>
+    <string name="pair_err_checksum">Could not prepare the app for download. Try again.</string>
+    <string name="pair_err_missing_url">Enter the full app link first.</string>
 
     <!-- Child launcher (managed) -->
     <string name="managed_pin_title">Parent PIN</string>
@@ -260,6 +289,8 @@
     <string name="perm_notifications">Notifications</string>
     <string name="perm_nearby">Nearby devices</string>
     <string name="perm_local_network">local network access</string>
+    <string name="perm_intro">Môme DM talks to your child\'s phone over Bluetooth — no internet, no account. Allow these permissions so the two phones can find each other.</string>
+    <string name="perm_gate_button">Get started</string>
 
     <!-- Parent connection screen (Settings > Connection) -->
     <string name="settings_connection">Connection</string>

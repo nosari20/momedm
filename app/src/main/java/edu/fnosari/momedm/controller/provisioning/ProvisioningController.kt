@@ -14,6 +14,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * Why pairing failed, as a stable code. The screen maps each to a plain-language sentence in the
+ * parent's locale, with a next step; the raw developer detail goes to logcat only — the same split
+ * [edu.fnosari.momedm.protocol.Message.Result.code] enforces for command results, applied to the
+ * one path that had not received it.
+ */
+enum class ProvisionError { HOTSPOT, NO_ADDRESS, SERVER, CHECKSUM, MISSING_URL }
+
 /** Drives the Provision screen: Wi-Fi source, APK hosting, QR payload. */
 class ProvisioningController(private val context: Context, private val prefs: ControllerPrefs, private val scope: CoroutineScope) {
     companion object {
@@ -34,9 +42,13 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     data class State(
         val mode: String = ControllerPrefs.MODE_HOTSPOT, val ssid: String = "", val password: String = "", val customUrl: String = "",
         val hotspotSsid: String = "", val hotspotPassword: String = "",
-        val ip: String? = null, val serverRunning: Boolean = false, val qrPayload: String? = null, val error: String? = null,
+        val ip: String? = null, val serverRunning: Boolean = false, val qrPayload: String? = null, val error: ProvisionError? = null,
         /** True once a code was shown and then timed out, so the UI can say why it went away. */
         val expired: Boolean = false,
+        /** Deadline of the live code, for the on-screen countdown; null when no code is showing. */
+        val expiresAt: Long? = null,
+        /** True once the child's phone has fetched the APK from this one at least once. */
+        val apkServed: Boolean = false,
     )
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -95,7 +107,7 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         when (_state.value.mode) {
             ControllerPrefs.MODE_HOTSPOT -> hotspot.start(
                 onReady = { ssid, pass -> _state.update { it.copy(hotspotSsid = ssid, hotspotPassword = pass) }; serveAndBuild() },
-                onFailed = { reason -> _state.update { it.copy(error = reason) } },
+                onFailed = { reason -> Log.w(LOG_TAG, "Hotspot failed: $reason"); _state.update { it.copy(error = ProvisionError.HOTSPOT) } },
             )
             ControllerPrefs.MODE_MANUAL -> serveAndBuild()
             else -> buildQr()
@@ -106,9 +118,14 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         pollJob?.cancel(); pollJob = null
         try {
             // daemon = true: the listener thread must not keep the process alive after the UI is gone.
-            if (http == null) { http = ApkHttpServer(context.applicationInfo.sourceDir).also { it.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, true) } }
+            if (http == null) {
+                // onApkServed feeds the screen's "downloading…" line — the first sign of life the
+                // parent gets after the scan, in a window that used to be pure silence.
+                http = ApkHttpServer(context.applicationInfo.sourceDir, onApkServed = { _state.update { it.copy(apkServed = true) } })
+                    .also { it.start(fi.iki.elonen.NanoHTTPD.SOCKET_READ_TIMEOUT, true) }
+            }
         } catch (e: Exception) {
-            Log.e(LOG_TAG, "HTTP server failed", e); _state.update { it.copy(error = "HTTP server: ${e.message}") }; return
+            Log.e(LOG_TAG, "HTTP server failed", e); _state.update { it.copy(error = ProvisionError.SERVER) }; return
         }
         if (_state.value.mode == ControllerPrefs.MODE_HOTSPOT) {
             // The AP interface's address can take a moment to settle after the hotspot reports ready; poll for it.
@@ -142,7 +159,8 @@ class ProvisioningController(private val context: Context, private val prefs: Co
             // Nothing to serve without an address to advertise — tear the HTTP server back down so
             // `serverRunning` reflects reality instead of claiming a server nobody can reach.
             http?.stop(); http = null
-            _state.update { it.copy(error = "no IPv4 address", serverRunning = false) }
+            Log.w(LOG_TAG, "No IPv4 address to advertise")
+            _state.update { it.copy(error = ProvisionError.NO_ADDRESS, serverRunning = false) }
             return
         }
         _state.update { it.copy(serverRunning = true, ip = ip) }
@@ -152,11 +170,11 @@ class ProvisioningController(private val context: Context, private val prefs: Co
     private fun buildQr() = scope.launch {
         val id = prefs.ensureIdentity(); val s = _state.value
         val url = if (s.mode == ControllerPrefs.MODE_CUSTOM_URL) s.customUrl else QrPayloadBuilder.apkUrl(s.ip ?: return@launch)
-        if (url.isBlank()) { _state.update { it.copy(error = "missing APK URL") }; return@launch }
-        val checksum = try { SignatureChecksum.compute(context) } catch (e: Exception) { _state.update { it.copy(error = "checksum: ${e.message}") }; return@launch }
+        if (url.isBlank()) { _state.update { it.copy(error = ProvisionError.MISSING_URL) }; return@launch }
+        val checksum = try { SignatureChecksum.compute(context) } catch (e: Exception) { Log.e(LOG_TAG, "Checksum failed", e); _state.update { it.copy(error = ProvisionError.CHECKSUM) }; return@launch }
         val (ssid, password) = if (s.mode == ControllerPrefs.MODE_HOTSPOT) s.hotspotSsid to s.hotspotPassword else s.ssid to s.password
         val payload = QrPayloadBuilder.build(ProvisioningParams(url, checksum, ssid.ifBlank { null }, password, id.controllerId, id.secretBase64))
-        _state.update { it.copy(qrPayload = payload) }
+        _state.update { it.copy(qrPayload = payload, expiresAt = System.currentTimeMillis() + EXPIRY_MS) }
         armExpiry()
         Log.d(LOG_TAG, "QR payload ready (${payload.length} chars)")
     }
@@ -183,6 +201,6 @@ class ProvisioningController(private val context: Context, private val prefs: Co
         expiryJob?.cancel(); expiryJob = null
         pollJob?.cancel(); pollJob = null
         http?.stop(); http = null; hotspot.stop()
-        _state.update { it.copy(hotspotSsid = "", hotspotPassword = "", ip = null, error = null, qrPayload = null, serverRunning = false) }
+        _state.update { it.copy(hotspotSsid = "", hotspotPassword = "", ip = null, error = null, qrPayload = null, serverRunning = false, expiresAt = null, apkServed = false) }
     }
 }

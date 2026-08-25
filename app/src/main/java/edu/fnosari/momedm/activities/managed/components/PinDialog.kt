@@ -12,7 +12,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import edu.fnosari.momedm.R
@@ -29,8 +33,11 @@ fun PinDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit, error: String?,
                 OutlinedTextField(value = pin, onValueChange = { v -> if (v.length <= 6 && v.all { it.isDigit() }) pin = v },
                     label = { Text(stringResource(R.string.managed_pin_hint)) }, singleLine = true, enabled = !locked,
                     visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), isError = error != null)
-                if (locked) Text(stringResource(R.string.managed_pin_locked, (lockedForMs / 1000L) + 1), color = MaterialTheme.colorScheme.error)
-                else error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                // Announced politely: a failed attempt used to be visual-only, so a screen
+                // reader heard nothing at all after submitting a wrong PIN.
+                val announce = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                if (locked) Text(stringResource(R.string.managed_pin_locked, (lockedForMs / 1000L) + 1), color = MaterialTheme.colorScheme.error, modifier = announce)
+                else error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = announce) }
             }
         },
         confirmButton = { TextButton(onClick = { onSubmit(pin); pin = "" }, enabled = !locked && pin.length >= 4) { Text(stringResource(R.string.managed_pin_ok)) } },

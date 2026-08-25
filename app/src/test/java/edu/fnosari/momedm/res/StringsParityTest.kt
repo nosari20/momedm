@@ -23,8 +23,12 @@ class StringsParityTest {
 
     private fun keys(file: File): Set<String> {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)
-        val nodes = doc.getElementsByTagName("string")
-        return (0 until nodes.length).map { nodes.item(it).attributes.getNamedItem("name").nodeValue }.toSet()
+        // Plurals count too: a quantity string present in one locale only crashes at runtime the
+        // same way a missing plain string would.
+        return listOf("string", "plurals").flatMap { tag ->
+            val nodes = doc.getElementsByTagName(tag)
+            (0 until nodes.length).map { tag + "/" + nodes.item(it).attributes.getNamedItem("name").nodeValue }
+        }.toSet()
     }
 
     @Test

@@ -23,7 +23,11 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -37,9 +41,7 @@ import edu.fnosari.momedm.activities.managed.components.PinDialog
 import edu.fnosari.momedm.protocol.LockState
 import kotlinx.coroutines.delay
 import java.text.DateFormat
-import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 
 /**
  * What the child sees while the device is completely locked: a deliberately quiet screen so it reads
@@ -57,10 +59,11 @@ fun BedtimeScreen(vm: ManagedViewModel) {
 
     var tick by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) { while (true) { delay(30_000L); tick++ } }
-    val clock = remember(tick) {
-        val c = Calendar.getInstance()
-        String.format(Locale.getDefault(), "%02d:%02d", c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
-    }
+    // The device's own 12/24-hour setting, not a hard-coded 24h clock: the subtitle below already
+    // respects it, and the format a child is taught at home is the one they can actually read.
+    val context = LocalContext.current
+    val timeFmt = remember { android.text.format.DateFormat.getTimeFormat(context) }
+    val clock = remember(tick) { timeFmt.format(Date()) }
 
     val night = lock?.reason == LockState.REASON_NIGHT
     val until = lock?.until
@@ -73,14 +76,16 @@ fun BedtimeScreen(vm: ManagedViewModel) {
         val m = ((left % 3_600_000L) / 60_000L).toInt()
         val relative = when {
             h > 0 && m > 0 -> stringResource(R.string.bedtime_in_hm, h, m)
-            h > 0 -> stringResource(R.string.bedtime_in_h, h)
-            else -> stringResource(R.string.bedtime_in_m, m.coerceAtLeast(1))
+            h > 0 -> pluralStringResource(R.plurals.bedtime_in_h, h, h)
+            else -> m.coerceAtLeast(1).let { mm -> pluralStringResource(R.plurals.bedtime_in_m, mm, mm) }
         }
         stringResource(R.string.bedtime_until_relative, relative,
             DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(until)))
     } else stringResource(R.string.bedtime_manual)
 
     val a11y = stringResource(R.string.launcher_lock_cd)
+    val menuCd = stringResource(R.string.launcher_menu_cd)
+    val parentMenuAction = stringResource(R.string.launcher_parent_menu_action)
     // A slow dawn. As the unlock time approaches, a warm tint bleeds into the top of the sky, reaching
     // its full (still faint) strength right at the end. It is the same fact as the countdown above,
     // said in light instead of digits — and it moves at exactly the same rate whatever the child does,
@@ -108,10 +113,20 @@ fun BedtimeScreen(vm: ManagedViewModel) {
                 // phone with no way to reach the parent menu — the one situation where someone most
                 // needs to ask it what is going on.
                 if (pinSet) Modifier
-                    .semantics { contentDescription = a11y }
+                    .semantics {
+                        contentDescription = a11y
+                        customActions = listOf(
+                            CustomAccessibilityAction(parentMenuAction) { vm.pinDialogOpen.value = true; true },
+                        )
+                    }
                     .pointerInput(pinSet) { detectTapGestures(onLongPress = { vm.pinDialogOpen.value = true }) }
                 else Modifier
-                    .semantics { contentDescription = a11y }
+                    .semantics {
+                        contentDescription = menuCd
+                        customActions = listOf(
+                            CustomAccessibilityAction(parentMenuAction) { vm.menuOpen.value = true; true },
+                        )
+                    }
                     .pointerInput(pinSet) { detectTapGestures(onLongPress = { vm.menuOpen.value = true }) },
             ),
         ) {
@@ -132,7 +147,8 @@ fun BedtimeScreen(vm: ManagedViewModel) {
             }
             Text(clock, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface)
-            Text(stringResource(R.string.bedtime_title), style = MaterialTheme.typography.headlineSmall,
+            Text(stringResource(if (night) R.string.bedtime_title else R.string.bedtime_break_title),
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface)
             Text(subtitle, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 32.dp))

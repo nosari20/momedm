@@ -32,14 +32,23 @@ fun formatMinutes(minutes: Int): String = String.format(Locale.getDefault(), "%0
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimeRangeRow(label: String, startMinutes: Int, endMinutes: Int, onChange: (Int, Int) -> Unit) {
+fun TimeRangeRow(
+    label: String,
+    startMinutes: Int,
+    endMinutes: Int,
+    enabled: Boolean = true,
+    known: Boolean = true,
+    onChange: (Int, Int) -> Unit,
+) {
     var editing by remember { mutableStateOf<String?>(null) }   // "start", "end", or null
     Column(Modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { editing = "start" }) { Text(formatMinutes(startMinutes)) }
+            // Disabled with the rest of the card while offline, and "—" until a real schedule
+            // has been reported: a default rendered as a fact erodes trust in every other number.
+            TextButton(onClick = { editing = "start" }, enabled = enabled) { Text(if (known) formatMinutes(startMinutes) else "—") }
             Text("→")   // language-neutral, so it needs no string resource
-            TextButton(onClick = { editing = "end" }) { Text(formatMinutes(endMinutes)) }
+            TextButton(onClick = { editing = "end" }, enabled = enabled) { Text(if (known) formatMinutes(endMinutes) else "—") }
         }
     }
     editing?.let { which ->

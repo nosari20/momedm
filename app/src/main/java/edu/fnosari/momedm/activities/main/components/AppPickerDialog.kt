@@ -23,6 +23,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import edu.fnosari.momedm.R
+import kotlinx.coroutines.delay
 import edu.fnosari.momedm.protocol.AppInfo
 import edu.fnosari.momedm.ui.common.AccentPill
 import edu.fnosari.momedm.ui.theme.pastelOf
@@ -48,7 +50,7 @@ import edu.fnosari.momedm.ui.theme.pastelOf
 @Composable
 fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initiallyPinned: String?,
                     onConfirm: (apps: List<String>, pinned: String?) -> Unit, onDismiss: () -> Unit,
-                    singleChoice: Boolean = false, title: String? = null) {
+                    singleChoice: Boolean = false, title: String? = null, supportingText: String? = null) {
     var selected by remember { mutableStateOf(initiallySelected) }
     var pinOne by remember { mutableStateOf(initiallyPinned != null) }
     var pinned by remember { mutableStateOf(initiallyPinned) }
@@ -68,8 +70,14 @@ fun AppPickerDialog(apps: List<AppInfo>?, initiallySelected: Set<String>, initia
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.apps_cancel)) } },
         text = {
             if (apps == null) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { CircularProgressIndicator(); Text(stringResource(R.string.apps_loading)) }
+                // A BLE peer can drop right after LIST_APPS was sent; without a timeout this
+                // spinner ran until the parent worked out that Cancel was the only exit.
+                var timedOut by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { delay(15_000L); timedOut = true }
+                if (timedOut) Text(stringResource(R.string.conn_no_answer))
+                else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { CircularProgressIndicator(); Text(stringResource(R.string.apps_loading)) }
             } else Column {
+                supportingText?.let { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp)) }
                 OutlinedTextField(query, { query = it }, label = { Text(stringResource(R.string.search)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 if (!singleChoice) Row(
                     Modifier.fillMaxWidth().padding(vertical = 8.dp).background(pastelOf(MaterialTheme.colorScheme.primary), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
