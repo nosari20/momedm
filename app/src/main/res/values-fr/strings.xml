@@ -54,6 +54,11 @@
     <string name="launcher_greeting_morning_named">Bonjour %1$s !</string>
     <string name="launcher_greeting_afternoon_named">Salut %1$s !</string>
     <string name="launcher_greeting_evening_named">Bonsoir %1$s !</string>
+    <string name="launcher_customise_title">Fais-le à ton goût</string>
+    <string name="launcher_moon_label">Ta lune</string>
+    <string name="moon_solid">Pleine</string>
+    <string name="moon_outline">Contour</string>
+    <string name="moon_craters">Avec des cratères</string>
     <string name="launcher_name_title">Comment ce téléphone doit-il t’appeler ?</string>
     <string name="launcher_name_hint">C’est juste pour toi. Personne d’autre ne le voit, et ça ne change rien aux règles.</string>
     <string name="launcher_name_label">Ton prénom</string>

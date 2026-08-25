@@ -18,6 +18,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
@@ -48,6 +50,7 @@ import java.util.Locale
 fun BedtimeScreen(vm: ManagedViewModel) {
     val lock by vm.lockState.collectAsState()
     val pinSet by vm.pinSet.collectAsState()
+    val moon by vm.moonStyle.collectAsState()
     val pinError by vm.pinError.collectAsState()
     val pinLockedRemaining by vm.pinLockedRemainingMs.collectAsState()
     val showPin by vm.pinDialogOpen.collectAsState()
@@ -78,10 +81,20 @@ fun BedtimeScreen(vm: ManagedViewModel) {
     } else stringResource(R.string.bedtime_manual)
 
     val a11y = stringResource(R.string.launcher_lock_cd)
+    // A slow dawn. As the unlock time approaches, a warm tint bleeds into the top of the sky, reaching
+    // its full (still faint) strength right at the end. It is the same fact as the countdown above,
+    // said in light instead of digits — and it moves at exactly the same rate whatever the child does,
+    // so it cannot be read as a reward for waiting quietly. Recomputed on the clock's existing tick.
+    val dawn = if (night && until != null) {
+        val left = remember(tick, until) { (until - System.currentTimeMillis()).coerceAtLeast(0L) }
+        ((DAWN_WINDOW_MS - left).coerceAtLeast(0L).toFloat() / DAWN_WINDOW_MS).coerceIn(0f, 1f)
+    } else 0f
+    val skyTop = lerp(MaterialTheme.colorScheme.surfaceVariant, DawnWarm, dawn * 0.22f)
+
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface))),
+            .background(Brush.verticalGradient(listOf(skyTop, MaterialTheme.colorScheme.surface))),
         contentAlignment = Alignment.Center,
     ) {
         // Long-press is scoped to the clock/title column (spec §1.7: "long-press the header"), not the
@@ -112,7 +125,9 @@ fun BedtimeScreen(vm: ManagedViewModel) {
                 NightSky(
                     phase = remember(tick) { moonPhaseAt(System.currentTimeMillis()) },
                     moonColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
-                    starColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    // The stars fade as dawn comes up, the way they actually do.
+                    starColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f * (1f - dawn * 0.8f)),
+                    style = moon,
                 )
             }
             Text(clock, style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.Bold,
@@ -142,3 +157,9 @@ fun BedtimeScreen(vm: ManagedViewModel) {
         lockedForMs = pinLockedRemaining,
     )
 }
+
+/** How long before the unlock time the sky starts to lighten. */
+private const val DAWN_WINDOW_MS = 45 * 60_000L
+
+/** The warmth dawn blends in. Fixed rather than themed: sunrise is not an accent colour. */
+private val DawnWarm = Color(0xFFE9A15C)

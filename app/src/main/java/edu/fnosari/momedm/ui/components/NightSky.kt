@@ -19,6 +19,20 @@ import kotlin.math.abs
 import kotlin.math.cos
 
 /**
+ * How the moon itself is drawn. The phase is always the real one; only the rendering changes.
+ *
+ * Stored locally on the child's phone and never sent to the parent — the same asymmetry as their
+ * name. Three is deliberate: enough to feel like a choice, few enough that a child picks one and gets
+ * on with it rather than fiddling.
+ */
+enum class MoonStyle { SOLID, OUTLINE, CRATERS;
+    companion object {
+        /** Tolerant of an unknown stored value, so a downgrade cannot leave the sky blank. */
+        fun from(name: String?): MoonStyle = entries.firstOrNull { it.name == name } ?: SOLID
+    }
+}
+
+/**
  * The moon and a scatter of stars, for the bedtime screen.
  *
  * Drawn rather than shipped as an asset: the project takes no new dependencies, and the core Material
@@ -35,9 +49,17 @@ fun NightSky(
     starColor: Color,
     modifier: Modifier = Modifier,
     size: Dp = 132.dp,
+    style: MoonStyle = MoonStyle.SOLID,
+    stars: Boolean = true,
 ) {
-    Canvas(modifier.size(size)) { drawNightSky(phase, moonColor, starColor) }
+    Canvas(modifier.size(size)) { drawNightSky(phase, moonColor, starColor, style, stars) }
 }
+
+/** Crater offsets as fractions of the moon's radius, with their own radius. Fixed, for the same reason. */
+private val CRATERS = listOf(
+    Triple(-0.30f, -0.28f, 0.20f), Triple(0.18f, 0.34f, 0.15f),
+    Triple(-0.10f, 0.12f, 0.11f), Triple(0.34f, -0.20f, 0.09f),
+)
 
 /** Fixed star positions as fractions of the canvas, with a radius in dp. A random scatter would flicker. */
 private val STARS = listOf(
@@ -53,8 +75,8 @@ private val STARS = listOf(
  * sliding one coin across another. Cheaper than intersecting paths, and it reads correctly at this
  * size. Needs its own layer, because BlendMode.Clear would otherwise punch through the background.
  */
-private fun DrawScope.drawNightSky(phase: Float, moonColor: Color, starColor: Color) {
-    for ((fx, fy, sr) in STARS) {
+private fun DrawScope.drawNightSky(phase: Float, moonColor: Color, starColor: Color, style: MoonStyle, stars: Boolean) {
+    if (stars) for ((fx, fy, sr) in STARS) {
         drawCircle(starColor, radius = sr.dp.toPx(), center = Offset(size.width * fx, size.height * fy))
     }
 
@@ -65,7 +87,27 @@ private fun DrawScope.drawNightSky(phase: Float, moonColor: Color, starColor: Co
 
     drawIntoCanvas { canvas ->
         canvas.saveLayer(Rect(Offset.Zero, size), Paint())
-        drawCircle(moonColor, radius = r, center = centre, style = Fill)
+        when (style) {
+            MoonStyle.SOLID -> drawCircle(moonColor, radius = r, center = centre, style = Fill)
+            // An outline still has to be a filled shape at this point, or clearing the shadow would
+            // leave both edges of the ring and read as a lens rather than a moon. Draw it filled and
+            // punch the middle out first, so the shadow pass then bites a crescent from a ring.
+            MoonStyle.OUTLINE -> {
+                drawCircle(moonColor, radius = r, center = centre, style = Fill)
+                drawCircle(Color.Transparent, radius = r - 5.dp.toPx(), center = centre, blendMode = BlendMode.Clear)
+            }
+            MoonStyle.CRATERS -> {
+                drawCircle(moonColor, radius = r, center = centre, style = Fill)
+                // Drawn before the shadow, so craters on the dark side disappear with it.
+                for ((dx, dy, cr) in CRATERS) {
+                    drawCircle(
+                        moonColor.copy(alpha = 0.45f), radius = r * cr,
+                        center = Offset(centre.x + r * dx, centre.y + r * dy),
+                        blendMode = BlendMode.DstOut,
+                    )
+                }
+            }
+        }
         when {
             // Full: nothing to take away.
             k <= -0.995f -> Unit

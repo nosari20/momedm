@@ -60,6 +60,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import edu.fnosari.momedm.R
+import edu.fnosari.momedm.ui.components.NightSky
+import edu.fnosari.momedm.ui.components.MoonStyle
 import edu.fnosari.momedm.activities.managed.ManagedViewModel
 import edu.fnosari.momedm.activities.managed.RepairScanActivity
 import edu.fnosari.momedm.activities.managed.components.AppTile
@@ -89,6 +91,7 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     val childName by vm.childName.collectAsState()
     val naming by vm.namingOpen.collectAsState()
     val hidden by vm.hiddenApps.collectAsState()
+    val moon by vm.moonStyle.collectAsState()
     val paused = pauseLeft > 0L
     val context = LocalContext.current
     val connected = link == LinkState.AUTHENTICATED
@@ -316,9 +319,10 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
 
     if (naming) {
         var draft by remember { mutableStateOf(childName) }
+        var draftMoon by remember { mutableStateOf(moon) }
         AlertDialog(
             onDismissRequest = { vm.namingOpen.value = false },
-            title = { Text(stringResource(R.string.launcher_name_title)) },
+            title = { Text(stringResource(R.string.launcher_customise_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.launcher_name_hint), style = MaterialTheme.typography.bodyMedium)
@@ -329,10 +333,41 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                         label = { Text(stringResource(R.string.launcher_name_label)) },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    Text(stringResource(R.string.launcher_moon_label), style = MaterialTheme.typography.bodyMedium)
+                    // Chosen here rather than on the bedtime screen on purpose: that screen exists to
+                    // end phone use, and something to fiddle with on it would quietly make the lock
+                    // negotiable. The child picks it here; the night sky simply shows what they chose.
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        for (option in MoonStyle.entries) {
+                            val selected = option == draftMoon
+                            // Resolved out here: semantics {} is not a composable scope.
+                            val name = moonName(option)
+                            Surface(
+                                onClick = { draftMoon = option },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.semantics { contentDescription = name },
+                            ) {
+                                NightSky(
+                                    // Shown full, not at tonight's phase: the three styles are only
+                                    // told apart on a full disc, and at a thin crescent the picker
+                                    // would offer three identical pictures.
+                                    phase = 0.5f,
+                                    moonColor = MaterialTheme.colorScheme.onSurface,
+                                    starColor = Color.Transparent,
+                                    size = 64.dp,
+                                    style = option,
+                                    stars = false,
+                                    modifier = Modifier.padding(4.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { vm.setChildName(draft) }) { Text(stringResource(R.string.settings_dialog_confirm)) }
+                TextButton(onClick = { vm.saveChildLook(draft, draftMoon) }) { Text(stringResource(R.string.settings_dialog_confirm)) }
             },
             dismissButton = {
                 TextButton(onClick = { vm.namingOpen.value = false }) { Text(stringResource(R.string.settings_dialog_dismiss)) }
@@ -347,3 +382,13 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
         lockedForMs = pinLockedRemaining,
     )
 }
+
+/** A screen-reader name for each moon, so the picker is not three unlabelled pictures. */
+@Composable
+private fun moonName(style: MoonStyle): String = stringResource(
+    when (style) {
+        MoonStyle.SOLID -> R.string.moon_solid
+        MoonStyle.OUTLINE -> R.string.moon_outline
+        MoonStyle.CRATERS -> R.string.moon_craters
+    },
+)

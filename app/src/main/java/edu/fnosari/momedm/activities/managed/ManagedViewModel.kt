@@ -18,6 +18,7 @@ import edu.fnosari.momedm.persistence.ManagedPrefs
 import edu.fnosari.momedm.protocol.LockSchedule
 import edu.fnosari.momedm.protocol.SafetyConfig
 import edu.fnosari.momedm.protocol.LockState
+import edu.fnosari.momedm.ui.components.MoonStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -62,10 +63,22 @@ class ManagedViewModel(application: Application) : AndroidViewModel(application)
      */
     val childName: StateFlow<String> = prefs.childName.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
+    /** The moon the child picked, for the bedtime sky. Local to this phone; never sent to the parent. */
+    val moonStyle: StateFlow<MoonStyle> = prefs.moonStyle
+        .map { MoonStyle.from(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, MoonStyle.SOLID)
+
     /** True while the child is editing their name. */
     val namingOpen = MutableStateFlow(false)
 
-    fun setChildName(name: String) { viewModelScope.launch { prefs.setChildName(name); namingOpen.value = false } }
+    /** Saves both halves of "make it yours" together, so one Save closes the sheet once. */
+    fun saveChildLook(name: String, moon: MoonStyle) {
+        viewModelScope.launch {
+            prefs.setChildName(name)
+            prefs.setMoonStyle(moon.name)
+            namingOpen.value = false
+        }
+    }
 
     val pinSet: StateFlow<Boolean> = prefs.childPrefs.map { it.pinHash != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
