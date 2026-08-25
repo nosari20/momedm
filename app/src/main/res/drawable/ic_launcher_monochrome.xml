@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed-icon layer: the same moon and stars as one tintable glyph, craters punched out. -->
+<!-- Themed-icon glyph: sun, orbit and planet as one tintable shape, craters punched out. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#FFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M33,51 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 Z M43.5,45.1 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0 Z M54.6,58.1 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z" />
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000"
+        android:pathData="M28,52 a26,22 0 1,0 52,0 a26,22 0 1,0 -52,0" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M31,31 L34,34 L31,37 L28,34 Z M77,28.6 L79.4,31 L77,33.4 L74.6,31 Z M74,69 L76,71 L74,73 L72,71 Z M36,70.3 L37.7,72 L36,73.7 L34.3,72 Z" />
+        android:pathData="M41,51 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M68.5,62 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0 Z M72.8,59.6 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M33,30.5 L35.5,33 L33,35.5 L30.5,33 Z M76,34 L78,36 L76,38 L74,36 Z" />
 </vector>

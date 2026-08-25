@@ -1,39 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The child's moon (MoonStyle.CRATERS, same crater offsets as NightSky.kt) over three fixed
-     stars. Everything sits inside the 66dp adaptive safe zone. -->
+<!-- The parent as a warm sun, the child as a small cratered planet on its orbit (the craters are
+     NightSky.kt's own offsets, scaled). Everything fits the 66dp adaptive safe zone: the orbit's
+     extremes stay within r=33 of centre, and the planet grazes it at 32.9. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Moon disc -->
+    <!-- Orbit ring -->
+    <path
+        android:strokeColor="#C7D0E8"
+        android:strokeWidth="2"
+        android:strokeAlpha="0.45"
+        android:fillColor="#00000000"
+        android:pathData="M28,52 a26,22 0 1,0 52,0 a26,22 0 1,0 -52,0" />
+    <!-- The sun's soft halo, then the sun -->
+    <path
+        android:fillColor="#E9A15C"
+        android:fillAlpha="0.30"
+        android:pathData="M38,51 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0 Z" />
+    <path
+        android:fillColor="#E9A15C"
+        android:pathData="M41,51 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
+    <path
+        android:fillColor="#F2BE85"
+        android:pathData="M45,47 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 Z" />
+    <!-- The child's planet, on the ring, moon-cream with its craters -->
     <path
         android:fillColor="#F0EAD8"
-        android:pathData="M33,51 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 Z" />
-    <!-- Craters, slightly darker than the disc -->
+        android:pathData="M68.5,62 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0 Z" />
     <path
         android:fillColor="#D8CDAE"
-        android:pathData="M43.5,45.1 a4.2,4.2 0 1,0 8.4,0 a4.2,4.2 0 1,0 -8.4,0 Z" />
+        android:pathData="M72.8,59.6 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0 Z" />
     <path
         android:fillColor="#D8CDAE"
-        android:pathData="M54.6,58.1 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0 Z" />
-    <path
-        android:fillColor="#D8CDAE"
-        android:pathData="M49.6,53.5 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0 Z" />
-    <path
-        android:fillColor="#D8CDAE"
-        android:pathData="M59.2,46.8 a1.9,1.9 0 1,0 3.8,0 a1.9,1.9 0 1,0 -3.8,0 Z" />
-    <!-- Stars: fixed four-point diamonds, like the launcher's fixed star field -->
+        android:pathData="M77.2,64.9 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0 Z" />
+    <!-- Fixed stars -->
     <path
         android:fillColor="#C7D0E8"
-        android:pathData="M31,31 L34,34 L31,37 L28,34 Z" />
+        android:pathData="M33,30.5 L35.5,33 L33,35.5 L30.5,33 Z" />
     <path
         android:fillColor="#C7D0E8"
-        android:pathData="M77,28.6 L79.4,31 L77,33.4 L74.6,31 Z" />
+        android:pathData="M76,34 L78,36 L76,38 L74,36 Z" />
     <path
         android:fillColor="#C7D0E8"
-        android:pathData="M74,69 L76,71 L74,73 L72,71 Z" />
-    <path
-        android:fillColor="#C7D0E8"
-        android:pathData="M36,70.3 L37.7,72 L36,73.7 L34.3,72 Z" />
+        android:pathData="M34,68.2 L35.8,70 L34,71.8 L32.2,70 Z" />
 </vector>
