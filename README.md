@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/images/icon.svg" width="96" alt="The app icon: a warm parent sun and a small child planet in a night sky">
+
 # Môme DM
 
 **A parental-control app for families that runs entirely between two phones.**
