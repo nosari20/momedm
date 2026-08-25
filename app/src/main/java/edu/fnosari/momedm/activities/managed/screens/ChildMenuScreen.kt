@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -65,6 +66,11 @@ fun ChildMenuScreen(vm: ManagedViewModel, onPause: () -> Unit) {
     // a parent who scrolled past it is stuck on a screen with no visible exit.
     BackHandler { vm.menuOpen.value = false }
 
+    // Paints the themed background itself. Its siblings do — the launcher draws a gradient, the
+    // bedtime screen a Box — and this one drew nothing, so the Activity's window background showed
+    // through instead: a child long-pressing into the menu at night got a white flash in an otherwise
+    // dark app, and the parent's pushed theme was ignored on exactly one screen.
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).padding(16.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -175,6 +181,7 @@ fun ChildMenuScreen(vm: ManagedViewModel, onPause: () -> Unit) {
         OutlinedButton(onClick = { vm.closeMenu() }, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.menu_close))
         }
+    }
     }
 }
 

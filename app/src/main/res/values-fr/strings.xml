@@ -124,6 +124,7 @@
     <string name="settings_pin">Code PIN parental</string>
     <string name="settings_pin_help">Déverrouille un appareil enfant pour un moment</string>
     <string name="settings_advanced">Avancé</string>
+    <string name="settings_connection_help">Quels enfants sont connectés en ce moment</string>
     <string name="settings_advanced_help">Clé d\'association et identifiant</string>
     <string name="settings_version">Version %1$s (%2$s)</string>
     <string name="settings_copyright">© 2026 fnosari</string>

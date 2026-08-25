@@ -124,6 +124,7 @@
     <string name="settings_pin">Parent PIN</string>
     <string name="settings_pin_help">Unlocks a child device for a short while</string>
     <string name="settings_advanced">Advanced</string>
+    <string name="settings_connection_help">Which children are connected right now</string>
     <string name="settings_advanced_help">Pairing key and identifier</string>
     <string name="settings_version">Version %1$s (%2$s)</string>
     <string name="settings_copyright">© 2026 fnosari</string>

@@ -47,6 +47,9 @@ fun SettingsMenu(navController: NavHostController) {
             item { SettingsCategoryItem(
                 title = context.getString(Routes.CONNECTION.label),
                 icon = Routes.CONNECTION.icon,
+                // The only row that lacked a subtitle, and the one that most needed one: the screen
+                // behind it is the most technical in the app (advertising state, an event log).
+                supportingText = context.getString(R.string.settings_connection_help),
                 onClick = { navController.navigate(Routes.CONNECTION.name) })
             }
 
