@@ -107,7 +107,11 @@ nothing there to approve, and nothing to take away as a consequence. The parent
 owns the rules; this is the part the child owns.
 
 If some apps are hidden, the grid says so and says a parent chose — so a short
-list of apps never looks like a broken phone.
+list of apps never looks like a broken phone. A tile that cannot open says so in
+the child's own words instead of doing nothing, and the states that need
+explaining carry a small drawn picture as well as a sentence — an empty outlined
+grid for "no apps yet" — so a six-year-old who reads haltingly still knows the
+phone is fine.
 
 There is no visible lock button, deliberately. A parent unlocks by
 **long-pressing the header**, which opens the PIN pad. A child looking at the
@@ -123,7 +127,11 @@ also lock the phone **right now** from their own device.
 The moon is the real one for tonight — the actual phase, which a child can check
 against their window — and in the last three quarters of an hour the sky warms up
 and the stars fade, so morning arrives on its own rather than as a number counting
-down. The screen says "your phone wakes up in 7h 20min" before it says 07:00,
+down. The sky is night whatever theme the family chose: a fixed deep navy the
+parent's accent only tints, because the one screen that *is* night should never
+render as a pale grey day. A phone locked by hand in the afternoon says
+**"Screen break"** instead — a moon over a Tuesday lunchtime would be the app
+lying, and cheerfulness about a restriction reads as sarcasm. The screen says "your phone wakes up in 7h 20min" before it says 07:00,
 because *how long* is the question a child actually has. Nothing on it moves or
 can be tapped: it is a screen for ending the evening, not another thing to play
 with.
@@ -144,8 +152,11 @@ answer — so a missed alarm or a changed clock cannot strand it in the wrong st
 Type the parent PIN on the child's phone and the lock pauses for ten minutes —
 enough to check something or deal with an exception — then it re-locks itself.
 During the pause the phone is genuinely unrestricted: every installed app is on
-the home screen and launchable, not just the allowed ones. Either side can end the
-pause early.
+the home screen and launchable, not just the allowed ones. The banner shows the
+remaining break in minutes with a slim progress bar — not a ticking MM:SS, which
+is the visual grammar of exams and bombs — and ending the pause early asks for
+confirmation first, because one stray child tap should not cost a parent a full
+PIN re-entry.
 
 <div align="center">
 <img src="docs/images/child-paused.png" width="245" alt="The child's phone during a ten-minute pause">
@@ -160,7 +171,10 @@ the hash. Wrong guesses trigger a lockout that grows and survives killing the ap
 
 The same PIN opens a menu on the child's phone that answers "why is this phone
 behaving like this?" — the rules actually in force, whether the parent's phone is
-in range, which parent it is paired to, and what the device is. Everything is read
+in range, which parent it is paired to, and what the device is. It opens with one
+line in the child's own register — this phone follows rules your parent set, and
+everything below shows what they are — before the technical cards, because the
+menu deliberately lets a child read it too. Everything is read
 from the child's own storage, so it still answers when the parent is nowhere near.
 
 From there a parent can pause child mode, or re-pair the phone to a different
@@ -186,9 +200,22 @@ what `com.mojang.minecraftpe` is. The store is only reachable on the child's pho
 for ten minutes after a parent asks for it — otherwise it stays out of reach, so a
 link in an allowed app cannot become a way to install whatever they like.
 
+The page is organised by topic — status, apps, bedtime, content, this phone —
+with starting and stopping child mode in the header, next to the state it
+changes. Every command shows its life inline on the page: "Sent — waiting for the
+phone…" is replaced in place by the outcome in your language, and a failure stays
+put until you dismiss it instead of vanishing in a toast while you looked away.
+The status card answers "right now?" honestly: app names instead of package ids,
+"last seen 2 minutes ago" instead of a timestamp to subtract, and a quiet refresh
+every time the page opens.
+
 When the child's phone is out of range, the controls that need it are disabled and
 the page says so plainly, including the part that matters: commands are not saved
 up to send later.
+
+First run explains itself too: one short paragraph on why Bluetooth is needed and
+a single button for the whole permission set, instead of a wall of identical
+system prompts.
 
 <div align="center">
 <img src="docs/images/parent-children.png" width="245" alt="The list of children">
@@ -225,6 +252,15 @@ there are three ways to arrange that: your home Wi-Fi, the parent's phone acting
 as a hotspot so no existing network is needed at all, or a plain link if you would
 rather serve the file yourself. Any of them does the same job.
 
+The screen walks it as stages, because enrolment is the one journey a mistake
+makes expensive. It opens with the two facts that must come first — reset the
+child's phone *before* creating the code, and the code lives five minutes. While
+the code shows, it owns the screen: a live countdown, the display kept awake, a
+note about the "no internet" warning some phones raise, then "the child's phone
+is downloading the app…" when it happens, and finally the new device greeted by
+name with a button straight to its page. When something fails, the message is a
+plain sentence with a next step — never an error code.
+
 <div align="center">
 <img src="docs/images/enrolment.svg" width="720" alt="Setting up a child's phone in six steps: wipe it, pick the network, show the code, tap the welcome screen six times, scan, and the two phones pair over Bluetooth">
 </div>
@@ -235,8 +271,8 @@ rather serve the file yourself. Any of them does the same job.
 
 *The pairing code and Wi-Fi password are blurred in this screenshot on purpose —
 that code carries the shared secret, so treat the real one as sensitive while it
-is on screen.* It expires after five minutes, and the download is switched off with
-it, so a code left on a table stops being useful.
+is on screen.* It expires after five minutes — counted down beside it — and the
+download is switched off with it, so a code left on a table stops being useful.
 
 And the same thing again with the traffic drawn in, for anyone who wants to know
 what their phones are actually saying to each other:
