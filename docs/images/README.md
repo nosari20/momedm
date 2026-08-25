@@ -19,8 +19,8 @@ is fully bilingual and that contrast is intentional.
 | `parent-pin.png` | Parent PIN screen in the "PIN already set" state (Change PIN / Remove PIN) — no digits shown. |
 | `parent-provision.png` | Provision screen after tapping "Show the code": steps 1–3 of the enrolment flow. **The QR code and Wi-Fi credentials are deliberately blurred** — that code carries the shared pairing secret. Keep them redacted in any re-capture. |
 | `child-launcher-allapps.png` | Kid launcher with child mode OFF: full app grid, big clock, time-of-day greeting, connection dot. |
-| `child-launcher-childmode.png` | Kid launcher with child mode ON: grid reduced to only the 5 parent-allowed apps. |
-| `child-bedtime.png` | Bedtime/complete-lock screen: "Bonne nuit !", "Déverrouillage à 07:00", no app tiles, and the explicit "Appel d'urgence" button. Captured inside a real 21:00→07:00 window. |
+| `child-launcher-childmode.png` | Kid launcher with child mode ON: grid reduced to the parent-allowed apps, a chosen name in the greeting, and the line saying how many apps are hidden. |
+| `child-bedtime.png` | Bedtime/complete-lock screen: tonight's real moon phase, "Bonne nuit !", how long is left before the time it unlocks, and the explicit "Appel d'urgence" button. Captured inside a real night window. |
 | `child-pin-dialog.png` | "Code PIN parental" dialog opened by long-pressing the header clock/greeting area — empty input field. |
 | `child-paused.png` | Launcher showing the "Mode enfant en pause" banner with "Menu" and "Reverrouiller" — during a pause every installed app is listed, not just the allowed ones. |
 | `child-parent-menu.png` | The parent menu on the child's phone: rules in force, the parent link, device facts, then Pause / Re-pair / Close. Reached by long-pressing the header and entering the PIN. |

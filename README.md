@@ -94,9 +94,20 @@ Anything a form cannot represent is listed as not editable rather than hidden.
 ### A home screen built for a child
 
 Not a cut-down admin console: a big clock, a greeting that follows the time of
-day, large rounded app tiles that respond to a press, and a small dot showing
-whether the parent's phone is nearby. Meant to feel normal for a child up to
-about 14 — friendly without being babyish.
+day, large rounded app tiles that arrive one after another, and a small dot
+showing whether the parent's phone is nearby. The background carries a faint
+warmth in the morning and cools off in the evening — tied to the clock and
+nothing else, so it can never read as a reward or a telling-off. Meant to feel
+normal for a child up to about 14: friendly without being babyish.
+
+**A little of it belongs to the child.** Tapping the greeting lets them say what
+the phone should call them, and pick the moon that shows on the bedtime screen.
+Both are stored on their own phone and are never sent to the parent — there is
+nothing there to approve, and nothing to take away as a consequence. The parent
+owns the rules; this is the part the child owns.
+
+If some apps are hidden, the grid says so and says a parent chose — so a short
+list of apps never looks like a broken phone.
 
 There is no visible lock button, deliberately. A parent unlocks by
 **long-pressing the header**, which opens the PIN pad. A child looking at the
@@ -105,9 +116,17 @@ screen finds nothing to poke at.
 ### Night lock — a bedtime the phone keeps on its own
 
 Set a bedtime window and the phone locks itself: no apps, just a quiet screen
-with the time and when it opens again. Separate windows for school nights and for
-Friday and Saturday, because those differ in most houses. The parent can also
-lock the phone **right now** from their own device.
+with the time, a moon, and how long is left. Separate windows for school nights
+and for Friday and Saturday, because those differ in most houses. The parent can
+also lock the phone **right now** from their own device.
+
+The moon is the real one for tonight — the actual phase, which a child can check
+against their window — and in the last three quarters of an hour the sky warms up
+and the stars fade, so morning arrives on its own rather than as a number counting
+down. The screen says "your phone wakes up in 7h 20min" before it says 07:00,
+because *how long* is the question a child actually has. Nothing on it moves or
+can be tapped: it is a screen for ending the evening, not another thing to play
+with.
 
 <div align="center">
 <img src="docs/images/parent-time-picker.png" width="245" alt="Setting the bedtime window">
@@ -148,6 +167,11 @@ From there a parent can pause child mode, or re-pair the phone to a different
 parent by scanning a fresh code — the way back if the parent's phone is lost,
 replaced, or reinstalled.
 
+Reading the menu needs nothing; changing anything needs the PIN. If no PIN has
+been set, those two actions appear only while the phone is not actually
+restricted, so a child cannot open the menu on a locked phone and simply pause it
+or point it at someone else's.
+
 <div align="center">
 <img src="docs/images/child-parent-menu.png" width="245" alt="The parent menu on the child's phone">
 </div>
@@ -158,7 +182,13 @@ Which apps are allowed, what the child is using right now, battery, when the
 phone was last seen, whether it is locked — with the controls to change any of it.
 Installing something new is done by name rather than by package id: type "Minecraft"
 and the child's Play Store opens on that search, so a parent never has to know
-what `com.mojang.minecraftpe` is.
+what `com.mojang.minecraftpe` is. The store is only reachable on the child's phone
+for ten minutes after a parent asks for it — otherwise it stays out of reach, so a
+link in an allowed app cannot become a way to install whatever they like.
+
+When the child's phone is out of range, the controls that need it are disabled and
+the page says so plainly, including the part that matters: commands are not saved
+up to send later.
 
 <div align="center">
 <img src="docs/images/parent-children.png" width="245" alt="The list of children">
@@ -205,7 +235,8 @@ rather serve the file yourself. Any of them does the same job.
 
 *The pairing code and Wi-Fi password are blurred in this screenshot on purpose —
 that code carries the shared secret, so treat the real one as sensitive while it
-is on screen.*
+is on screen.* It expires after five minutes, and the download is switched off with
+it, so a code left on a table stops being useful.
 
 And the same thing again with the traffic drawn in, for anyone who wants to know
 what their phones are actually saying to each other:
@@ -316,7 +347,10 @@ than useless:
   child's phone; someone still has to tap Install. Silent installation requires
   being a registered enterprise EMM.
 - **The BLE link is authenticated, not encrypted.** Messages cannot be forged or
-  replayed, but they are not confidential to someone sniffing the radio.
+  replayed, but they are not confidential to someone sniffing the radio — and the
+  parent PIN's hash is among the things that cross it when a PIN is set or changed.
+  The hash is PBKDF2-salted, but a four-digit PIN behind it is not much work for
+  someone determined.
 - **Physical access wins.** A factory reset removes the app entirely.
 
 ## Contributing
