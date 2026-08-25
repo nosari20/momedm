@@ -61,7 +61,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -188,6 +190,17 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
     var confirmRelock by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(gradient)) {
+        // After dusk a few fixed stars come out at the top of the sky — the same celestial language
+        // as the icon and the bedtime screen, tied to the clock and nothing else (like the mood
+        // tint: identical whatever the child did today). Static and faint; scenery, not a feature.
+        if (hour >= 19 || hour < 6) {
+            Canvas(Modifier.fillMaxWidth().height(170.dp).alpha(0.35f)) {
+                for ((fx, fy, sr) in HEADER_STARS) {
+                    val x = size.width * fx; val y = size.height * fy; val r = sr.dp.toPx()
+                    drawPath(Path().apply { moveTo(x, y - r); lineTo(x + r, y); lineTo(x, y + r); lineTo(x - r, y); close() }, StarDim)
+                }
+            }
+        }
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
             // Header — long-press anywhere on it reveals the parent PIN pad (kids can't discover it by sight).
             val headerA11y = stringResource(R.string.launcher_lock_cd)
@@ -276,16 +289,27 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                     if (firstDot) { firstDot = false; return@LaunchedEffect }
                     dotScale.animateTo(1.35f, tween(140)); dotScale.animateTo(1f, tween(220))
                 }
-                val dotColor = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                 val dotCd = stringResource(if (connected) R.string.launcher_online else R.string.launcher_offline)
-                Box(
+                // The icon draws the parent as a warm sun; this is the same fact at 16dp — the
+                // parent in range means the sun is out, out of range leaves a thin empty ring.
+                // Same size, place, semantics and one-shot bounce as the dot it replaces.
+                val ringColor = MaterialTheme.colorScheme.outline
+                Canvas(
                     Modifier
-                        .size(14.dp)
+                        .size(16.dp)
                         .scale(dotScale.value)
-                        .clip(CircleShape)
-                        .background(dotColor)
                         .semantics { contentDescription = dotCd },
-                )
+                ) {
+                    val r = size.minDimension / 2f
+                    if (connected) {
+                        drawCircle(SunWarm.copy(alpha = 0.30f), radius = r)
+                        drawCircle(SunWarm, radius = r * 0.62f)
+                        drawCircle(SunHighlight, radius = r * 0.24f,
+                            center = center - androidx.compose.ui.geometry.Offset(r * 0.18f, r * 0.18f))
+                    } else {
+                        drawCircle(ringColor, radius = r * 0.55f, style = Stroke(width = 2.dp.toPx()))
+                    }
+                }
             }
 
             if (paused) {
@@ -338,10 +362,10 @@ fun ChildLauncherScreen(vm: ManagedViewModel) {
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
                         ) {
-                            // S2: a picture lane for pre-readers — an outlined, empty tile grid says
-                            // "nothing here yet, and the place is fine" to a six-year-old the text
-                            // cannot reach. Canvas, like the moon: no new assets, no new icons dep.
-                            EmptyTilesGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+                            // S2: a picture lane for pre-readers — and the same picture as the app's
+                            // icon: the parent sun with the child planet beside it. "Nothing here yet,
+                            // and the place is fine" — the two of you are still here, apps or not.
+                            CelestialGlyph()
                             Text(
                                 stringResource(emptyText),
                                 style = MaterialTheme.typography.titleMedium,
@@ -504,24 +528,23 @@ private fun moonName(style: MoonStyle): String = stringResource(
 )
 
 /**
- * Four outlined, empty tiles — the app grid with nothing in it yet, drawn rather than written, for
- * the child who reads haltingly or not at all (S2). Fixed geometry, no motion.
+ * The icon's composition at card size: the parent sun, the child planet beside it, two stars —
+ * drawn rather than written, for the child who reads haltingly or not at all (S2). Fixed geometry,
+ * no motion, no assets.
  */
 @Composable
-private fun EmptyTilesGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier.size(48.dp)) {
-        val gap = size.width * 0.14f
-        val cell = (size.width - gap) / 2f
-        val corner = CornerRadius(cell * 0.3f, cell * 0.3f)
-        val stroke = Stroke(width = size.width * 0.055f)
-        for (ix in 0..1) for (iy in 0..1) {
-            drawRoundRect(
-                color = color,
-                topLeft = Offset(ix * (cell + gap), iy * (cell + gap)),
-                size = Size(cell, cell),
-                cornerRadius = corner,
-                style = stroke,
-            )
+private fun CelestialGlyph(modifier: Modifier = Modifier) {
+    Canvas(modifier.size(56.dp)) {
+        val w = size.width; val h = size.height
+        drawCircle(SunWarm.copy(alpha = 0.30f), radius = w * 0.30f, center = Offset(w * 0.40f, h * 0.44f))
+        drawCircle(SunWarm, radius = w * 0.24f, center = Offset(w * 0.40f, h * 0.44f))
+        drawCircle(SunHighlight, radius = w * 0.085f, center = Offset(w * 0.32f, h * 0.36f))
+        drawCircle(MoonCream, radius = w * 0.13f, center = Offset(w * 0.78f, h * 0.68f))
+        drawCircle(MoonCrater, radius = w * 0.035f, center = Offset(w * 0.74f, h * 0.64f))
+        drawCircle(MoonCrater, radius = w * 0.025f, center = Offset(w * 0.81f, h * 0.72f))
+        for ((fx, fy, sr) in listOf(Triple(0.16f, 0.16f, 0.045f), Triple(0.82f, 0.22f, 0.035f))) {
+            val x = w * fx; val y = h * fy; val r = w * sr
+            drawPath(Path().apply { moveTo(x, y - r); lineTo(x + r, y); lineTo(x, y + r); lineTo(x - r, y); close() }, StarDim)
         }
     }
 }
@@ -536,3 +559,16 @@ private fun PauseGlyph(color: Color, modifier: Modifier = Modifier) {
         drawRoundRect(color, topLeft = Offset(size.width * 0.6f, 0f), size = Size(barW, size.height), cornerRadius = corner)
     }
 }
+
+/** The celestial palette shared with the launcher icon and the bedtime screen. */
+private val SunWarm = Color(0xFFE9A15C)
+private val SunHighlight = Color(0xFFF2BE85)
+private val MoonCream = Color(0xFFF0EAD8)
+private val MoonCrater = Color(0xFFD8CDAE)
+private val StarDim = Color(0xFFC7D0E8)
+
+/** Fixed star positions for the evening header, as fractions of the star field. Fixed: no flicker. */
+private val HEADER_STARS = listOf(
+    Triple(0.12f, 0.55f, 2.2f), Triple(0.30f, 0.28f, 1.6f), Triple(0.55f, 0.62f, 1.8f),
+    Triple(0.72f, 0.20f, 1.5f), Triple(0.90f, 0.48f, 2.0f),
+)

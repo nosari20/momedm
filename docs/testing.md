@@ -441,3 +441,13 @@ wizard's "downloading…" and success stages ran only in code review), the local
 TalkBack passes (custom actions don't appear in uiautomator dumps), and the emergency-call
 button under lock task on a real handset.
 
+## 2026-08-25 — celestial touches on the child launcher (rig)
+
+- Presence indicator: thin ring while the link was down after reinstall, warm haloed sun
+  once the parent authenticated — both states screenshotted at 22:3x.
+- Evening stars: faint fixed diamonds visible in the header after 19:00, static.
+- Post-update note: `install -r` on the device-owner briefly shows the system launcher
+  until HOME fires; one HOME keyevent routed straight back to ManagedHomeActivity.
+- Empty-state CelestialGlyph verified in code only (needs a zero-app allowlist, which the
+  picker deliberately refuses).
+
