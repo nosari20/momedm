@@ -59,9 +59,16 @@ fun SettingsAppearanceScreen(navController: NavHostController) {
     }
     if (showLanguage) ChoiceDialog(stringResource(R.string.language), AppLocale.TAGS, language, { languageLabel(it) }, { showLanguage = false }) { tag ->
         showLanguage = false
-        scope.launch { prefs.setUiPrefs(tag, theme, accent); ControllerLink.prefsChanged.tryEmit(Unit) }
-        // API 34: AppLocale.apply uses LocaleManager and returns false (no manual recreate needed); persist above for SET_PREFS regardless.
-        if (AppLocale.apply(context, tag)) (context as? android.app.Activity)?.recreate()
+        scope.launch {
+            prefs.setUiPrefs(tag, theme, accent)
+            ControllerLink.prefsChanged.tryEmit(Unit)
+            // Apply the locale LAST, inside the same coroutine. On API 33+ AppLocale.apply changes
+            // the per-app locale, which recreates this Activity and cancels this composition-bound
+            // scope — with apply running first (as it used to), the persist and the prefsChanged
+            // emit above were cancelled mid-flight, so online children never received SET_PREFS
+            // and kept their old language until the next reconnect happened to push it.
+            if (AppLocale.apply(context, tag)) (context as? android.app.Activity)?.recreate()
+        }
     }
     if (showTheme) ChoiceDialog(stringResource(R.string.theme), listOf(THEME_SYSTEM, THEME_LIGHT, THEME_DARK), theme, { themeLabel(it) }, { showTheme = false }) {
         showTheme = false; scope.launch { prefs.setUiPrefs(language, it, accent); ControllerLink.prefsChanged.tryEmit(Unit) }

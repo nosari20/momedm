@@ -490,3 +490,17 @@ button under lock task on a real handset.
   (cmd locale set-app-locales) — worth a look at the child-side prefs handler someday.
 - Rig restored: parent language English, night schedule off, child locale fr.
 
+## 2026-08-26 — language-push race fixed and verified (rig)
+
+The bug flagged in the previous session is closed. Cause: the language handler in
+SettingsAppearanceScreen called AppLocale.apply() synchronously and left the persist +
+prefsChanged emit in a rememberCoroutineScope coroutine — on API 33+ apply() recreates the
+Activity, cancelling that scope mid-flight, so SET_PREFS never reached online children.
+Apply is now sequenced last inside the same coroutine.
+
+Verified live: parent toggled English->Français->English; the child logged
+"Command SET_PREFS" + "Prefs applied (lang=fr/…en…)" within a second of each toggle and
+`cmd locale get-app-locales` followed ([fr] then [en]) with no manual locale set.
+Rig end state: parent and child both English — the old parent-EN/child-FR contrast was
+an artefact of this bug plus a manual locale set, not a configuration.
+
