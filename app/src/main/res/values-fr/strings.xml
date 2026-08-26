@@ -139,6 +139,8 @@
     <string name="settings_appearance_help">Couleur, clair ou sombre, français ou anglais</string>
     <string name="settings_pin">Code PIN parental</string>
     <string name="settings_pin_help">Déverrouille un appareil enfant pour un moment</string>
+    <string name="settings_privacy">Politique de confidentialité</string>
+    <string name="settings_privacy_help">Ce que l\'appli fait des données : rien ne quitte vos téléphones</string>
     <string name="settings_advanced">Avancé</string>
     <string name="settings_connection_help">Quels enfants sont connectés en ce moment</string>
     <string name="settings_advanced_help">Clé d\'association et identifiant</string>
@@ -369,5 +371,6 @@
     <string name="menu_pause">Suspendre le mode enfant 10 minutes</string>
     <string name="appcfg_add">Ajouter : %1$s</string>
     <string name="appcfg_remove">Supprimer</string>
+    <string name="appcfg_remove_all">Supprimer ces réglages</string>
     <string name="appcfg_items">%1$s (%2$d)</string>
 </resources>

@@ -60,6 +60,8 @@ fun AppConfigDialog(
     current: JsonObject,
     onConfirm: (JsonObject) -> Unit,
     onDismiss: () -> Unit,
+    /** Removes this app's stored configuration entirely; absent (null) when nothing is stored. */
+    onRemoveAll: (() -> Unit)? = null,
 ) {
     // Only keys the parent actually touches are written back; everything else is carried over from
     // `current` untouched on save.
@@ -90,7 +92,15 @@ fun AppConfigDialog(
                 onClick = { onConfirm(JsonObject(current + edits)) },
             ) { Text(stringResource(R.string.settings_dialog_confirm)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_dialog_dismiss)) } },
+        dismissButton = {
+            // "Remove" sits beside Cancel, in the error colour: it is the one destructive act here.
+            onRemoveAll?.let {
+                TextButton(onClick = it) {
+                    Text(stringResource(R.string.appcfg_remove_all), color = MaterialTheme.colorScheme.error)
+                }
+            }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_dialog_dismiss)) }
+        },
     )
 }
 

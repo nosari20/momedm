@@ -63,6 +63,12 @@ fun SettingsMenu(navController: NavHostController) {
             item { SettingsCategoryDivider() }
 
             item { SettingsCategoryItem(
+                title = context.getString(Routes.PRIVACY.label),
+                icon = Routes.PRIVACY.icon,
+                supportingText = context.getString(R.string.settings_privacy_help),
+                onClick = { navController.navigate(Routes.PRIVACY.name) })
+            }
+            item { SettingsCategoryItem(
                 title = context.getString(Routes.LEGAL.label),
                 icon = Routes.LEGAL.icon,
                 onClick = { navController.navigate(Routes.LEGAL.name) })

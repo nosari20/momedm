@@ -19,6 +19,7 @@ enum class Routes(
     PIN(R.string.settings_pin, Icons.Outlined.Lock),
     CONNECTION(R.string.settings_connection, Icons.Outlined.Share),
     ADVANCED(R.string.settings_advanced, Icons.Outlined.Build),
+    PRIVACY(R.string.settings_privacy, Icons.Outlined.Info),
     LEGAL(R.string.settings_screen_category_legal, Icons.Outlined.Info),
     LICENSES(R.string.settings_screen_category_licenses, Icons.Outlined.Info),
     EASTEREGG(R.string.settings_screen_category_easteregg, Icons.Outlined.Star),

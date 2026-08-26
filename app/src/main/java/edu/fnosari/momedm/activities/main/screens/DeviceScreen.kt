@@ -284,6 +284,10 @@ fun DeviceScreen(navController: NavHostController, viewModel: ControllerViewMode
                 current = s?.safety?.appConfigs?.get(pkg) ?: JsonObject(emptyMap()),
                 onConfirm = { values -> viewModel.setAppConfig(deviceId, s?.safety, pkg, values); viewModel.clearSchema() },
                 onDismiss = { viewModel.clearSchema() },
+                // Offered only when something is actually stored for this app.
+                onRemoveAll = if (s?.safety?.appConfigs?.containsKey(pkg) == true) {
+                    { viewModel.removeAppConfig(deviceId, s.safety, pkg); viewModel.clearSchema() }
+                } else null,
             )
         }
     }

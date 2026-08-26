@@ -522,3 +522,18 @@ an artefact of this bug plus a manual locale set, not a configuration.
 - Release build now produces app-release-unsigned.apk without keystore.properties and
   signs when it exists; assembleDebug and assembleRelease both green.
 
+## 2026-08-26 — remaining review items closed (rig)
+
+- In-app privacy policy: Settings gains a "Privacy policy" entry rendering the bundled
+  EN/FR text offline (raw resources, markdown-lite renderer). Verified rendering on the
+  parent emulator; the three copies (annotated source, published page, bundled raw) are
+  cross-referenced for sync.
+- Stale appConfigs: the child now prunes per-app configs for uninstalled packages when a
+  SET_SAFETY lands; verified live — after one Content push, the menu's "Apps with
+  settings" dropped the uninstalled test app (chrome only), and both child-menu store
+  screenshots were recaptured clean. The parent's Advanced-app-settings dialog also
+  gains "Remove these settings" for stored configs.
+- The child no longer reports itself in LIST_APPS, so the parent's picker stops offering
+  "Môme DM" as an allowable/pinnable app.
+- Store hero reorder: the child launcher now leads both screenshot sets (P2).
+

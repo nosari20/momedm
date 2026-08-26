@@ -18,6 +18,7 @@ import edu.fnosari.momedm.activities.settings.screens.SettingsConnectionScreen
 import edu.fnosari.momedm.activities.settings.screens.SettingsEasterEgg
 import edu.fnosari.momedm.activities.settings.screens.SettingsMenu
 import edu.fnosari.momedm.activities.settings.screens.SettingsPinScreen
+import edu.fnosari.momedm.activities.settings.screens.SettingsPrivacyScreen
 import edu.fnosari.momedm.activities.settings.screens.SettingsScreen
 import edu.fnosari.momedm.persistence.preferences.DataStorePreferencesProvider
 import edu.fnosari.momedm.ui.ControllerThemed
@@ -46,6 +47,8 @@ class SettingsActivity : ComponentActivity() {
                     composable(Routes.PIN.name) { SettingsPinScreen(navController) }
                     composable(Routes.CONNECTION.name) { SettingsConnectionScreen(navController) }
                     composable(Routes.ADVANCED.name) { SettingsAdvancedScreen(navController) }
+
+                    composable(Routes.PRIVACY.name) { SettingsPrivacyScreen(navController) }
 
                     composable(Routes.LEGAL.name) {
                         SettingsScreen(

@@ -371,6 +371,15 @@ class PolicyManager(private val context: Context, private val prefs: ManagedPref
      * private DNS — so the parent sees the real outcome rather than a bare "done".
      */
     override suspend fun setSafety(config: SafetyConfig): Result<String> = try {
+        // Drop per-app configs for packages that are no longer installed. Without this, an entry
+        // outlives its app forever (uninstalling never edits SafetyConfig) and keeps surfacing in
+        // the child menu's "Apps with settings" and in every Status pushed to the parent. An app
+        // that is reinstalled simply gets reconfigured — the price of not hoarding stale state.
+        val installed = config.appConfigs.keys.filter { pkg ->
+            runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
+        }
+        @Suppress("NAME_SHADOWING") val config = if (installed.size == config.appConfigs.size) config
+            else config.copy(appConfigs = config.appConfigs.filterKeys { it in installed })
         prefs.setSafety(config)
         val o = SafetyManager(context, dpm, admin).apply(config)
         val skipped = if (o.appsSkipped.isEmpty()) "" else ", not installed: ${o.appsSkipped.joinToString()}"

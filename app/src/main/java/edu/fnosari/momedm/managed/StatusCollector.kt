@@ -95,6 +95,10 @@ class StatusCollector(private val context: Context, private val prefs: ManagedPr
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+            // Never offer this app itself: the launcher already always allows it (it IS the
+            // launcher), so a "Môme DM" row in the parent's picker was noise at best and, pinned,
+            // would have pinned the child to the tool that manages the pin.
+            .filter { it.activityInfo.packageName != context.packageName }
             .map { AppInfo(it.activityInfo.packageName, it.loadLabel(pm).toString()) }
             .distinctBy { it.pkg }.sortedBy { it.label.lowercase() }.take(MAX_APPS)
     }

@@ -95,8 +95,8 @@ sees before they scroll.
 
 | # | File (in `assets/screenshots/{en,fr}/`) | Caption EN | Caption FR |
 |---|---|---|---|
-| 1 | `01-parent-children.png` | Your children at a glance — connected, child mode on. | Vos enfants en un coup d’œil — connecté, mode enfant actif. |
-| 2 | `02-child-launcher.png` | The child’s home screen — only the apps you chose. | L’écran d’accueil de l’enfant — seulement les applis choisies. |
+| 1 | `01-child-launcher.png` | The child’s home screen — only the apps you chose. | L’écran d’accueil de l’enfant — seulement les applis choisies. |
+| 2 | `02-parent-children.png` | Your children at a glance — connected, child mode on. | Vos enfants en un coup d’œil — connecté, mode enfant actif. |
 | 3 | `03-parent-device.png` | Everything for one child: status, apps, bedtime, content. | Tout pour un enfant : état, applis, coucher, contenu. |
 | 4 | `04-child-bedtime.png` | Bedtime, kept by the phone itself — with the real moon. | Le coucher, tenu par le téléphone — avec la vraie lune. |
 | 5 | `05-parent-apps-picker.png` | Choose exactly which apps exist on their phone. | Choisissez exactement les applis présentes sur son téléphone. |

@@ -181,6 +181,19 @@ class ControllerViewModel(application: Application) : AndroidViewModel(applicati
         announce(deviceId, id)
     }
 
+    /**
+     * Removes [pkg]'s managed configuration entirely — the counterpart [setAppConfig] never had,
+     * which left a configured app's entry immortal (visible in the child menu's "Apps with
+     * settings") with no way back short of editing the child's storage.
+     */
+    fun removeAppConfig(deviceId: String, current: SafetyConfig?, pkg: String) {
+        val base = current ?: SafetyConfig()
+        val merged = base.copy(appConfigs = base.appConfigs - pkg)
+        val id = ControllerLink.sendCmd(deviceId) { Message.Cmd(it, CmdType.SET_SAFETY, safety = merged) }
+        Log.d(LOG_TAG, "removeAppConfig -> $deviceId: $pkg: ${if (id == null) "offline" else "sent (id=$id)"}")
+        announce(deviceId, id)
+    }
+
     fun lockNow(deviceId: String) { send(deviceId, CmdType.LOCK_NOW) }
     fun unlock(deviceId: String) { send(deviceId, CmdType.UNLOCK) }
 
