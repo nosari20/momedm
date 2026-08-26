@@ -150,7 +150,13 @@ Florent NOSARI — nosari20@gmail.com — or open an issue at
 
 ## Publishing this policy (for the developer)
 
-> **Status 2026-08-26:** a publishable copy now exists at
+> **Status 2026-08-26, later that day: LIVE AND VERIFIED.** GitHub Pages was
+> enabled on `main:/docs` via the REST API; the URL below answered HTTP 200
+> with rendered HTML (Jekyll, proper title tag) about ninety seconds after the
+> first build. This is the URL to paste into Play Console → App content →
+> Privacy policy. Re-verify in an incognito window at submission time.
+>
+> A publishable copy exists at
 > [`docs/privacy-policy.md`](../privacy-policy.md) — same text, plus the YAML
 > front matter GitHub Pages' Jekyll needs to render Markdown as HTML (a bare
 > `.md` is served as raw text and the `.html` path 404s), minus this

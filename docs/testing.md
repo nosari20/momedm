@@ -537,3 +537,10 @@ an artefact of this bug plus a manual locale set, not a configuration.
   "Môme DM" as an allowable/pinnable app.
 - Store hero reorder: the child launcher now leads both screenshot sets (P2).
 
+## 2026-08-26 — privacy-policy URL live
+
+GitHub Pages enabled on main:/docs through the REST API (the stored git credential
+carried API scope); https://nosari20.github.io/momedm/privacy-policy.html verified
+HTTP 200 with rendered HTML on the sixth 15-second poll. The Play submission's first
+blocking item is closed; the URL is recorded in docs/play/privacy-policy.md.
+
