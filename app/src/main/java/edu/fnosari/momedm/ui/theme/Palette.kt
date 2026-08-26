@@ -8,11 +8,13 @@ import kotlin.math.roundToInt
  * used from places that have no Compose scope, such as the system bar setup in MainActivity.
  */
 object Palette {
-    const val DEFAULT = 0xFF16866F.toInt()
+    // Night blue, matching the app icon's sky. The old Pronote green remains a preset below.
+    const val DEFAULT = 0xFF3D5A8F.toInt()
 
     /** Offered in settings. Deep enough to carry white text in light mode. */
     val PRESETS = listOf(
-        DEFAULT,                  // green (Pronote-ish)
+        DEFAULT,                  // night blue (the icon's sky)
+        0xFF16866F.toInt(),       // green (Pronote-ish)
         0xFF10777C.toInt(),       // teal
         0xFF1D6FA5.toInt(),       // blue
         0xFF4A55A2.toInt(),       // indigo

@@ -9,13 +9,16 @@
 > | `assets/icon-512.png` | App icon | 512×512 RGB PNG, rendered from the launcher vectors |
 > | `assets/feature-graphic.png` | Feature graphic (en-US) | 1024×500 RGB PNG |
 > | `assets/feature-graphic-fr.png` | Feature graphic (fr-FR) | 1024×500 RGB PNG |
-> | `assets/screenshots/01–08*.png` | Phone screenshots | exactly 2:1, RGB, no alpha |
+> | `assets/screenshots/en/01–08*.png` | Phone screenshots (en-US listing) | exactly 2:1, RGB, no alpha |
+> | `assets/screenshots/fr/01–08*.png` | Phone screenshots (fr-FR listing) | exactly 2:1, RGB, no alpha |
 > | `assets/video/demo-child.mp4`, `demo-parent.mp4` | DPC/audience demo | see [`video-script.md`](video-script.md) |
 >
-> Screenshots were captured fresh on the emulator rig from the current build
-> (icon, wizard, celestial child UI included); `04-child-bedtime.png` is the
-> real-device night capture from `docs/images/`. The rest of this file keeps
-> the specs and the reasoning.
+> Screenshots were captured fresh on the emulator rig from the current build —
+> night-blue default accent, icon, wizard, celestial child UI — as **two full
+> language sets**: every screen in English for the en-US listing and in French
+> for the fr-FR one (the app pushes the parent's language to the child, so both
+> sets are genuine end-to-end captures, bedtime included). The rest of this
+> file keeps the specs and the reasoning.
 
 
 Current, official pixel/format rules, and an exact mapping from the real
@@ -90,20 +93,24 @@ the listing tells the "two phones, one system" story instead of reading as
 two separate apps. Order matters — the first 2–3 are what a browsing user
 sees before they scroll.
 
-| # | File (in `assets/screenshots/`) | Caption EN | Caption FR |
+| # | File (in `assets/screenshots/{en,fr}/`) | Caption EN | Caption FR |
 |---|---|---|---|
 | 1 | `01-parent-children.png` | Your children at a glance — connected, child mode on. | Vos enfants en un coup d’œil — connecté, mode enfant actif. |
 | 2 | `02-child-launcher.png` | The child’s home screen — only the apps you chose. | L’écran d’accueil de l’enfant — seulement les applis choisies. |
 | 3 | `03-parent-device.png` | Everything for one child: status, apps, bedtime, content. | Tout pour un enfant : état, applis, coucher, contenu. |
-| 4 | `04-child-bedtime.png` | Bedtime, kept by the phone itself — tonight’s real moon. | Le coucher, tenu par le téléphone — avec la vraie lune du soir. |
+| 4 | `04-child-bedtime.png` | Bedtime, kept by the phone itself — with the real moon. | Le coucher, tenu par le téléphone — avec la vraie lune. |
 | 5 | `05-parent-apps-picker.png` | Choose exactly which apps exist on their phone. | Choisissez exactement les applis présentes sur son téléphone. |
-| 6 | `06-child-launcher-night.png` | After dark, the home screen becomes a quiet galaxy. | À la nuit tombée, l’écran d’accueil devient une galaxie. |
+| 6 | `06-child-customise.png` | A little of the phone belongs to the child — name and moon, stored only there. | Une part du téléphone appartient à l’enfant — prénom et lune, gardés chez lui. |
 | 7 | `07-child-parent-menu.png` | The child’s phone can always explain its rules. | Le téléphone de l’enfant sait toujours expliquer ses règles. |
 | 8 | `08-parent-provision.png` | Guided setup: reset, scan, done — no QR shown pre-generation. | Installation guidée : réinitialiser, scanner, c’est fait. |
 
 Captions are for caption overlays or the listing’s marketing — Play’s
 uploader itself takes no captions. The provision screenshot is the wizard’s
-*form* stage, before any code exists, so there is nothing to redact.
+*form* stage, before any code exists, so there is nothing to redact. The
+night-galaxy launcher was dropped from the sets: it can only be captured
+after 19:00 real time, and a same-language, same-theme pair mattered more —
+the "Make it yours" dialog in slot 6 carries the child-ownership story
+(and the moon) instead.
 
 Two more worth having in reserve if Play's 8-slot limit is raised or a
 future update wants variety: `parent-app-config.png` (the auto-built

@@ -476,3 +476,17 @@ button under lock task on a real handset.
 - Rig left with the night schedule disabled again; weekday window times remain
   09:00->07:00 (disabled, harmless). PIN 1234 still set.
 
+## 2026-08-26 — night-blue default, localized Play sets (rig)
+
+- Default accent switched to the icon's night blue (0xFF3D5A8F); both emulators picked
+  it up through the preference defaults with nothing stored. 170+ unit tests green.
+- Play screenshots recaptured as two full language sets (en/, fr/) on the new theme,
+  including bedtime via a live night window in each language; slot 6 is now the
+  "Make it yours" dialog (the galaxy shot needs real evening and stays out of the sets).
+- Demo videos re-recorded with the child UI in English; parent side still falls back
+  to 720x1280 (encoder limit).
+- Found and worked around: the parent's language change pushes ChildPrefs, but the
+  child's LocaleManager per-app locale kept the old value until set directly
+  (cmd locale set-app-locales) — worth a look at the child-side prefs handler someday.
+- Rig restored: parent language English, night schedule off, child locale fr.
+

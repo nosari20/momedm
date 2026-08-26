@@ -38,7 +38,7 @@ data class ChildPrefs(
     }
     companion object {
         /** MaClasse green — the default seed colour of both apps. */
-        const val DEFAULT_ACCENT: Int = 0xFF16866F.toInt()
+        const val DEFAULT_ACCENT: Int = 0xFF3D5A8F.toInt()
         val LANGUAGES = setOf("system", "fr", "en")
         val THEMES = setOf("system", "light", "dark")
         /** 16 bytes of lower-case hex — what [PinHash.newSalt] emits. */

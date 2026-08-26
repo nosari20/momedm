@@ -5,15 +5,19 @@ Play’s review of this app hinges on two sensitive declarations: it is a
 as part of its audience. Reviewers ask for a video demonstrating the core
 functionality that requires each capability. These recordings, captured on
 the two-emulator BLE rig on 2026-08-26, are exactly that demonstration.
+The child UI is **in English** — reviewers read English; the same flows in
+French are covered by the fr screenshot set.
 
 ## Files
 
 | File | Length | Shows |
 |---|---|---|
-| `assets/video/demo-child.mp4` | ~50 s | The child’s phone, full flow |
-| `assets/video/demo-parent.mp4` | ~50 s | The parent’s phone, same session |
+| `assets/video/demo-child.mp4` | ~26 s | The child’s phone, full flow |
+| `assets/video/demo-parent.mp4` | ~26 s | The parent’s phone, same session |
 
-The two files are the same 50 seconds from each side of the Bluetooth link.
+The two files are the same session from each side of the Bluetooth link
+(the parent capture is 720×1280 — the emulator’s encoder rejects its
+native resolution).
 
 ## What the child recording demonstrates, in order
 

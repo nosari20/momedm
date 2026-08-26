@@ -7,11 +7,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PaletteTest {
-    private val green = Palette.DEFAULT      // 0xFF16866F
+    private val seed = Palette.DEFAULT      // 0xFF3D5A8F, night blue
 
     @Test fun blendEndsAreTheInputs() {
-        assertEquals(green, Palette.blend(green, 0xFFFFFFFF.toInt(), 0f))
-        assertEquals(0xFFFFFFFF.toInt(), Palette.blend(green, 0xFFFFFFFF.toInt(), 1f))
+        assertEquals(seed, Palette.blend(seed, 0xFFFFFFFF.toInt(), 0f))
+        assertEquals(0xFFFFFFFF.toInt(), Palette.blend(seed, 0xFFFFFFFF.toInt(), 1f))
     }
 
     @Test fun blendKeepsAlphaAndMovesTowardsTarget() {
@@ -23,8 +23,8 @@ class PaletteTest {
     }
 
     @Test fun lightenRaisesLuminanceAndDarkenLowersIt() {
-        assertTrue(Palette.luminance(Palette.lighten(green, 0.5f)) > Palette.luminance(green))
-        assertTrue(Palette.luminance(Palette.darken(green, 0.5f)) < Palette.luminance(green))
+        assertTrue(Palette.luminance(Palette.lighten(seed, 0.5f)) > Palette.luminance(seed))
+        assertTrue(Palette.luminance(Palette.darken(seed, 0.5f)) < Palette.luminance(seed))
     }
 
     @Test fun luminanceOfBlackAndWhiteAreTheExtremes() {
@@ -45,7 +45,7 @@ class PaletteTest {
             val darkPrimary = Palette.primaryFor(preset, dark = true)
             assertTrue(Palette.luminance(darkPrimary) > Palette.luminance(preset))
         }
-        assertEquals(green, Palette.primaryFor(green, dark = false))
+        assertEquals(seed, Palette.primaryFor(seed, dark = false))
     }
 
     @Test fun darkModeTopBarTakesDarkTextForEveryPreset() {
@@ -82,10 +82,10 @@ class PaletteTest {
     }
 
     @Test fun hexRoundTripsAndRejectsRubbish() {
-        assertEquals("16866F", Palette.toHex(green))
-        assertEquals(green, Palette.parseHex("16866F"))
-        assertEquals(green, Palette.parseHex("#16866f"))
-        assertEquals(green, Palette.parseHex("  16866F "))
+        assertEquals("3D5A8F", Palette.toHex(seed))
+        assertEquals(seed, Palette.parseHex("3D5A8F"))
+        assertEquals(seed, Palette.parseHex("#3d5a8f"))
+        assertEquals(seed, Palette.parseHex("  3D5A8F "))
         assertEquals(null, Palette.parseHex("16866"))
         assertEquals(null, Palette.parseHex("16866FF"))
         assertEquals(null, Palette.parseHex("ZZZZZZ"))
