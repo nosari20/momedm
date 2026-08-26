@@ -504,3 +504,21 @@ Verified live: parent toggled English->Français->English; the child logged
 Rig end state: parent and child both English — the old parent-EN/child-FR contrast was
 an artefact of this bug plus a manual locale set, not a configuration.
 
+## 2026-08-26 — Play-review fixes applied (rig + docs)
+
+- Child device renamed to "Max" and the Connectivity Check test app uninstalled; all four
+  leaking screenshots per language recaptured (device page, picker, children list, child
+  menu), FR set via a real language round-trip. Remaining known leak: the child menu's
+  "Apps with settings" row still lists com.nosari20.connectivitytest because the entry
+  lives in the stored SafetyConfig (uninstalling doesn't prune appConfigs) — and the
+  Model row necessarily shows the emulator's Build.MODEL. Real-device captures will
+  clean both eventually; there is no parent-side UI to remove a per-app config today
+  (worth a small feature some day).
+- Extended EN demo video: kiosk -> complete lock (emergency button) -> unlock -> bedtime
+  lock engaging (Good night + moon) -> unlock. Discovered en route: the notification
+  shade cannot be pulled under lock task (kiosk omits LOCK_TASK_FEATURE_NOTIFICATIONS),
+  and the provisioning wizard activities refuse to start outside a real enrolment
+  (BIND_DEVICE_ADMIN) — both documented as evidence gaps in video-script.md.
+- Release build now produces app-release-unsigned.apk without keystore.properties and
+  signs when it exists; assembleDebug and assembleRelease both green.
+

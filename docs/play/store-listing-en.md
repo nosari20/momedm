@@ -56,7 +56,7 @@ WHAT YOU CAN DO
 
 • Set a bedtime. Pick a window for school nights and another for weekends, and your child’s phone locks itself completely — no apps, just the time, tonight’s real moon and how long until morning — then reopens on schedule, even with your phone nowhere nearby.
 
-• A home screen made for a child. A calm launcher with a big clock, a greeting by the name they chose, and a sky that becomes a quiet star field after dark. Friendly for ages 6–14 — no rewards, no streaks, no pressure mechanics.
+• A home screen made for a child to look at. A calm launcher with a big clock, a greeting by the name they chose, and a sky that becomes a quiet star field after dark — no rewards, no streaks, no pressure mechanics.
 
 • Use a PIN for exceptions. Typing your PIN on your child’s phone pauses restrictions for ten minutes, then they resume automatically. The PIN is hashed before it ever leaves your phone.
 
@@ -72,12 +72,12 @@ Two Android phones on Android 14 or newer. The child’s phone must be factory r
 
 WHAT’S NOT INCLUDED
 
-There’s no silent app install — installing something new opens its Play Store listing to tap Install. There’s no location tracking, no message, call or browsing-history monitoring, and no remote camera or microphone access. If a feature isn’t listed above, the app doesn’t do it.
+There’s no silent app install — installing something new opens its Play Store listing (where Play is available) to tap Install. There’s no location tracking, no message, call or browsing-history monitoring, and no remote camera or microphone access. If a feature isn’t listed above, the app doesn’t do it.
 
 Môme DM is open source under the Apache-2.0 licence. The full source, including exactly what data the two phones exchange, is at github.com/nosari20/momedm.
 ```
 
-**3960 / 4000 characters.**
+**3973 / 4000 characters.**
 
 ## Notes for whoever pastes this in
 

@@ -56,7 +56,7 @@ CE QUE VOUS POUVEZ FAIRE
 
 • Fixer une heure de coucher. Une plage pour les nuits d’école, une autre pour le week-end : le téléphone se verrouille complètement — plus d’appli, juste l’heure, la vraie lune et le temps restant — puis se rouvre à l’heure prévue.
 
-• Un écran d’accueil pensé pour l’enfant. Un lanceur calme : grande horloge, salutation avec le prénom qu’il a choisi, ciel étoilé à la nuit tombée. De 6 à 14 ans — sans récompenses, sans séries, sans mécanique de pression.
+• Un écran d’accueil pensé pour l’enfant. Un lanceur calme : grande horloge, salutation avec le prénom qu’il a choisi, ciel étoilé à la nuit tombée — sans récompenses, sans séries, sans mécanique de pression.
 
 • Utiliser un code PIN pour les exceptions. Le taper chez l’enfant met les restrictions en pause dix minutes, puis elles reprennent seules. Le code est haché avant de quitter votre téléphone.
 
@@ -72,12 +72,12 @@ Deux téléphones Android 14 ou plus récent. Le téléphone de l’enfant doit 
 
 CE QUI N’EST PAS INCLUS
 
-Pas d’installation silencieuse : installer une appli ouvre sa fiche Play Store. Pas de suivi de localisation, pas de surveillance des messages, des appels ou de la navigation, pas d’accès distant à la caméra ou au micro. Si une fonction n’est pas listée ci-dessus, l’appli ne la fait pas.
+Pas d’installation silencieuse : installer une appli ouvre sa fiche Play Store (si présent). Pas de suivi de localisation, pas de surveillance des messages, des appels ou de la navigation, pas d’accès distant à la caméra ou au micro. Si une fonction n’est pas listée ci-dessus, l’appli ne la fait pas.
 
 Open source, licence Apache 2.0. Code source complet, y compris le détail exact des échanges entre les deux téléphones, sur github.com/nosari20/momedm.
 ```
 
-**3989 / 4000 caractères.**
+**3987 / 4000 caractères.**
 
 ## Notes
 

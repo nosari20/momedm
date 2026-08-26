@@ -100,6 +100,32 @@ now than after a submission is already in review.
   Families-policy-adjacent surfaces this app deliberately isn't opting
   into).
 
+### 3bis. Newer App-content forms and store decisions the sections below predate (added 2026-08-26)
+
+- **EU DSA trader declaration** (mandatory for EU visibility since Feb 2025;
+  this is a France-based launch): declare **non-trader** — an individual
+  distributing a free, non-monetised app. The listing will carry a "no
+  trader status" consumer notice. If monetisation ever appears, trader
+  status with a published postal address becomes mandatory.
+- **Health apps declaration:** answer **not a health app**.
+- **Advertising ID:** **No** (see `policy-forms.md` §3's added note; verify
+  the merged release manifest).
+- **Account creation / deletion:** **no accounts** — no deletion URL needed.
+- **Store settings, recorded decisions:** category **Parenting**; tags
+  (suggest: Parental controls, Kids, Family); contact email
+  **nosari20@gmail.com** — note that an individual account also displays the
+  developer's legal name and country publicly on every listing; accept that
+  or create an alias before submission. **Countries: all. Price: Free —
+  irreversible on Play** (a free app can never become paid).
+- **IARC content rating:** the questionnaire requires a contact email and
+  sends the certificate there — same address as above.
+- **Release notes:** [`release-notes.md`](release-notes.md) holds the EN/FR
+  "what's new" text Play requires per release.
+- **Post-launch vitals:** the app ships no crash-reporting SDK on purpose, so
+  Play Console's Android vitals is the only crash/ANR telemetry. Check it
+  routinely — a crashing device-owner launcher is a bricked child phone, and
+  bad-behaviour thresholds also degrade store ranking.
+
 ### 4. Complete each questionnaire and declaration form
 
 Full reasoning for every answer is in `policy-forms.md` — this is just the

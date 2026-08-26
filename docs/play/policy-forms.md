@@ -302,6 +302,17 @@ absent a server), the safer fallback is:
 
 ---
 
+### Two more mandatory answers inside the same Data safety flow (added 2026-08-26)
+
+- **Advertising ID:** answer **No**. No ads or GMS-ads dependencies exist in
+  `app/build.gradle.kts`; before upload, confirm the *merged* release manifest
+  contains no `com.google.android.gms.permission.AD_ID` (a transitive
+  dependency can inject it — check
+  `app/build/intermediates/merged_manifests/`).
+- **Account creation:** answer **No — users cannot create an account.** That
+  is also the complete answer to Play's account-deletion requirement: with no
+  accounts, no deletion URL is required.
+
 ## 4. Restricted permission declarations
 
 Play requires a **Permissions Declaration Form** (App content → Permissions

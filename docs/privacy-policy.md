@@ -1,7 +1,12 @@
+---
+title: "Privacy Policy — Môme DM"
+---
+
 # Privacy Policy — Môme DM
 
-*Effective date: the date this app is first published on Google Play. Update
-this line whenever the policy text changes.*
+
+*Effective date: 26 August 2026. Updated whenever the policy text changes;
+the full history is visible in the project's public git log.*
 
 Môme DM ("the app") is developed by Florent NOSARI. This policy covers the
 Android application with package id `edu.fnosari.momedm`, distributed on
@@ -145,60 +150,3 @@ source repository.
 
 Florent NOSARI — nosari20@gmail.com — or open an issue at
 [github.com/nosari20/momedm/issues](https://github.com/nosari20/momedm/issues).
-
----
-
-## Publishing this policy (for the developer)
-
-> **Status 2026-08-26:** a publishable copy now exists at
-> [`docs/privacy-policy.md`](../privacy-policy.md) — same text, plus the YAML
-> front matter GitHub Pages' Jekyll needs to render Markdown as HTML (a bare
-> `.md` is served as raw text and the `.html` path 404s), minus this
-> developer section, with a real effective date. Once Pages is enabled on
-> `/docs`, the URL to verify (in an incognito window) and paste into Play
-> Console is:
->
-> ```
-> https://nosari20.github.io/momedm/privacy-policy.html
-> ```
->
-> This file remains the annotated source; keep the two in sync when the
-> policy changes.
-
-Google Play requires a **publicly reachable URL** to a privacy policy on the
-Store Listing page of Play Console (App content → Privacy policy). A file
-inside the git repo is not itself reachable by a browser, so publish it with
-GitHub Pages:
-
-1. In the GitHub repo, go to **Settings → Pages**.
-2. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-3. Branch: `main`, folder: `/docs` (this repository already keeps its docs
-   under `docs/`, so no restructuring is needed) — or `/ (root)` if a plain
-   Markdown render at the repo root is preferred instead; either works as
-   long as the chosen file is reachable.
-4. Save. GitHub Pages serves Markdown files as rendered HTML automatically
-   when Jekyll is left on (the default), so no build step is required for a
-   single Markdown file.
-5. The resulting URL will be:
-
-   ```
-   https://nosari20.github.io/momedm/play/privacy-policy.html
-   ```
-
-   (GitHub Pages serves `docs/play/privacy-policy.md` at that path once Pages
-   is enabled with the `/docs` source; confirm the exact rendered path in the
-   repo's Pages settings after first deploy, since Jekyll's default
-   permalink scheme can also serve it without the `.html` suffix as
-   `.../play/privacy-policy/`.)
-
-   Use whichever exact URL loads correctly in a private/incognito browser
-   window — that is the one to paste into Play Console. Test it logged out of
-   GitHub, since Play's reviewers will not be authenticated.
-
-Alternative, if a cleaner URL is preferred: copy this file's contents into a
-minimal static HTML page and publish it as a GitHub Pages project site, or
-host it anywhere else that is free, doesn't require a login to view, and
-that the developer controls (a personal domain, a Gist rendered via
-raw.githubusercontent.com is **not** acceptable — Play wants an HTML page,
-not a raw text file, and some reviewers reject bare `raw.githubusercontent.com`
-links). GitHub Pages is the simplest option that stays inside this repo.

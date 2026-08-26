@@ -20,3 +20,8 @@ local.properties
 # Screenshot capture scratch (working shots, not the published set)
 docs/images/_*.png
 docs/images/CAPTURE-NOTES.md
+
+# Release signing - never committed (docs/play/release-steps.md)
+/keystore.properties
+*.jks
+*.keystore
