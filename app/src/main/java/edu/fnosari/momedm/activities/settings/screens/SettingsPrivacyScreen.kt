@@ -35,7 +35,7 @@ fun SettingsPrivacyScreen(navController: NavHostController) {
         val res = if (fr) R.raw.privacy_policy_fr else R.raw.privacy_policy_en
         context.resources.openRawResource(res).bufferedReader().readText()
             // Markdown links read as raw [text](url) noise on screen; keep the visible text only.
-            .replace(Regex("\[([^\]]+)\]\([^)]*\)"), "$1")
+            .replace(Regex("\[([^\]]+)\]\([^)]*\)"), "\$1")
     }
     BasicLayoutWithTopBar(
         title = stringResource(R.string.settings_privacy),
