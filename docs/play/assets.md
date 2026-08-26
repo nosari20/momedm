@@ -1,5 +1,23 @@
 # Graphic assets for the Play Store listing
 
+> **2026-08-26: the assets exist now.** Everything below the rules table used
+> to describe work to do; the produced, upload-ready files live in
+> [`assets/`](assets/):
+>
+> | File | Slot | Spec check |
+> |---|---|---|
+> | `assets/icon-512.png` | App icon | 512×512 RGB PNG, rendered from the launcher vectors |
+> | `assets/feature-graphic.png` | Feature graphic (en-US) | 1024×500 RGB PNG |
+> | `assets/feature-graphic-fr.png` | Feature graphic (fr-FR) | 1024×500 RGB PNG |
+> | `assets/screenshots/01–08*.png` | Phone screenshots | exactly 2:1, RGB, no alpha |
+> | `assets/video/demo-child.mp4`, `demo-parent.mp4` | DPC/audience demo | see [`video-script.md`](video-script.md) |
+>
+> Screenshots were captured fresh on the emulator rig from the current build
+> (icon, wizard, celestial child UI included); `04-child-bedtime.png` is the
+> real-device night capture from `docs/images/`. The rest of this file keeps
+> the specs and the reasoning.
+
+
 Current, official pixel/format rules, and an exact mapping from the real
 screenshots already in `docs/images/` to Play's store-listing slots. Rules
 below are from Play Console Help's graphic-asset documentation (see
@@ -72,16 +90,20 @@ the listing tells the "two phones, one system" story instead of reading as
 two separate apps. Order matters — the first 2–3 are what a browsing user
 sees before they scroll.
 
-| # | File (after crop/flatten per above) | Suggested caption |
-|---|---|---|
-| 1 | `parent-children.png` | Your children, one glance: connected, presence, child mode on or off. |
-| 2 | `child-launcher-childmode.png` | The child's home screen — only the apps you chose. |
-| 3 | `parent-device.png` | Everything for one child: status, night lock, content. |
-| 4 | `child-bedtime.png` | Bedtime, enforced by the phone itself — no apps, just the clock. |
-| 5 | `parent-content-dialog.png` | Content restrictions, explained plainly — what's covered and what isn't. |
-| 6 | `parent-apps-picker.png` | Choose exactly which apps your child can open. |
-| 7 | `child-parent-menu.png` | The child's phone can always explain itself: rules, parent link, device. |
-| 8 | `parent-provision.png` | Set-up: scan a code, done. *(Re-capture with a fresh, still-blurred QR/Wi-Fi code — see the redaction note below.)* |
+| # | File (in `assets/screenshots/`) | Caption EN | Caption FR |
+|---|---|---|---|
+| 1 | `01-parent-children.png` | Your children at a glance — connected, child mode on. | Vos enfants en un coup d’œil — connecté, mode enfant actif. |
+| 2 | `02-child-launcher.png` | The child’s home screen — only the apps you chose. | L’écran d’accueil de l’enfant — seulement les applis choisies. |
+| 3 | `03-parent-device.png` | Everything for one child: status, apps, bedtime, content. | Tout pour un enfant : état, applis, coucher, contenu. |
+| 4 | `04-child-bedtime.png` | Bedtime, kept by the phone itself — tonight’s real moon. | Le coucher, tenu par le téléphone — avec la vraie lune du soir. |
+| 5 | `05-parent-apps-picker.png` | Choose exactly which apps exist on their phone. | Choisissez exactement les applis présentes sur son téléphone. |
+| 6 | `06-child-launcher-night.png` | After dark, the home screen becomes a quiet galaxy. | À la nuit tombée, l’écran d’accueil devient une galaxie. |
+| 7 | `07-child-parent-menu.png` | The child’s phone can always explain its rules. | Le téléphone de l’enfant sait toujours expliquer ses règles. |
+| 8 | `08-parent-provision.png` | Guided setup: reset, scan, done — no QR shown pre-generation. | Installation guidée : réinitialiser, scanner, c’est fait. |
+
+Captions are for caption overlays or the listing’s marketing — Play’s
+uploader itself takes no captions. The provision screenshot is the wizard’s
+*form* stage, before any code exists, so there is nothing to redact.
 
 Two more worth having in reserve if Play's 8-slot limit is raised or a
 future update wants variety: `parent-app-config.png` (the auto-built

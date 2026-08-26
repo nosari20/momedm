@@ -70,7 +70,7 @@ automatic device backups either.
 | `CAMERA` | Scanning a QR code, only when re-pairing an already-provisioned child's phone to a (possibly new) parent phone. |
 | `RECEIVE_BOOT_COMPLETED` | Restarting the link and re-evaluating the lock schedule after the child's phone reboots. |
 | `PACKAGE_USAGE_STATS` | Optional. If the parent grants it during setup, lets the child's phone report which app is currently in the foreground, so the parent can see it. Skippable, and nothing breaks if it is skipped — the status is simply left blank. |
-| `USE_EXACT_ALARM` | Waking the child's phone at exactly the right minute to start or end the bedtime lock. |
+| `SCHEDULE_EXACT_ALARM` | Waking the child's phone at exactly the right minute to start or end the bedtime lock. |
 
 Every one of these permissions is used only to make the direct phone-to-phone
 BLE connection work, or to let the child's phone act as device owner as

@@ -18,6 +18,7 @@ as unconditionally final without re-reading the reasoning behind it.
 | [`store-listing-fr.md`](store-listing-fr.md) | Same, in French — a real translation matching this app's existing bilingual vocabulary, not a machine gloss. |
 | [`privacy-policy.md`](privacy-policy.md) | The full privacy policy text, plus how to publish it at a public URL via GitHub Pages and which exact URL to paste into Play Console. |
 | [`assets.md`](assets.md) | Exact current Play graphic-asset specs, and a precise mapping from the real screenshots already in `docs/images/` to Play's store-listing slots — including a concrete, verified problem (existing screenshots exceed Play's max aspect ratio and carry an alpha channel) that must be fixed before upload. |
+| [`video-script.md`](video-script.md) | The DPC / child-audience demo videos in `assets/video/`: what they show, why Play wants them, and how to attach them (unlisted YouTube URL) to the declaration forms. |
 | [`release-steps.md`](release-steps.md) | The actual build mechanics for this repo: generating an upload keystore, wiring a signing config without committing secrets, the exact Gradle commands, versionCode/versionName strategy, and pre-launch checks. |
 
 ## Before you start: two risks that could block this app regardless of what's in these docs
@@ -34,13 +35,11 @@ blocks the app, no amount of correct form-filling here fixes it:
    first.** If it's blocked, the appeal process's documented criteria are
    enterprise-framed, and it is not confirmed that a family/consumer DPC
    qualifies.
-2. **`USE_EXACT_ALARM`** is a Play-restricted permission limited to
-   alarm-clock/calendar apps. Môme DM uses it for the bedtime lock, which
-   doesn't cleanly fit either category. `policy-forms.md` §4 recommends an
-   actual code change (switch to a non-restricted, inexact-but-near-the-
-   boundary scheduling approach, which the app's own documented
-   "alarms never set state, they only trigger re-evaluation" design
-   already supports) rather than relying on the declaration form alone.
+2. **`USE_EXACT_ALARM`** — **resolved 2026-08-25**: the manifest now
+   requests the non-restricted `SCHEDULE_EXACT_ALARM` instead (see the
+   comment in `AndroidManifest.xml`), exactly the change `policy-forms.md`
+   §4 recommended. The declaration-form risk this item described no longer
+   applies; §4 is kept for the reasoning.
 
 ## End-to-end publishing checklist, in order
 
@@ -50,17 +49,16 @@ now than after a submission is already in review.
 
 ### 0. Fix what the app itself needs before submitting
 
-- [ ] Add the `isMonitoringTool` manifest meta-data (`policy-forms.md` §5) —
-      required on every version code, every track, from the first upload.
-- [ ] Resolve the `USE_EXACT_ALARM` question (`policy-forms.md` §4) — either
-      change the scheduling approach, or budget time for the Permissions
-      Declaration Form's extended review and accept the rejection risk.
+- [x] ~~Add the `isMonitoringTool` manifest meta-data~~ — **done** (2026-08-25):
+      `AndroidManifest.xml` declares `isMonitoringTool = child_monitoring`.
+- [x] ~~Resolve the `USE_EXACT_ALARM` question~~ — **done** (2026-08-25): the
+      manifest requests `SCHEDULE_EXACT_ALARM`, the non-restricted variant.
 - [ ] Test device-owner QR provisioning against Play Protect's DPC allowlist
       (`policy-forms.md` §1) on a current patched device. If blocked, start
       the appeal now — it can take weeks.
-- [ ] Reprocess the screenshots (`assets.md`) — crop to ≤2:1 aspect ratio
-      and remove the alpha channel; none of the existing PNGs in
-      `docs/images/` can be uploaded as-is.
+- [x] ~~Reprocess the screenshots~~ — **done** (2026-08-26): upload-ready
+      2:1 RGB screenshots, the 512 icon, both feature graphics and the two
+      demo videos live in `docs/play/assets/` (see `assets.md`).
 - [ ] Wire up a real release signing config (`release-steps.md` §2) —
       `app/build.gradle.kts`'s `release` build type has no `signingConfig`
       today.

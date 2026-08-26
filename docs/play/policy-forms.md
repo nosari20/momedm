@@ -327,6 +327,12 @@ Checked against `AndroidManifest.xml`:
 
 ### `USE_EXACT_ALARM` — the one permission likely to cause an actual rejection
 
+> **Resolved 2026-08-25.** The manifest now requests `SCHEDULE_EXACT_ALARM`
+> (non-restricted) instead — the code change recommended below was made, and
+> `LockAlarms` falls back gracefully when the user revokes the special-app
+> access. This section is kept as the reasoning behind that change; nothing
+> in the Permissions Declaration Form is triggered by the current manifest.
+
 Play's policy on the Exact Alarm permission restricts it to apps whose
 **core, user-facing functionality** is precisely-timed — the named
 acceptable categories are alarm-clock apps and calendar apps with timed

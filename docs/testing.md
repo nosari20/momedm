@@ -463,3 +463,16 @@ button under lock task on a real handset.
   grid was present immediately after install -r + HOME. A genuinely empty result still
   shows at once.
 
+## 2026-08-26 — Play listing capture session (rig)
+
+- Fresh store screenshots captured from the current build and processed to Play spec
+  (exact 2:1, RGB, no alpha) into docs/play/assets/screenshots/; the night-bedtime shot
+  was produced by enabling the night schedule with a window covering the current time
+  (09:00->07:00), which also re-exercised SET_SCHEDULE end to end — moon, navy sky and
+  relative wake time all correct on the child.
+- Demo videos (docs/play/assets/video/) recorded via adb screenrecord: kiosk launcher ->
+  parent "Lock now" -> complete lock with visible emergency button -> unlock -> kiosk.
+  The parent-side recording fell back to 720x1280 (a codec limit at native resolution).
+- Rig left with the night schedule disabled again; weekday window times remain
+  09:00->07:00 (disabled, harmless). PIN 1234 still set.
+
